@@ -1,0 +1,78 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "CLI: repo <OWNER/NAME>",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "github_metrics",
+      "args": ["repo", "${input:repoSlug}"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": true
+    },
+    {
+      "name": "CLI: repo <OWNER/NAME> --geocode",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "github_metrics",
+      "args": ["repo", "${input:repoSlug}", "--geocode"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": true
+    },
+    {
+      "name": "CLI: rate-limit",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "github_metrics",
+      "args": ["rate-limit"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": true
+    },
+    {
+      "name": "CLI: step into dependencies",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "github_metrics",
+      "args": ["repo", "${input:repoSlug}"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      // Lets you step into PyGithub and geopy when the bug is not ours.
+      "justMyCode": false
+    },
+    {
+      "name": "Pytest: all tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests", "-m", "not integration"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "Pytest: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-vv"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    }
+  ],
+  "inputs": [
+    {
+      "id": "repoSlug",
+      "type": "promptString",
+      "description": "Repository to analyse, as OWNER/NAME",
+      "default": "python/cpython"
+    }
+  ]
+}

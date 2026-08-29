@@ -26,7 +26,12 @@ def _license_id(repo: Repository) -> str | None:
     """Return the SPDX id of a repository's license, if it declares one."""
     try:
         license_obj = repo.get_license().license
-    except GithubException:  # 404 for repositories without a detected license
+    except GithubException as exc:
+        # A repository with no detected license 404s here, which is normal and
+        # not an error. Log it so that a genuine API failure - a 403 from an
+        # exhausted rate limit, say - is still distinguishable from "no
+        # license", since both leave license_id as None in the output.
+        LOGGER.debug("No license resolved for %s: %s", repo.full_name, exc)
         return None
     return str(license_obj.spdx_id) if license_obj is not None else None
 
@@ -58,8 +63,16 @@ def collect_repository_metrics(
     Returns:
         The collected metrics.
     """
+    LOGGER.debug("Collecting metrics for %s", full_name)
     repo = client.repository(full_name)
     contributors: list[NamedUser] = list(repo.get_contributors()[:contributor_limit])
+    if len(contributors) == contributor_limit:
+        # The caller sees a truncated count, not the repository's real total.
+        LOGGER.info(
+            "Contributor list for %s truncated at the --contributors limit of %d",
+            full_name,
+            contributor_limit,
+        )
 
     locations: list[ContributorLocation] = []
     for user in contributors:

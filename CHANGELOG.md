@@ -8,6 +8,31 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Repository inventory ingestion.** `github_metrics.ingest` reads an
+  `owner,repoid` CSV into validated `RepositoryRef` values. It performs no
+  network access and collects no metrics, so it needs no `GITHUB_TOKEN`.
+  Tolerates a UTF-8 BOM, CRLF or LF endings, reordered/recased/padded headers,
+  unknown columns, blank lines and padded values; rejects malformed headers,
+  non-UTF-8 bytes, binary content, malformed rows, invalid GitHub names and
+  duplicates.
+- **`github_metrics.validation`** with the GitHub account and repository name
+  grammars, returning the reason a name was rejected rather than a boolean.
+- **`github_metrics.errors`** — a stable `GM-<AREA>-<NNN>` code taxonomy,
+  separating file-level exceptions from row-level `RowIssue` records.
+- **Concurrent multi-file reads** via `read_repository_csvs`, deterministic in
+  both result order and error precedence.
+- **`github-metrics ingest`** command, with `--strict`, `--workers`,
+  `--format {text,json}` and `--output`, and distinct exit statuses (0 clean,
+  3 rows rejected, 2 unreadable).
+- **Documentation set** under `docs/`: user guide, CLI reference, error
+  catalog, architecture, maintainer guide, roadmap, three levels of
+  requirements (`L1.md`, `L2.md`, `L3.md`) and three ADRs.
+- **`scripts/build-trace-matrix.py`**, which generates `docs/TRACE-MATRIX.md`
+  from the requirement documents and `@pytest.mark.requirement` markers. CI
+  runs it with `--check` so the matrix cannot drift.
+- **Byte-exact CSV fixtures** under `tests/data/`, exempted from line-ending
+  normalisation so a CRLF fixture keeps testing CRLF.
+
 - Initial project scaffolding: Poetry packaging, CLI entry point, tooling
   configuration (black, isort, ruff, pylint, mypy, vulture, pytest), pre-commit
   hooks, and GitHub Actions CI.
@@ -20,6 +45,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The CLI resolves configuration lazily, so a command that needs no credentials
+  no longer fails when none are configured.
 - Python 3.14 is now a required CI target rather than `continue-on-error`; it passed
   on the first run.
 - Bumped `actions/checkout` to v7, `actions/setup-python` to v7,

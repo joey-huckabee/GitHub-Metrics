@@ -16,6 +16,10 @@
 *.sh     text eol=lf
 Makefile text eol=lf
 
+# Test fixtures are byte-exact inputs. A CRLF fixture that git rewrote to LF
+# would silently stop testing CRLF handling, and the test would still pass.
+tests/data/** -text
+
 # Never normalise these.
 *.png  binary
 *.jpg  binary

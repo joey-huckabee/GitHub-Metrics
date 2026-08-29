@@ -29,6 +29,9 @@ no-docstring-rgx = ^(_|test_)
 
 [DESIGN]
 max-args = 8
+# click invokes command callbacks with keyword arguments, so the positional
+# limit does not describe how these functions are actually called.
+max-positional-arguments = 8
 max-attributes = 16
 max-locals = 20
 

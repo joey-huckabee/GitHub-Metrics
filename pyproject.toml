@@ -92,7 +92,7 @@ ignore = [
 convention = "google"
 
 [tool.vulture]
-paths = ["github_metrics", "tests"]
+paths = ["github_metrics", "tests", "scripts"]
 exclude = [".venv"]
 min_confidence = 80
 ignore_names = ["cls"]
@@ -114,6 +114,7 @@ addopts = [
 ]
 markers = [
     "integration: tests that hit the live GitHub API (deselect with '-m \"not integration\"')",
+    "requirement(*ids): requirement identifiers this test verifies; harvested by scripts/build-trace-matrix.py",
 ]
 
 [tool.coverage.run]

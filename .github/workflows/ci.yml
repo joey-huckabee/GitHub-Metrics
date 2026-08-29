@@ -44,13 +44,16 @@ jobs:
         run: poetry run ruff check --output-format=github .
 
       - name: pylint
-        run: poetry run pylint github_metrics tests
+        run: poetry run pylint github_metrics tests scripts
 
       - name: mypy
         run: poetry run mypy --config-file mypy.ini
 
       - name: vulture
         run: poetry run vulture
+
+      - name: trace matrix is current
+        run: poetry run python scripts/build-trace-matrix.py --check
 
   test:
     name: Test (py${{ matrix.python-version }})

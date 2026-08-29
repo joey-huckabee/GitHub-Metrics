@@ -21,6 +21,42 @@ cp .env.example .env      # then set GITHUB_TOKEN
 
 ## Usage
 
+### Read an inventory
+
+Describe the repositories you care about in a CSV naming `owner` and `repoid`:
+
+```csv
+owner,repoid
+urllib3,urllib3
+bokeh,bokeh
+pypa,virtualenv
+```
+
+Each row denotes `https://github.com/<owner>/<repoid>`.
+
+```bash
+# Validate and report; no network access, no GITHUB_TOKEN required
+poetry run github-metrics ingest inventory.csv
+
+# Several files at once, read concurrently
+poetry run github-metrics ingest teams/*.csv
+
+# Machine-readable, for the next stage
+poetry run github-metrics ingest inventory.csv --format json --output inventory.json
+```
+
+Rejected rows do not stop the read. Every problem is reported with a stable
+code, a line number and the offending value:
+
+```
+inventory.csv:7: [GM-ING-014] invalid repoid 'virtualenv.git': may not end in '.git'
+```
+
+Exit status is `0` for a clean read, `3` when rows were rejected, and `2` when
+a file could not be read at all.
+
+### Collect metrics
+
 ```bash
 # Metrics for a single repository, as JSON on stdout
 poetry run github-metrics repo python/cpython
@@ -81,6 +117,23 @@ with GitHubClient(settings) as client:
 
 print(metrics.to_json(indent=2))
 ```
+
+## Documentation
+
+Full documentation is in [`docs/`](docs/README.md):
+
+- [User guide](docs/USER-GUIDE.md) — task-oriented introduction
+- [CLI reference](docs/CLI-REFERENCE.md) — every flag and exit code
+- [Error catalog](docs/ERROR-CATALOG.md) — every `GM-*` code explained
+- [Architecture](docs/ARCHITECTURE.md) — how the pieces fit, and why
+- [Maintainer guide](docs/MAINTAINER-GUIDE.md) — working on the code
+- [Roadmap](docs/ROADMAP.md) — what is deferred, and why
+
+Requirements are specified at three levels ([L1](docs/L1.md), [L2](docs/L2.md),
+[L3](docs/L3.md)) and traced to tests in
+[TRACE-MATRIX.md](docs/TRACE-MATRIX.md), which is generated rather than
+maintained by hand. Architecture decisions are recorded in
+[`docs/adr/`](docs/adr/).
 
 ## Development
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
 
 import click
@@ -14,8 +13,6 @@ from github_metrics.config import ConfigError, Settings
 from github_metrics.geo import Geocoder
 from github_metrics.logger import LogLevels, reset_logger
 from github_metrics.metrics import DEFAULT_CONTRIBUTOR_LIMIT, collect_repository_metrics
-
-LOGGER = logging.getLogger(__name__)
 
 
 @click.group(

@@ -17,6 +17,20 @@ def test_version_flag() -> None:
     assert __version__ in result.output
 
 
+def test_short_version_flag() -> None:
+    result = CliRunner().invoke(main, ["-V"])
+
+    assert result.exit_code == 0
+    assert __version__ in result.output
+
+
+def test_help_shows_the_version() -> None:
+    result = CliRunner().invoke(main, ["-h"])
+
+    assert result.exit_code == 0
+    assert f"(v{__version__})" in result.output
+
+
 def test_help_lists_commands() -> None:
     result = CliRunner().invoke(main, ["--help"])
 

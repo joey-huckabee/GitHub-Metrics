@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 from pathlib import Path
 
 import click
@@ -13,13 +12,17 @@ from github_metrics import __version__
 from github_metrics.client import GitHubClient
 from github_metrics.config import ConfigError, Settings
 from github_metrics.geo import Geocoder
+from github_metrics.logger import LogLevels, reset_logger
 from github_metrics.metrics import DEFAULT_CONTRIBUTOR_LIMIT, collect_repository_metrics
 
 LOGGER = logging.getLogger(__name__)
 
 
-@click.group(context_settings={"help_option_names": ["-h", "--help"]})
-@click.version_option(__version__, prog_name="github-metrics")
+@click.group(
+    context_settings={"help_option_names": ["-h", "--help"]},
+    help=f"Calculate GitHub metrics for FOSS analysis. (v{__version__})",
+)
+@click.version_option(__version__, "-V", "--version", prog_name="github-metrics")
 @click.option(
     "--env-file",
     type=click.Path(dir_okay=False, path_type=Path),
@@ -33,11 +36,7 @@ def main(ctx: click.Context, env_file: Path | None) -> None:
     except ConfigError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level, logging.INFO),
-        format="%(levelname)s %(name)s: %(message)s",
-        stream=sys.stderr,
-    )
+    reset_logger(LogLevels.from_name(settings.log_level))
     ctx.obj = settings
 
 

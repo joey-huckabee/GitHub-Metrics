@@ -30,7 +30,15 @@ poetry run github-metrics repo python/cpython --geocode --output cpython.json
 
 # How much API budget is left on the current token?
 poetry run github-metrics rate-limit
+
+# Tool version (-V is an alias)
+poetry run github-metrics --version
 ```
+
+Every snapshot carries a `tool_version` field recording which release produced it,
+so archived results stay attributable. Logs go to **stderr**, which keeps stdout a
+clean JSON stream — `github-metrics repo owner/name | jq .stars` works even at
+`LOG_LEVEL=DEBUG`.
 
 The same entry point is available as `python -m github_metrics`.
 
@@ -45,6 +53,20 @@ All configuration is read from the environment, or from a `.env` file
 | `GITHUB_API_URL` | no | `https://api.github.com` | Point at GitHub Enterprise |
 | `GEOCODER_USER_AGENT` | no | `github-metrics` | User-Agent sent to Nominatim |
 | `LOG_LEVEL` | no | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+
+### Logging
+
+`github_metrics.logger.reset_logger()` configures the package logger and can be
+called repeatedly without duplicating handlers:
+
+```python
+from github_metrics.logger import LogLevels, reset_logger
+
+logger = reset_logger(LogLevels.DEBUG)   # defaults to sys.stderr
+```
+
+The `Logger` wrapper class is deprecated — use `logging.getLogger(__name__)` in new
+code and let `reset_logger()` own the configuration.
 
 ## Library use
 

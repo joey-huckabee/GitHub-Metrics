@@ -21,7 +21,7 @@ jobs:
     name: Lint & type check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Poetry
         run: pipx install poetry==${{ env.POETRY_VERSION }}
@@ -71,7 +71,7 @@ jobs:
             experimental: true
     continue-on-error: ${{ matrix.experimental == true }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Poetry
         run: pipx install poetry==${{ env.POETRY_VERSION }}
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, test]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Poetry
         run: pipx install poetry==${{ env.POETRY_VERSION }}

@@ -27,4 +27,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The CLI configures logging through `reset_logger()` instead of
   `logging.basicConfig()`.
 
+### Fixed
+
+- `cli.py` and `metrics.py` declared a module `LOGGER` and never used it.
+  `cli.py` no longer declares one (its output goes through `click.echo`), and
+  `metrics.py` now logs: a debug line when a license lookup fails, so an API
+  error is distinguishable from a repository that simply has no license, and an
+  info line when the contributor list is truncated by `--contributors`.
+- Tests restore the `github_metrics` logger after each case. `reset_logger()`
+  sets `propagate = False` on a process-wide singleton, so a test that ran the
+  CLI could stop `caplog` from seeing later tests' records.
+- Line endings are normalised to LF and pinned by `.gitattributes`.
+- A shared `.vscode/` workspace pins every linter to this project's 100-column
+  line length, removing spurious `line too long` warnings.
+
 [Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/8feb637...HEAD

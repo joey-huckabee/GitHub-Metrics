@@ -3,23 +3,10 @@
 from __future__ import annotations
 
 import io
-import logging
-from collections.abc import Iterator
 
 import pytest
 
-from github_metrics.logger import PACKAGE_LOGGER_NAME, Logger, LogLevels, reset_logger
-
-
-@pytest.fixture(autouse=True)
-def restore_package_logger() -> Iterator[None]:
-    """Leave the package logger exactly as the test session found it."""
-    logger = logging.getLogger(PACKAGE_LOGGER_NAME)
-    handlers, level, propagate = list(logger.handlers), logger.level, logger.propagate
-    yield
-    logger.handlers = handlers
-    logger.setLevel(level)
-    logger.propagate = propagate
+from github_metrics.logger import Logger, LogLevels, reset_logger
 
 
 @pytest.mark.parametrize(

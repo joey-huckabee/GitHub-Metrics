@@ -1,0 +1,86 @@
+{
+  // ---------------------------------------------------------------------
+  // Line length
+  //
+  // This project uses 100 columns (pyproject.toml: [tool.black], [tool.ruff];
+  // .pylintrc: max-line-length). Several linter extensions default to 79 or
+  // 88 and will report "line too long" at the wrong width unless they are
+  // pointed at this repository's config, so every one of them is pinned
+  // explicitly below - including the ones you may not have installed, which
+  // are simply ignored if absent.
+  // ---------------------------------------------------------------------
+  "editor.rulers": [100],
+
+  "black-formatter.args": ["--line-length", "100"],
+  "isort.args": ["--profile", "black", "--line-length", "100"],
+  "ruff.configuration": "${workspaceFolder}/pyproject.toml",
+  "pylint.args": ["--rcfile=${workspaceFolder}/.pylintrc"],
+  "mypy-type-checker.args": ["--config-file=${workspaceFolder}/mypy.ini"],
+  "mypy-type-checker.reportingScope": "workspace",
+
+  // Not used by this project, but pinned so that having the extension
+  // installed cannot reintroduce an 79-column "line too long".
+  "flake8.args": ["--max-line-length=100"],
+  "pycodestyle.args": ["--max-line-length=100"],
+  "autopep8.args": ["--max-line-length", "100"],
+
+  // ---------------------------------------------------------------------
+  // Editor behaviour
+  // ---------------------------------------------------------------------
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true
+  },
+  "[json][jsonc][yaml][toml]": {
+    "editor.tabSize": 2
+  },
+
+  // Matches .editorconfig and .gitattributes: this repository is LF-only.
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // ---------------------------------------------------------------------
+  // Python environment
+  //
+  // Poetry creates an in-project .venv, which the Python extension detects
+  // automatically. Run `poetry install --with dev` if it is missing.
+  // ---------------------------------------------------------------------
+  "python.terminal.activateEnvInCurrentTerminal": true,
+  "python.analysis.typeCheckingMode": "standard",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.extraPaths": ["${workspaceFolder}"],
+  "python.envFile": "${workspaceFolder}/.env",
+
+  // ---------------------------------------------------------------------
+  // Testing
+  // ---------------------------------------------------------------------
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["tests", "-m", "not integration"],
+
+  // ---------------------------------------------------------------------
+  // Noise reduction
+  // ---------------------------------------------------------------------
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.mypy_cache": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/*.egg-info": true
+  },
+  "search.exclude": {
+    "**/.venv": true,
+    "**/dist": true,
+    "**/htmlcov": true,
+    "poetry.lock": true
+  },
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml"
+  }
+}

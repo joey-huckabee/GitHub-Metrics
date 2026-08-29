@@ -7,6 +7,7 @@
 | Use the tool | [`USER-GUIDE.md`](USER-GUIDE.md) |
 | Look up a flag or exit code | [`CLI-REFERENCE.md`](CLI-REFERENCE.md) |
 | Understand an error code | [`ERROR-CATALOG.md`](ERROR-CATALOG.md) |
+| Know how a metric is calculated | [`METRICS.md`](METRICS.md) |
 | Change the code | [`MAINTAINER-GUIDE.md`](MAINTAINER-GUIDE.md) |
 | Understand how it fits together | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Know what is coming | [`ROADMAP.md`](ROADMAP.md) |

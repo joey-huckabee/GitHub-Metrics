@@ -1,0 +1,36 @@
+[MAIN]
+py-version = 3.10
+jobs = 0
+ignore-paths = ^\.venv/.*$
+load-plugins =
+    pylint.extensions.docparams,
+    pylint.extensions.no_self_use
+
+[MESSAGES CONTROL]
+# Disabled where black / ruff / mypy already own the concern, plus a few
+# rules that fight normal application code.
+disable =
+    line-too-long,
+    wrong-import-order,
+    ungrouped-imports,
+    missing-type-doc,
+    missing-return-type-doc,
+    too-few-public-methods,
+    duplicate-code,
+    fixme
+
+[FORMAT]
+max-line-length = 100
+
+[BASIC]
+good-names = i, j, k, n, x, y, db, id, ok, pr, gh, _
+# Private helpers, test cases, and pytest fixtures document themselves by name.
+no-docstring-rgx = ^(_|test_)
+
+[DESIGN]
+max-args = 8
+max-attributes = 16
+max-locals = 20
+
+[REPORTS]
+score = no

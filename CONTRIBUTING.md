@@ -23,6 +23,24 @@ cp .env.example .env      # then add a real GITHUB_TOKEN
 
 Without `make`, run the underlying commands directly, e.g. `poetry run pytest`.
 
+## Editor setup (VS Code)
+
+`.vscode/` is checked in. Accept the recommended extensions when prompted and
+the workspace is configured for you:
+
+- Every linter is pinned to this project's **100-column** line length. Black,
+  isort, Ruff, and Pylint default to 79 or 88 columns, so without these settings
+  you would see spurious `line too long` errors.
+- Format-on-save runs black, and imports are organised with isort.
+- `Run and Debug` ships configurations for the CLI (`repo`, `repo --geocode`,
+  `rate-limit`), each loading `.env`, plus pytest for the whole suite or the
+  current file.
+- The test explorer is wired to pytest with the `integration` marker excluded.
+
+If you still see a `line too long` warning, check which extension is reporting
+it. `ms-python.flake8` and `ms-python.autopep8` are listed as unwanted for this
+workspace precisely because they bring their own defaults.
+
 ## Conventions
 
 - **Formatting** is owned by `black` (line length 100) and `isort` (black profile).

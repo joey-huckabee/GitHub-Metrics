@@ -1,0 +1,20 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "ms-python.pylint",
+    "ms-python.mypy-type-checker",
+    "charliermarsh.ruff",
+    "editorconfig.editorconfig",
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml",
+    "github.vscode-github-actions"
+  ],
+  "unwantedRecommendations": [
+    "ms-python.flake8",
+    "ms-python.autopep8"
+  ]
+}

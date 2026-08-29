@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from github_metrics import __version__
 from github_metrics.models import ContributorLocation, RepositoryMetrics
 
 
@@ -26,3 +27,9 @@ def test_optional_datetimes_encode_as_none() -> None:
     assert payload["created_at"] is None
     assert payload["pushed_at"] is None
     assert payload["contributor_locations"] == []
+
+
+def test_snapshot_records_the_tool_version() -> None:
+    payload = RepositoryMetrics(full_name="owner/repo").to_dict()
+
+    assert payload["tool_version"] == __version__

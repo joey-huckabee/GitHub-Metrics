@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 17
-- L2 requirements: 58
-- L3 requirements: 79
-- Verified L2+L3: 137 of 137 (100.0%)
+- L2 requirements: 62
+- L3 requirements: 84
+- Verified L2+L3: 146 of 146 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -36,7 +36,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-CFG-001 | L2-CFG-001, L2-CFG-002, L2-CFG-003 | _(none)_ | Implemented |
+| L1-CFG-001 | L2-CFG-001, L2-CFG-002, L2-CFG-003, L2-CFG-005 | _(none)_ | Implemented |
 | L1-CFG-002 | L2-CFG-004 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
@@ -47,6 +47,7 @@ through their children, so counting them too would count the same work twice.
 | L2-CFG-002 | L1-CFG-001 | L3-CFG-003, L3-CFG-007 | _(none)_ | Implemented |
 | L2-CFG-003 | L1-CFG-001 | L3-CFG-004, L3-CFG-006 | _(none)_ | Implemented |
 | L2-CFG-004 | L1-CFG-002 | L3-CFG-002, L3-CFG-005 | _(none)_ | Implemented |
+| L2-CFG-005 | L1-CFG-001 | L3-CFG-008 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -59,6 +60,7 @@ through their children, so counting them too would count the same work twice.
 | L3-CFG-005 | L2-CFG-004 | `tests/test_credentials.py::test_an_empty_scope_list_is_explained_rather_than_left_bare`<br>`tests/test_credentials.py::test_the_diagnostics_that_replace_it_are_logged`<br>`tests/test_credentials.py::test_the_token_never_appears_in_any_log_record` | Implemented |
 | L3-CFG-006 | L2-CFG-003 | `tests/test_credentials.py::test_a_rejected_token_exits_eight`<br>`tests/test_credentials.py::test_no_token_anywhere_exits_seven`<br>`tests/test_credentials.py::test_the_two_credential_failures_have_different_codes` | Implemented |
 | L3-CFG-007 | L2-CFG-002 | `tests/test_credentials.py::test_ingest_needs_no_token_and_is_never_verified`<br>`tests/test_credentials.py::test_verification_can_be_skipped` | Implemented |
+| L3-CFG-008 | L2-CFG-005 | `tests/test_cli_bands.py::test_a_token_is_read_from_a_file`<br>`tests/test_cli_bands.py::test_an_empty_token_file_is_a_usage_error`<br>`tests/test_cli_bands.py::test_an_unreadable_token_file_is_a_usage_error`<br>`tests/test_cli_bands.py::test_supplying_both_forms_is_refused`<br>`tests/test_cli_bands.py::test_the_token_from_a_file_is_never_echoed` | Implemented |
 
 ### CLI: CLI capability surface
 
@@ -77,6 +79,7 @@ through their children, so counting them too would count the same work twice.
 | L2-CLI-003 | L1-CLI-001 | L3-CLI-003 | _(none)_ | Implemented |
 | L2-CLI-004 | L1-CLI-001 | L3-CLI-004 | _(none)_ | Implemented |
 | L2-CLI-005 | L1-CLI-001 | L3-CLI-005, L3-CLI-006 | _(none)_ | Implemented |
+| L2-CLI-006 | L1-SCR-001 | L3-CLI-007 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -88,6 +91,7 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-004 | L2-CLI-004 | `tests/test_cli_ingest.py::test_a_clean_file_exits_zero`<br>`tests/test_cli_ingest.py::test_an_unreadable_file_produces_its_own_exit_status`<br>`tests/test_cli_ingest.py::test_rejected_rows_produce_a_distinct_exit_status`<br>`tests/test_cli_ingest.py::test_strict_mode_reports_the_first_bad_row_and_stops` | Implemented |
 | L3-CLI-005 | L2-CLI-005 | `tests/test_cli_closed_issues.py::test_a_disabled_tracker_is_called_out`<br>`tests/test_cli_closed_issues.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_cli_closed_issues.py::test_an_unreadable_repository_exits_four`<br>`tests/test_cli_closed_issues.py::test_explain_appends_the_bands`<br>`tests/test_cli_closed_issues.py::test_it_appears_in_the_command_list`<br>`tests/test_cli_closed_issues.py::test_it_reports_counts_the_tracker_state_and_the_weight`<br>`tests/test_cli_closed_issues.py::test_json_carries_the_same_values`<br>`tests/test_cli_closed_issues.py::test_json_includes_the_bands_only_when_explained` | Implemented |
 | L3-CLI-006 | L2-CLI-005 | `tests/test_releases.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_releases.py::test_an_unreadable_repository_exits_four`<br>`tests/test_releases.py::test_the_command_emits_json`<br>`tests/test_releases.py::test_the_command_explains_the_release_bands`<br>`tests/test_releases.py::test_the_command_flags_a_tags_only_project`<br>`tests/test_releases.py::test_the_command_reports_both_counts_and_the_distinct_total`<br>`tests/test_releases.py::test_the_command_shows_the_weight_and_warns_about_saturation` | Implemented |
+| L3-CLI-007 | L2-CLI-006 | `tests/test_cli_bands.py::test_an_unknown_metric_is_a_usage_error`<br>`tests/test_cli_bands.py::test_every_scoring_table_is_reachable`<br>`tests/test_cli_bands.py::test_it_needs_no_token`<br>`tests/test_cli_bands.py::test_no_argument_prints_every_table`<br>`tests/test_cli_bands.py::test_the_tables_carry_their_boundaries` | Implemented |
 
 ### CON: Concurrency
 
@@ -200,8 +204,8 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-MET-001 | L2-MET-001, L2-MET-002, L2-MET-003, L2-MET-005, L2-MET-006, L2-MET-008 | _(none)_ | Implemented |
-| L1-MET-002 | L2-MET-004, L2-MET-007, L2-MET-009, L2-SCR-004 | _(none)_ | Implemented |
+| L1-MET-001 | L2-MET-001, L2-MET-002, L2-MET-003, L2-MET-005, L2-MET-006, L2-MET-008, L2-MET-010 | _(none)_ | Implemented |
+| L1-MET-002 | L2-MET-004, L2-MET-007, L2-MET-009, L2-MET-011, L2-SCR-004 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -216,6 +220,8 @@ through their children, so counting them too would count the same work twice.
 | L2-MET-007 | L1-MET-002 | L3-MET-007 | _(none)_ | Implemented |
 | L2-MET-008 | L1-MET-001 | L3-MET-008, L3-MET-009, L3-MET-011 | _(none)_ | Implemented |
 | L2-MET-009 | L1-MET-002 | L3-MET-010 | _(none)_ | Implemented |
+| L2-MET-010 | L1-MET-001 | L3-MET-012 | _(none)_ | Implemented |
+| L2-MET-011 | L1-MET-002 | L3-MET-013, L3-MET-014 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -232,6 +238,9 @@ through their children, so counting them too would count the same work twice.
 | L3-MET-009 | L2-MET-008 | `tests/test_elapsed.py::test_a_freshly_updated_repository_reports_near_zero`<br>`tests/test_elapsed.py::test_collected_timestamps_feed_the_elapsed_calculations`<br>`tests/test_elapsed.py::test_hours_are_measured_from_updated_at` | Implemented |
 | L3-MET-010 | L2-MET-009 | `tests/test_elapsed.py::test_a_naive_timestamp_is_refused_with_a_reason`<br>`tests/test_elapsed.py::test_a_timestamp_after_the_scan_is_reported_and_clamped` | Implemented |
 | L3-MET-011 | L2-MET-008 | `tests/test_elapsed.py::test_a_null_repository_fails_rather_than_raising_a_key_error`<br>`tests/test_elapsed.py::test_a_repository_never_pushed_to_is_handled`<br>`tests/test_elapsed.py::test_all_three_timestamps_are_parsed`<br>`tests/test_elapsed.py::test_an_unparseable_timestamp_fails_loudly`<br>`tests/test_elapsed.py::test_one_query_asks_for_all_three`<br>`tests/test_elapsed.py::test_the_parsed_timestamps_are_timezone_aware` | Implemented |
+| L3-MET-012 | L2-MET-010 | `tests/test_repository.py::test_a_null_repository_fails_rather_than_raising_a_key_error`<br>`tests/test_repository.py::test_a_repository_never_pushed_to_is_handled`<br>`tests/test_repository.py::test_an_unparseable_timestamp_fails_loudly`<br>`tests/test_repository.py::test_distinct_versions_is_derived_the_same_way_as_elsewhere`<br>`tests/test_repository.py::test_every_scored_value_comes_from_one_query`<br>`tests/test_repository.py::test_the_query_asks_for_totals_only` | Implemented |
+| L3-MET-013 | L2-MET-011 | `tests/test_repository.py::test_a_disabled_tracker_is_still_reported_here`<br>`tests/test_repository.py::test_a_personally_owned_repository_is_noted`<br>`tests/test_repository.py::test_a_personally_owned_repository_reports_no_organisation`<br>`tests/test_repository.py::test_an_organisation_owned_repository_reports_its_organisation`<br>`tests/test_repository.py::test_an_unknown_owner_type_is_not_treated_as_an_organisation` | Implemented |
+| L3-MET-014 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_transfer`<br>`tests/test_repository.py::test_a_transfer_is_reported`<br>`tests/test_repository.py::test_a_transferred_repository_keeps_both_owners` | Implemented |
 
 ### OUT: Result output and destinations
 
@@ -278,7 +287,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-SCR-001 | L2-SCR-001, L2-SCR-002, L2-SCR-003, L2-SCR-005, L2-SCR-006, L2-SCR-007, L2-SCR-008 | _(none)_ | Implemented |
+| L1-SCR-001 | L2-CLI-006, L2-SCR-001, L2-SCR-002, L2-SCR-003, L2-SCR-005, L2-SCR-006, L2-SCR-007, L2-SCR-008 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 

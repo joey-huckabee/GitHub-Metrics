@@ -86,13 +86,15 @@ before doing it.
 | `model/` | `ScanIdentifier`, `SoftwareRow` | never |
 | `output/` | CSV, JSON, console; field selection; destination resolution | never |
 | `client` | Authenticated PyGithub wrapper | yes |
+| `collect/` | GraphQL collection: repository, counts, timestamps, credentials | via `client` |
+| `analysis/` | Scoring. Band tables and the weights they produce | never |
 | `metrics` | Collection over the API | via `client` |
 | `geo` | Location to coordinates (Nominatim, cached per run) | yes |
 
 Planned packages, per `docs/ROADMAP.md`: `sources/` (where inventories come
-from — CSV now, URLs at v0.2.0), `collect/` (API, rate limiting, concurrency)
-and `analysis/` (scoring). `ingest.py` moves into `sources/` in the same commit
-that renames `ingest` to `metrics`, so the diff reads as one change.
+from — CSV now, URLs at v0.2.0). Rate limiting and collection concurrency join
+`collect/`. `ingest.py` moves into `sources/` in the same commit that renames
+`ingest` to `metrics`, so the diff reads as one change.
 
 ### Ingestion pipeline
 
@@ -218,6 +220,22 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   construction, and costs one point per repository for the whole query.
   `Requester.graphql_query()` is on PyGithub already, so this adds no
   dependency.
+- **One query per repository, and it asks for `totalCount`, never `nodes`.**
+  GraphQL bills per query rather than per field, so `collect/repository.py`
+  folds every value a row needs into one document costing **one point** —
+  measured, not assumed. The condition that keeps it there is the absence of a
+  `nodes` selection: `nodes` prices a query by the number of objects it could
+  return, so adding one would make the cheapest route the most expensive one
+  for exactly the largest repositories, and nothing would fail visibly. A test
+  asserts the query contains no `nodes`.
+- **`organization` is empty for a personally owned repository, and that is the
+  answer.** GitHub says whether an owner is a `User` or an `Organization`, and
+  empty is the only place a row records the former. Echoing the user's login
+  into the column would make the two kinds of owner indistinguishable, and
+  every aggregate by organisation would acquire one bucket per individual
+  maintainer. The owner GitHub reports is kept beside the owner the inventory
+  supplied, because a transferred repository still resolves — the inventory
+  is stale but working, and both facts have to survive.
 - **GraphQL reports failure with HTTP 200 and an `errors` array.** Any code
   path that checks only the status sees success and then reads a null
   repository. Always inspect `errors`, and classify `NOT_FOUND` separately - a

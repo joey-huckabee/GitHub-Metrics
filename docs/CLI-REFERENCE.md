@@ -8,7 +8,8 @@ The same entry point is available as `python -m github_metrics`.
 ## Synopsis
 
 ```
-github-metrics [--env-file PATH] [-V|--version] [-h|--help] COMMAND [ARGS]...
+github-metrics [--env-file PATH] [--token TEXT | --token-file PATH]
+               [--no-verify-token] [-V|--version] [-h|--help] COMMAND [ARGS]...
 ```
 
 ## Global options
@@ -19,6 +20,7 @@ github-metrics [--env-file PATH] [-V|--version] [-h|--help] COMMAND [ARGS]...
 | `-V`, `--version` | Print the version and exit. |
 | `-h`, `--help` | Show help and exit. Available on every subcommand. |
 | `--token TEXT` | GitHub token, overriding `GITHUB_TOKEN`. See the warning below. |
+| `--token-file PATH` | Read the token from this file. Safer than `--token`. |
 | `--no-verify-token` | Skip the credential check. |
 
 Configuration is resolved **lazily**: `--env-file` is recorded when the command
@@ -30,7 +32,7 @@ API. `ingest` therefore runs on a machine with no credentials at all.
 Commands that reach the GitHub API need a token. It is taken from, in order of
 precedence:
 
-1. `--token`
+1. `--token` or `--token-file`
 2. `GITHUB_TOKEN` in the environment
 3. `GITHUB_TOKEN` in a `.env` file
 
@@ -38,6 +40,29 @@ precedence:
 > and is written to your shell history.** Prefer the environment or a `.env`
 > file wherever either will do. `--token` exists for the cases where neither
 > is available, such as a CI step that already holds the value in a variable.
+
+`--token-file` reads the token from a file and is the safer of the two: a path
+is not a secret, so it can appear in a command line, a script, or a process
+listing without disclosing anything. It suits a container secret mounted at a
+path, or a file the operating system keeps at mode 600.
+
+Surrounding whitespace is stripped, so a file written by `echo` works. A token
+with a trailing newline is rejected by GitHub with the same 401 as an expired
+one, which is a hard failure to read backwards from - hence the strip.
+
+Supplying **both** `--token` and `--token-file` is a usage error (exit 2)
+rather than a precedence rule. Two answers to one question can only be a
+mistake, and guessing which was meant would be worse than saying so.
+
+```console
+$ github-metrics --token-file /run/secrets/github rate-limit
+4983 core requests remaining
+
+$ github-metrics --token-file /run/secrets/absent rate-limit
+Error: could not read --token-file /run/secrets/absent: [Errno 2] No such file or directory
+$ echo $?
+2
+```
 
 Before doing any work, the tool confirms the token is accepted. The check calls
 the rate-limit endpoint, which **does not count against the rate limit**, so it
@@ -253,9 +278,10 @@ many issues the repository has.
 | Code | Meaning |
 |---|---|
 | `0` | The repository was read |
-| `1` | No `GITHUB_TOKEN` configured |
 | `2` | Usage error, including a slug with no `/` |
 | `4` | The repository could not be read - deleted, renamed, or private |
+| `7` | No token supplied |
+| `8` | GitHub rejected the token |
 
 ### Examples
 
@@ -314,6 +340,149 @@ some-org/mirror
   note: the issue tracker is off, so zero is a configuration fact rather than a maintenance one
 ```
 
+---
+
+## `releases`
+
+Report release and tag counts, and the score they produce, for one repository.
+**Requires `GITHUB_TOKEN`.**
+
+```
+github-metrics releases [OPTIONS] OWNER/REPOID
+```
+
+The scored value is the **distinct version count**, not releases plus tags.
+Publishing a GitHub Release creates a tag, so a release is already counted
+among the tags; adding the two together counts every release twice. Measured
+across a sample of repositories the sum overstated by between 1.3x and 2x, and
+the inflation grew with how diligently a project used Releases - so the metric
+rewarded the tooling rather than the release cadence. See
+[`METRICS.md`](METRICS.md) for the derivation.
+
+| Argument | Description |
+|---|---|
+| `OWNER/REPOID` | The repository, e.g. `pypa/virtualenv`. A value without a `/` is a usage error. |
+
+| Option | Default | Description |
+|---|---|---|
+| `--explain` | off | Append the scoring bands. |
+| `--format {text,json}` | `text` | Report format. `json` includes the bands only with `--explain`. |
+
+Costs one GraphQL point, whatever the length of the release history.
+
+### Exit status
+
+| Code | Meaning |
+|---|---|
+| `0` | The repository was read |
+| `2` | Usage error, including a slug with no `/` |
+| `4` | The repository could not be read - deleted, renamed, or private |
+| `7` | No token supplied |
+| `8` | GitHub rejected the token |
+
+### Examples
+
+```console
+$ github-metrics releases pypa/virtualenv
+pypa/virtualenv
+  releases                  98
+  tags                     285
+  distinct versions        285
+  weight                   1.0
+  tags with no release     187
+  note: releases + tags would report 383 (1.34x), counting every release twice
+  note: at or above 80 versions the weight is capped at 1.0, so this project is indistinguishable from any other above that line
+```
+
+Both notes are diagnostics rather than warnings. The first quantifies what the
+double count would have added for this repository; the second says the score
+has saturated, which matters when a portfolio of mature projects all land on
+1.0 and the metric stops separating them.
+
+```console
+$ github-metrics releases cline/cline --format json
+{
+  "owner": "cline",
+  "repoid": "cline",
+  "releases": 398,
+  "tags": 717,
+  "distinct_versions": 717,
+  "legacy_sum": 1115,
+  "weight": 1.0,
+  "bands": null
+}
+```
+
+`legacy_sum` is reported so a value from the previous definition can be
+recognised in an older spreadsheet, not because anything consumes it.
+
+A repository that has never tagged anything scores 0.0 rather than the lowest
+non-zero band - a project with nothing at all scores nothing.
+
+---
+
+## `bands`
+
+Print the scoring bands for one metric, or for every metric. **Needs no token
+and no network.**
+
+```
+github-metrics bands [METRIC]
+```
+
+| Argument | Description |
+|---|---|
+| `METRIC` | One of `closed-issues`, `last-update`, `maturity`, `popularity`, `releases`. Omit it to print all five. |
+
+The tables *are* the scoring model - the command renders the same objects the
+scoring code reads, so it cannot drift from the implementation the way a
+transcribed table in a document can. It is how a surprising score gets
+explained without opening source, and how the model gets reviewed before a
+collection run is worth starting.
+
+```console
+$ github-metrics bands releases
+release bands (on distinct versions):
+  <1     -> 0.0
+  <5     -> 0.1
+  <10    -> 0.2
+  <20    -> 0.3
+  <40    -> 0.4
+  <50    -> 0.5
+  <60    -> 0.6
+  <70    -> 0.7
+  <80    -> 0.8
+  >=80   -> 1.0
+
+$ github-metrics bands popularity
+star and fork bands (weight for a count below each bound):
+   bound   stars   forks
+  <5         0.0     0.0
+  <10        0.1     0.1
+  <20        0.2     0.2
+  <30        0.3     0.3
+  <40        0.4     0.4
+  <50        0.5     0.5
+  <70        0.6     0.6
+  <90        0.7     0.7
+  <110               0.8
+  <150       0.8     0.9
+  <300       0.9
+   above     1.0     1.0
+```
+
+Stars and forks share one table because they are the same measurement of
+attention at different scales: forks are rarer, so their bounds are tighter.
+A blank cell means that bound belongs to only one of the two.
+
+### Exit status
+
+| Code | Meaning |
+|---|---|
+| `0` | The tables were printed |
+| `2` | Usage error - an unrecognised metric name. The message lists the valid ones. |
+
+
 ## `repo`
 
 Collect metrics for a single repository. **Requires `GITHUB_TOKEN`.**
@@ -369,7 +538,7 @@ click and are listed for completeness rather than chosen. See
 | `1` | Configuration error, e.g. a missing token | no | all |
 | `2` | Usage error - malformed command line | no | all |
 | `3` | Degraded: some input rows were rejected | yes | `ingest` |
-| `4` | Degraded: a repository could not be read | yes | `closed-issues` |
+| `4` | Degraded: a repository could not be read | yes | `closed-issues`, `releases` |
 | `5` | Aborted: API budget exhausted | partial | reserved |
 | `6` | Aborted: the input could not be read | no | `ingest` |
 | `7` | Aborted: no GitHub token supplied | no | API commands |

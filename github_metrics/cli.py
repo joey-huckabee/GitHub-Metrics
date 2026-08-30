@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +18,9 @@ from github_metrics.analysis.closed_issues import (
     describe_bands,
     score_closed_issues,
 )
+from github_metrics.analysis.last_update import describe_bands as describe_last_update_bands
+from github_metrics.analysis.maturity import describe_bands as describe_maturity_bands
+from github_metrics.analysis.popularity import describe_bands as describe_popularity_bands
 from github_metrics.analysis.releases import RELEASE_BANDS, SATURATION_COUNT
 from github_metrics.analysis.releases import describe_bands as describe_release_bands
 from github_metrics.analysis.releases import score_releases
@@ -38,6 +43,8 @@ from github_metrics.metrics import DEFAULT_CONTRIBUTOR_LIMIT, collect_repository
 # Exit statuses, severity-ordered; the highest applicable one wins. Codes 1 and
 # 2 belong to click (ClickException and UsageError) and are listed for
 # completeness rather than chosen. See docs/adr/0004-exit-code-scheme.md.
+LOGGER = logging.getLogger(__name__)
+
 EXIT_ROWS_REJECTED = 3
 """Degraded: the input was read but at least one row was rejected."""
 
@@ -165,6 +172,15 @@ class CliContext:
     ),
 )
 @click.option(
+    "--token-file",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Read the token from this file. Safer than --token, which is visible "
+        "to other processes and lands in shell history."
+    ),
+)
+@click.option(
     "--no-verify-token",
     is_flag=True,
     help="Skip the credential check. It is free and catches a bad token early.",
@@ -174,6 +190,7 @@ def main(
     ctx: click.Context,
     env_file: Path | None,
     token: str | None,
+    token_file: Path | None,
     no_verify_token: bool,
 ) -> None:
     """Calculate GitHub metrics for FOSS analysis."""
@@ -185,7 +202,11 @@ def main(
         load_dotenv(override=False)
 
     reset_logger(LogLevels.from_name(os.getenv("LOG_LEVEL", "INFO")))
-    ctx.obj = CliContext(env_file=env_file, token=token, verify=not no_verify_token)
+    ctx.obj = CliContext(
+        env_file=env_file,
+        token=_resolve_token(token, token_file),
+        verify=not no_verify_token,
+    )
 
 
 @main.command("repo")
@@ -539,3 +560,63 @@ def releases_command(
         return
 
     click.echo("\n".join(_releases_lines(owner, repoid, counts, weight, explain=explain)))
+
+
+def _resolve_token(token: str | None, token_file: Path | None) -> str | None:
+    """Choose between the two ways of supplying a token on the command line.
+
+    Args:
+        token: The value of `--token`, if given.
+        token_file: The path from `--token-file`, if given.
+
+    Returns:
+        The token, or `None` to fall back to the environment.
+
+    Raises:
+        click.UsageError: If both were supplied, which can only be a mistake,
+            or if the file cannot be read.
+    """
+    if token and token_file:
+        raise click.UsageError("pass --token or --token-file, not both")
+
+    if token_file is None:
+        return token
+
+    try:
+        contents = token_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise click.UsageError(f"could not read --token-file {token_file}: {exc}") from exc
+
+    # A file written by `echo` ends in a newline, and a token with a trailing
+    # newline is rejected by the API for reasons that are hard to see.
+    stripped = contents.strip()
+    if not stripped:
+        raise click.UsageError(f"--token-file {token_file} is empty")
+
+    LOGGER.debug("Token read from %s (%d characters)", token_file, len(stripped))
+    return stripped
+
+
+BAND_TABLES: dict[str, Callable[[], str]] = {
+    "closed-issues": describe_bands,
+    "releases": describe_release_bands,
+    "last-update": describe_last_update_bands,
+    "maturity": describe_maturity_bands,
+    "popularity": describe_popularity_bands,
+}
+"""Every scoring table, by the name of the metric it scores."""
+
+
+@main.command("bands")
+@click.argument("metric", required=False, type=click.Choice(sorted(BAND_TABLES)))
+def bands_command(metric: str | None) -> None:
+    """Print the scoring bands for METRIC, or for every metric.
+
+    The tables are the scoring model. Printing them is how a surprising score
+    gets explained without reading source, and how the model gets reviewed
+    without trusting a document to have kept up with the code.
+
+    Needs no network and no token.
+    """
+    chosen = [metric] if metric else sorted(BAND_TABLES)
+    click.echo("\n\n".join(BAND_TABLES[name]() for name in chosen))

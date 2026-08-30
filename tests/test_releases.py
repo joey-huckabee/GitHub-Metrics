@@ -223,9 +223,14 @@ class _NullClient:
 
 @pytest.fixture
 def offline(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Credentials present, network absent."""
+    """Credentials present, network absent.
+
+    The credential check makes a real request through a client it creates
+    itself, so it has to be neutralised alongside `GitHubClient`.
+    """
     monkeypatch.setenv("GITHUB_TOKEN", "test-token")
     monkeypatch.setattr("github_metrics.cli.GitHubClient", lambda _settings: _NullClient())
+    monkeypatch.setattr("github_metrics.cli.verify_credentials", lambda _settings: None)
 
 
 def stub_cli(monkeypatch: pytest.MonkeyPatch, counts: ReleaseCounts) -> None:

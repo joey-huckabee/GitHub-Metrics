@@ -18,10 +18,49 @@ github-metrics [--env-file PATH] [-V|--version] [-h|--help] COMMAND [ARGS]...
 | `--env-file PATH` | Read configuration from this `.env` instead of the nearest one. |
 | `-V`, `--version` | Print the version and exit. |
 | `-h`, `--help` | Show help and exit. Available on every subcommand. |
+| `--token TEXT` | GitHub token, overriding `GITHUB_TOKEN`. See the warning below. |
+| `--no-verify-token` | Skip the credential check. |
 
 Configuration is resolved **lazily**: `--env-file` is recorded when the command
 group starts, but the file is only required by commands that reach the GitHub
 API. `ingest` therefore runs on a machine with no credentials at all.
+
+### Credentials
+
+Commands that reach the GitHub API need a token. It is taken from, in order of
+precedence:
+
+1. `--token`
+2. `GITHUB_TOKEN` in the environment
+3. `GITHUB_TOKEN` in a `.env` file
+
+> **A token passed as `--token` is visible to other processes on the machine
+> and is written to your shell history.** Prefer the environment or a `.env`
+> file wherever either will do. `--token` exists for the cases where neither
+> is available, such as a CI step that already holds the value in a variable.
+
+Before doing any work, the tool confirms the token is accepted. The check calls
+the rate-limit endpoint, which **does not count against the rate limit**, so it
+costs nothing but one round trip and turns a mid-run authentication failure
+into one message up front. `--no-verify-token` skips it.
+
+`LOG_LEVEL=DEBUG` reports the token's source, kind, length, the scopes GitHub
+returns, and the remaining budget on both APIs. **The token value is never
+logged**, at any level, in whole or in part.
+
+```console
+$ github-metrics rate-limit
+Error: [GM-CFG-001] no GitHub token available. Pass --token, set GITHUB_TOKEN in
+the environment, or copy .env.example to .env and add one.
+$ echo $?
+7
+
+$ github-metrics --token ghp_expired... rate-limit
+Error: [GM-CFG-002] GitHub rejected the token (401). It may be expired, revoked,
+or mistyped. Kind detected from its prefix: classic personal access token.
+$ echo $?
+8
+```
 
 ## Configuration
 
@@ -333,6 +372,8 @@ click and are listed for completeness rather than chosen. See
 | `4` | Degraded: a repository could not be read | yes | `closed-issues` |
 | `5` | Aborted: API budget exhausted | partial | reserved |
 | `6` | Aborted: the input could not be read | no | `ingest` |
+| `7` | Aborted: no GitHub token supplied | no | API commands |
+| `8` | Aborted: GitHub rejected the token | no | API commands |
 
 The 3-4 against 5-6 split is the load-bearing part: **3 and 4 still produced a
 usable result; 5 and 6 did not.** A caller can test `$? -ge 3` for "something

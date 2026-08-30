@@ -83,6 +83,8 @@ outcome as one that could not be opened.
 | `4` | Degraded: some repositories could not be fetched | yes |
 | `5` | Aborted: API budget exhausted, or pre-flight refused the run | partial or none |
 | `6` | Aborted: the input could not be read | no |
+| `7` | Aborted: no GitHub token was supplied | no |
+| `8` | Aborted: GitHub rejected the token | no |
 
 `1` and `2` are click's and are listed for completeness rather than chosen.
 
@@ -124,3 +126,17 @@ Neutral:
 The conditions behind each code are catalogued in
 [`../ERROR-CATALOG.md`](../ERROR-CATALOG.md). The command surface is in
 [`../CLI-REFERENCE.md`](../CLI-REFERENCE.md).
+## Amendment, 2026-08-30: codes 7 and 8
+
+Two credential failures were added, using the room this scheme reserved for
+exactly that. Both are aborts and sort above 6, keeping the severity ordering
+and the `$? -ge 5` test intact.
+
+They are separate codes rather than one because the fixes differ. `7` means no
+token was configured; `8` means the configured token was refused. A caller that
+cannot tell them apart cannot tell an operator whether to set a variable or
+rotate a credential.
+
+Neither reuses `1`, click's status for a generic `ClickException`, even though
+a missing token is arguably a configuration error. `1` is indistinguishable
+from any other failure, which is the problem this scheme exists to solve.

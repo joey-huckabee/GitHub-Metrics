@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 14
-- L2 requirements: 42
-- L3 requirements: 46
-- Verified L2+L3: 88 of 88 (100.0%)
+- L2 requirements: 44
+- L3 requirements: 49
+- Verified L2+L3: 93 of 93 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -171,7 +171,7 @@ through their children, so counting them too would count the same work twice.
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
 | L1-MET-001 | L2-MET-001, L2-MET-002, L2-MET-003, L2-MET-005, L2-MET-006 | _(none)_ | Implemented |
-| L1-MET-002 | L2-MET-004, L2-MET-007 | _(none)_ | Implemented |
+| L1-MET-002 | L2-MET-004, L2-MET-007, L2-SCR-004 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -242,7 +242,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-SCR-001 | L2-SCR-001, L2-SCR-002 | _(none)_ | Implemented |
+| L1-SCR-001 | L2-SCR-001, L2-SCR-002, L2-SCR-003 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -250,6 +250,8 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|-------------|----------------|--------|
 | L2-SCR-001 | L1-SCR-001 | L3-SCR-001, L3-SCR-003 | _(none)_ | Implemented |
 | L2-SCR-002 | L1-SCR-001 | L3-SCR-002, L3-SCR-004 | _(none)_ | Implemented |
+| L2-SCR-003 | L1-SCR-001 | L3-SCR-005, L3-SCR-007 | _(none)_ | Implemented |
+| L2-SCR-004 | L1-MET-002 | L3-SCR-006 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -259,6 +261,9 @@ through their children, so counting them too would count the same work twice.
 | L3-SCR-002 | L2-SCR-002 | `tests/test_closed_issues.py::test_a_negative_count_is_reported_and_treated_as_zero`<br>`tests/test_closed_issues.py::test_scoring_logs_the_band_it_chose` | Implemented |
 | L3-SCR-003 | L2-SCR-001 | `tests/test_releases.py::test_every_measured_repository_saturates`<br>`tests/test_releases.py::test_every_release_band_boundary_scores_as_documented`<br>`tests/test_releases.py::test_it_saturates_at_the_documented_count`<br>`tests/test_releases.py::test_no_version_count_is_left_unmapped`<br>`tests/test_releases.py::test_the_release_band_table_renders_for_diagnostics`<br>`tests/test_releases.py::test_the_release_score_never_decreases_as_versions_rise`<br>`tests/test_releases.py::test_the_table_never_produces_nine_tenths`<br>`tests/test_releases.py::test_zero_versions_scores_zero_not_the_floor_closed_issues_uses` | Implemented |
 | L3-SCR-004 | L2-SCR-002 | `tests/test_releases.py::test_a_negative_version_count_is_reported_and_treated_as_zero`<br>`tests/test_releases.py::test_release_scoring_logs_the_band_it_chose` | Implemented |
+| L3-SCR-005 | L2-SCR-003 | `tests/test_prevalence.py::test_the_floor_for_a_project_with_nothing_rose_from_zero_to_two`<br>`tests/test_prevalence.py::test_the_original_cliff_at_one_closed_issue_is_gone`<br>`tests/test_prevalence.py::test_the_result_is_twenty_times_the_stronger_weight`<br>`tests/test_prevalence.py::test_the_score_never_decreases_as_either_input_rises`<br>`tests/test_prevalence.py::test_the_score_stays_within_its_points_budget`<br>`tests/test_prevalence.py::test_the_stronger_signal_wins` | Implemented |
+| L3-SCR-006 | L2-SCR-004 | `tests/test_prevalence.py::test_a_disabled_tracker_excludes_the_issue_signal_rather_than_scoring_it`<br>`tests/test_prevalence.py::test_a_disabled_tracker_is_reported`<br>`tests/test_prevalence.py::test_a_disabled_tracker_still_scores_on_releases` | Implemented |
+| L3-SCR-007 | L2-SCR-003 | `tests/test_prevalence.py::test_every_measured_repository_reaches_the_maximum`<br>`tests/test_prevalence.py::test_it_still_discriminates_below_the_ceilings`<br>`tests/test_prevalence.py::test_no_evidence_at_all_is_logged`<br>`tests/test_prevalence.py::test_saturation_is_logged_so_a_constant_score_is_explainable`<br>`tests/test_prevalence.py::test_the_reference_row_is_reproduced`<br>`tests/test_prevalence.py::test_the_stronger_signal_is_named_in_the_log` | Implemented |
 
 ### VAL: Name validation
 

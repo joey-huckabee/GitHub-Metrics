@@ -67,7 +67,8 @@ def test_the_score_never_decreases_as_either_input_rises() -> None:
 @pytest.mark.parametrize(
     ("closed", "versions", "expected"),
     [
-        (0, 0, 2.0),  # nothing at all: the closed-issue floor of 0.1 wins
+        (0, 0, 0.0),  # nothing at all: no evidence, no score
+        (1, 0, 2.0),  # one closed issue is evidence
         (0, 1, 2.0),  # one version only -> 0.1
         (3, 0, 2.0),  # a few closed issues -> 0.1
         (600, 0, 20.0),  # issues alone carry it
@@ -102,11 +103,11 @@ def test_the_score_stays_within_its_points_budget() -> None:
 
 @pytest.mark.requirement("L3-SCR-006")
 def test_a_disabled_tracker_excludes_the_issue_signal_rather_than_scoring_it() -> None:
-    # With the tracker off, zero closed issues is an absent signal, not a low
-    # one. Scoring it as 0.1 would let it beat a project that has genuinely
-    # shipped nothing.
-    assert score_prevalence(0, 0, issues_enabled=False) == 0.0
-    assert score_prevalence(0, 0, issues_enabled=True) == 2.0
+    # A repository can accumulate closed issues and later have its tracker
+    # switched off. The issues remain, but the signal is no longer one this
+    # score is willing to read, so the release weight stands alone.
+    assert score_prevalence(600, 0, issues_enabled=True) == 20.0
+    assert score_prevalence(600, 0, issues_enabled=False) == 0.0
 
 
 @pytest.mark.requirement("L3-SCR-006")
@@ -147,12 +148,13 @@ def test_every_measured_repository_reaches_the_maximum() -> None:
 @pytest.mark.requirement("L3-SCR-007")
 def test_it_still_discriminates_below_the_ceilings() -> None:
     # Where the gate earns its keep: young and unshipped projects.
-    barely_started = score_prevalence(0, 0)
+    nothing_at_all = score_prevalence(0, 0)
     just_started = score_prevalence(25, 2)
     getting_going = score_prevalence(160, 25)
     established = score_prevalence(600, 100)
 
-    assert barely_started < just_started < getting_going < established
+    assert nothing_at_all == 0.0
+    assert nothing_at_all < just_started < getting_going < established
     assert established == MAX_PREVALENCE_SCORE
 
 
@@ -168,37 +170,51 @@ def test_saturation_is_logged_so_a_constant_score_is_explainable(
 
 @pytest.mark.requirement("L3-SCR-007")
 def test_no_evidence_at_all_is_logged(caplog: pytest.LogCaptureFixture) -> None:
-    # Only reachable with the tracker disabled: with it enabled, the
-    # closed-issue table's floor of 0.1 keeps the weight above zero.
     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
-        score_prevalence(0, 0, issues_enabled=False)
+        score_prevalence(0, 0)
 
     assert "no evidence" in caplog.text
 
 
-@pytest.mark.requirement("L3-SCR-005")
-def test_the_floor_for_a_project_with_nothing_rose_from_zero_to_two() -> None:
-    """Record a real behaviour change, so it is a decision and not a surprise.
+@pytest.mark.requirement("L3-SCR-006")
+def test_a_project_with_nothing_at_all_scores_zero() -> None:
+    """No closed issues and no versions is no evidence, and scores nothing.
 
-    The two band tables disagree about zero: the closed-issue table floors at
-    0.1, the release table at 0.0. The original rule sent a repository with no
-    closed issues down the release branch and scored it 0.0. Taking the
-    stronger signal surfaces the disagreement, and the floor wins.
+    The closed-issue band table floors at 0.1 for any count below 20, zero
+    included. Weighing an empty tracker would therefore score such a project
+    2.0 and place it above one with no evidence at all, which is backwards.
+    Excluding an absent signal - whether absent because the tracker is off or
+    because nothing has been closed - keeps the floor at zero, matching the
+    rule this replaces.
     """
     assert original_rule(0, 0) == 0.0
-    assert score_prevalence(0, 0) == 2.0
-
-    # An enabled-but-empty tracker is treated as weak evidence of intent; a
-    # disabled one is no evidence at all.
+    assert score_prevalence(0, 0) == 0.0
     assert score_prevalence(0, 0, issues_enabled=False) == 0.0
+
+    # One closed issue, or one version, is evidence.
+    assert score_prevalence(1, 0) == 2.0
+    assert score_prevalence(0, 1) == 2.0
 
 
 @pytest.mark.requirement("L3-SCR-007")
 def test_the_stronger_signal_is_named_in_the_log(caplog: pytest.LogCaptureFixture) -> None:
+    # Both signals must be present for one of them to be "stronger"; with no
+    # closed issues the issue signal is excluded rather than compared.
     with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
-        score_prevalence(0, 943)
+        score_prevalence(5, 943)
 
     assert "versions is the stronger signal" in caplog.text
+
+
+@pytest.mark.requirement("L3-SCR-006")
+def test_an_absent_issue_signal_is_reported_rather_than_compared(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        score_prevalence(0, 943)
+
+    assert "no closed issues" in caplog.text
+    assert "stronger signal" not in caplog.text
 
 
 @pytest.mark.requirement("L3-SCR-007")

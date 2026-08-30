@@ -567,18 +567,36 @@ five components. If ranking mature projects is wanted later, the change is to
 the band *boundaries* - the 500 and the 80 - not to the weights, which stay
 0.0 to 1.0 either way.
 
-### One behaviour change to note
+### When a signal is absent
 
-The two band tables disagree about zero. The closed-issue table floors at 0.1;
-the release table scores 0 as 0.0. The original rule sent a repository with no
-closed issues down the release branch, so a project with nothing at all scored
-**0.0**. Taking the stronger signal surfaces the disagreement, and the floor
-wins, so the same project now scores **2.0**.
+The issue signal is weighed only when there is issue evidence. Two situations
+produce none, and both are treated the same way - the signal is excluded and
+the release weight stands alone:
 
-A repository whose tracker is *disabled* and which has no versions still scores
-0.0, because the issue signal is excluded rather than floored. An enabled but
-empty tracker is treated as weak evidence of intent; a disabled one as no
-evidence at all.
+- the issue tracker is switched off, or
+- the tracker is on but nothing has been closed.
+
+This matters because the two band tables disagree about zero. The closed-issue
+table floors at **0.1** for any count below 20, zero included; the release
+table scores 0 as **0.0**. Weighing an empty tracker would therefore score a
+project that has shipped nothing and closed nothing at 2.0, placing it above a
+project with no evidence at all - which is backwards.
+
+Excluding an absent signal keeps that project at **0.0**, matching the rule
+this replaces. One closed issue, or one version, is evidence and scores 2.0.
+
+| Closed | Versions | Tracker | Score |
+|---|---|---|---|
+| 0 | 0 | on | **0.0** |
+| 0 | 0 | off | **0.0** |
+| 1 | 0 | on | 2.0 |
+| 0 | 1 | on | 2.0 |
+| 600 | 0 | on | 20.0 |
+| 600 | 0 | off | **0.0** |
+
+The last row is the case that shows why the tracker flag is collected: a
+repository can accumulate closed issues and later have its tracker switched
+off. The issues remain, but they are no longer a signal this score will read.
 
 ### Earlier recommendation, now adopted
 

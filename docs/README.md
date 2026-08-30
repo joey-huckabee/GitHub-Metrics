@@ -7,6 +7,7 @@
 | Use the tool | [`USER-GUIDE.md`](USER-GUIDE.md) |
 | Look up a flag or exit code | [`CLI-REFERENCE.md`](CLI-REFERENCE.md) |
 | Understand an error code | [`ERROR-CATALOG.md`](ERROR-CATALOG.md) |
+| Know how a metric is calculated | [`METRICS.md`](METRICS.md) |
 | Change the code | [`MAINTAINER-GUIDE.md`](MAINTAINER-GUIDE.md) |
 | Understand how it fits together | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Know what is coming | [`ROADMAP.md`](ROADMAP.md) |
@@ -44,6 +45,7 @@ without its alternatives cannot be reviewed later.
 | [0001](adr/0001-two-column-csv-as-the-inventory-contract.md) | Use a two-column `owner,repoid` CSV as the inventory contract |
 | [0002](adr/0002-concurrency-across-files-not-within-a-file.md) | Apply concurrency across inventory files, not within a single file |
 | [0003](adr/0003-lenient-ingestion-by-default-with-strict-opt-in.md) | Ingest leniently by default, with strict mode as an opt-in |
+| [0004](adr/0004-exit-code-scheme.md) | Use small ordered exit codes rather than sysexits.h |
 
 ## The one structural rule
 

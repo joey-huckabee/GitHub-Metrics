@@ -17,7 +17,10 @@ disable =
     missing-return-type-doc,
     too-few-public-methods,
     duplicate-code,
-    fixme
+    fixme,
+    # A pytest fixture is consumed by a parameter of the same name, so
+    # every test using a locally-defined fixture trips this.
+    redefined-outer-name
 
 [FORMAT]
 max-line-length = 100

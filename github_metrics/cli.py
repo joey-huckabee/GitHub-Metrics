@@ -16,8 +16,12 @@ from github_metrics.analysis.closed_issues import (
     describe_bands,
     score_closed_issues,
 )
+from github_metrics.analysis.releases import RELEASE_BANDS, SATURATION_COUNT
+from github_metrics.analysis.releases import describe_bands as describe_release_bands
+from github_metrics.analysis.releases import score_releases
 from github_metrics.client import GitHubClient
 from github_metrics.collect.closed_issues import ClosedIssueCounts, get_closed_issues
+from github_metrics.collect.releases import ReleaseCounts, get_release_counts
 from github_metrics.config import ConfigError, Settings
 from github_metrics.errors import CollectionError, IngestError
 from github_metrics.geo import Geocoder
@@ -314,11 +318,7 @@ def closed_issues_command(
 
     Exit status is 0 on success and 4 when the repository cannot be read.
     """
-    if "/" not in full_name:
-        raise click.BadParameter(
-            f"expected OWNER/REPOID, got {full_name!r}", param_hint="FULL_NAME"
-        )
-    owner, _, repoid = full_name.partition("/")
+    owner, repoid = _split_slug(full_name)
 
     try:
         with GitHubClient(context.settings()) as client:
@@ -353,3 +353,123 @@ def closed_issues_command(
         return
 
     click.echo("\n".join(_closed_issue_lines(owner, repoid, counts, weight, explain=explain)))
+
+
+def _split_slug(full_name: str) -> tuple[str, str]:
+    """Split an `OWNER/REPOID` argument.
+
+    Args:
+        full_name: The argument as typed.
+
+    Returns:
+        The owner and repository name.
+
+    Raises:
+        click.BadParameter: If the value is not two parts separated by a slash.
+    """
+    owner, separator, repoid = full_name.partition("/")
+    if not separator or not owner or not repoid:
+        raise click.BadParameter(
+            f"expected OWNER/REPOID, got {full_name!r}", param_hint="FULL_NAME"
+        )
+    return owner, repoid
+
+
+def _releases_lines(
+    owner: str, repoid: str, counts: ReleaseCounts, weight: float, *, explain: bool
+) -> list[str]:
+    """Render release counts as aligned label-and-value lines."""
+    lines = [
+        f"{owner}/{repoid}",
+        f"  releases            {counts.releases:>8}",
+        f"  tags                {counts.tags:>8}",
+        f"  distinct versions   {counts.distinct_versions:>8}",
+        f"  weight              {weight:>8}",
+    ]
+    if counts.releases == 0 and counts.tags > 0:
+        lines.append(
+            "  note: this project tags versions but publishes no GitHub Releases, "
+            "so counting releases alone would score it zero"
+        )
+    elif counts.releases > 0:
+        lines.append(f"  tags with no release{counts.tags_without_releases:>8}")
+    if counts.legacy_sum != counts.distinct_versions:
+        inflation = counts.legacy_sum / counts.distinct_versions
+        lines.append(
+            f"  note: releases + tags would report {counts.legacy_sum} "
+            f"({inflation:.2f}x), counting every release twice"
+        )
+    if counts.distinct_versions >= SATURATION_COUNT:
+        lines.append(
+            f"  note: at or above {SATURATION_COUNT} versions the weight is capped at 1.0, "
+            "so this project is indistinguishable from any other above that line"
+        )
+    if explain:
+        lines.append("")
+        lines.append(describe_release_bands())
+    return lines
+
+
+@main.command("releases")
+@click.argument("full_name")
+@click.option(
+    "--explain",
+    is_flag=True,
+    help="Print the scoring bands alongside the result.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+    help="Report format.",
+)
+@click.pass_obj
+def releases_command(
+    context: CliContext, full_name: str, explain: bool, output_format: str
+) -> None:
+    """Report release and tag counts for one OWNER/REPOID repository.
+
+    The scored value is the distinct version count, which is the tag count -
+    not releases plus tags, which counts every release twice.
+
+    Costs one GraphQL point. Exit status is 0 on success and 4 when the
+    repository cannot be read.
+    """
+    owner, repoid = _split_slug(full_name)
+
+    try:
+        with GitHubClient(context.settings()) as client:
+            counts = get_release_counts(client, owner, repoid)
+    except CollectionError as exc:
+        raise RepositoryError(str(exc)) from exc
+
+    weight = score_releases(counts.distinct_versions)
+
+    if output_format == "json":
+        click.echo(
+            json.dumps(
+                {
+                    "owner": owner,
+                    "repoid": repoid,
+                    "releases": counts.releases,
+                    "tags": counts.tags,
+                    "distinct_versions": counts.distinct_versions,
+                    "legacy_sum": counts.legacy_sum,
+                    "weight": weight,
+                    "bands": (
+                        [
+                            {"below": bound, "weight": band_weight}
+                            for bound, band_weight in RELEASE_BANDS
+                        ]
+                        if explain
+                        else None
+                    ),
+                },
+                indent=2,
+            )
+        )
+        return
+
+    click.echo("\n".join(_releases_lines(owner, repoid, counts, weight, explain=explain)))

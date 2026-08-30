@@ -5,5 +5,11 @@ format; that belongs to `github_metrics.sources`. See `docs/ARCHITECTURE.md`.
 """
 
 from github_metrics.collect.closed_issues import ClosedIssueCounts, get_closed_issues
+from github_metrics.collect.releases import ReleaseCounts, get_release_counts
 
-__all__ = ["ClosedIssueCounts", "get_closed_issues"]
+__all__ = [
+    "ClosedIssueCounts",
+    "ReleaseCounts",
+    "get_closed_issues",
+    "get_release_counts",
+]

@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 14
-- L2 requirements: 39
-- L3 requirements: 40
-- Verified L2+L3: 79 of 79 (100.0%)
+- L2 requirements: 42
+- L3 requirements: 46
+- Verified L2+L3: 88 of 88 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -46,7 +46,7 @@ through their children, so counting them too would count the same work twice.
 | L2-CLI-002 | L1-CLI-001 | L3-CLI-002 | _(none)_ | Implemented |
 | L2-CLI-003 | L1-CLI-001 | L3-CLI-003 | _(none)_ | Implemented |
 | L2-CLI-004 | L1-CLI-001 | L3-CLI-004 | _(none)_ | Implemented |
-| L2-CLI-005 | L1-CLI-001 | L3-CLI-005 | _(none)_ | Implemented |
+| L2-CLI-005 | L1-CLI-001 | L3-CLI-005, L3-CLI-006 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -57,6 +57,7 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-003 | L2-CLI-003 | `tests/test_cli_ingest.py::test_json_output_is_machine_readable`<br>`tests/test_cli_ingest.py::test_output_can_be_written_to_a_file` | Implemented |
 | L3-CLI-004 | L2-CLI-004 | `tests/test_cli_ingest.py::test_a_clean_file_exits_zero`<br>`tests/test_cli_ingest.py::test_an_unreadable_file_produces_its_own_exit_status`<br>`tests/test_cli_ingest.py::test_rejected_rows_produce_a_distinct_exit_status`<br>`tests/test_cli_ingest.py::test_strict_mode_reports_the_first_bad_row_and_stops` | Implemented |
 | L3-CLI-005 | L2-CLI-005 | `tests/test_cli_closed_issues.py::test_a_disabled_tracker_is_called_out`<br>`tests/test_cli_closed_issues.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_cli_closed_issues.py::test_an_unreadable_repository_exits_four`<br>`tests/test_cli_closed_issues.py::test_explain_appends_the_bands`<br>`tests/test_cli_closed_issues.py::test_it_appears_in_the_command_list`<br>`tests/test_cli_closed_issues.py::test_it_reports_counts_the_tracker_state_and_the_weight`<br>`tests/test_cli_closed_issues.py::test_json_carries_the_same_values`<br>`tests/test_cli_closed_issues.py::test_json_includes_the_bands_only_when_explained` | Implemented |
+| L3-CLI-006 | L2-CLI-005 | `tests/test_releases.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_releases.py::test_an_unreadable_repository_exits_four`<br>`tests/test_releases.py::test_the_command_emits_json`<br>`tests/test_releases.py::test_the_command_explains_the_release_bands`<br>`tests/test_releases.py::test_the_command_flags_a_tags_only_project`<br>`tests/test_releases.py::test_the_command_reports_both_counts_and_the_distinct_total`<br>`tests/test_releases.py::test_the_command_shows_the_weight_and_warns_about_saturation` | Implemented |
 
 ### CON: Concurrency
 
@@ -169,8 +170,8 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-MET-001 | L2-MET-001, L2-MET-002, L2-MET-003 | _(none)_ | Implemented |
-| L1-MET-002 | L2-MET-004 | _(none)_ | Implemented |
+| L1-MET-001 | L2-MET-001, L2-MET-002, L2-MET-003, L2-MET-005, L2-MET-006 | _(none)_ | Implemented |
+| L1-MET-002 | L2-MET-004, L2-MET-007 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -180,6 +181,9 @@ through their children, so counting them too would count the same work twice.
 | L2-MET-002 | L1-MET-001 | L3-MET-002 | _(none)_ | Implemented |
 | L2-MET-003 | L1-MET-001 | L3-MET-003 | _(none)_ | Implemented |
 | L2-MET-004 | L1-MET-002 | L3-MET-004 | _(none)_ | Implemented |
+| L2-MET-005 | L1-MET-001 | L3-MET-005 | _(none)_ | Implemented |
+| L2-MET-006 | L1-MET-001 | L3-MET-006 | _(none)_ | Implemented |
+| L2-MET-007 | L1-MET-002 | L3-MET-007 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -189,6 +193,9 @@ through their children, so counting them too would count the same work twice.
 | L3-MET-002 | L2-MET-002 | `tests/test_closed_issues.py::test_a_repository_with_no_issues_reports_zero_not_one`<br>`tests/test_closed_issues.py::test_only_counts_are_requested_so_the_cost_stays_at_one_point` | Implemented |
 | L3-MET-003 | L2-MET-003 | `tests/test_closed_issues.py::test_a_missing_repository_is_classified_against_the_live_api`<br>`tests/test_closed_issues.py::test_a_not_found_among_several_errors_is_still_classified`<br>`tests/test_closed_issues.py::test_a_not_found_raised_by_the_transport_is_classified`<br>`tests/test_closed_issues.py::test_a_not_found_returned_without_raising_is_classified`<br>`tests/test_closed_issues.py::test_a_null_repository_without_an_error_still_fails`<br>`tests/test_closed_issues.py::test_a_response_with_no_data_object_fails_loudly`<br>`tests/test_closed_issues.py::test_any_other_transport_error_is_reported_with_the_api_message`<br>`tests/test_closed_issues.py::test_errors_returned_without_raising_are_still_detected` | Implemented |
 | L3-MET-004 | L2-MET-004 | `tests/test_closed_issues.py::test_a_disabled_issue_tracker_is_flagged_rather_than_scored_as_inactivity`<br>`tests/test_closed_issues.py::test_an_enabled_but_empty_tracker_is_noted_without_a_warning`<br>`tests/test_closed_issues.py::test_collection_logs_the_counts_it_found` | Implemented |
+| L3-MET-005 | L2-MET-005 | `tests/test_releases.py::test_a_null_repository_fails_rather_than_raising_a_key_error`<br>`tests/test_releases.py::test_releases_and_tags_are_collected_separately`<br>`tests/test_releases.py::test_tags_without_releases_never_goes_negative`<br>`tests/test_releases.py::test_the_query_asks_for_totals_only_so_the_cost_stays_at_one_point` | Implemented |
+| L3-MET-006 | L2-MET-006 | `tests/test_releases.py::test_distinct_versions_counts_each_version_once`<br>`tests/test_releases.py::test_more_releases_than_tags_never_under_counts`<br>`tests/test_releases.py::test_the_inflation_is_uneven_across_publishing_styles`<br>`tests/test_releases.py::test_the_original_sum_double_counts_every_release` | Implemented |
+| L3-MET-007 | L2-MET-007 | `tests/test_releases.py::test_a_project_with_nothing_shipped_is_called_out`<br>`tests/test_releases.py::test_a_tags_only_project_is_called_out`<br>`tests/test_releases.py::test_drafts_making_the_count_irreproducible_are_warned_about`<br>`tests/test_releases.py::test_the_counts_and_their_relationship_are_logged`<br>`tests/test_releases.py::test_the_previous_definition_is_reported_so_a_changed_score_is_explainable` | Implemented |
 
 ### OUT: Result output and destinations
 
@@ -241,8 +248,8 @@ through their children, so counting them too would count the same work twice.
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-SCR-001 | L1-SCR-001 | L3-SCR-001 | _(none)_ | Implemented |
-| L2-SCR-002 | L1-SCR-001 | L3-SCR-002 | _(none)_ | Implemented |
+| L2-SCR-001 | L1-SCR-001 | L3-SCR-001, L3-SCR-003 | _(none)_ | Implemented |
+| L2-SCR-002 | L1-SCR-001 | L3-SCR-002, L3-SCR-004 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -250,6 +257,8 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-SCR-001 | L2-SCR-001 | `tests/test_closed_issues.py::test_bands_are_ordered_and_have_no_gaps`<br>`tests/test_closed_issues.py::test_every_band_boundary_scores_as_documented`<br>`tests/test_closed_issues.py::test_exactly_five_hundred_scores_rather_than_falling_through`<br>`tests/test_closed_issues.py::test_no_count_is_left_unmapped`<br>`tests/test_closed_issues.py::test_the_band_table_renders_for_diagnostics`<br>`tests/test_closed_issues.py::test_the_score_never_decreases_as_the_count_rises` | Implemented |
 | L3-SCR-002 | L2-SCR-002 | `tests/test_closed_issues.py::test_a_negative_count_is_reported_and_treated_as_zero`<br>`tests/test_closed_issues.py::test_scoring_logs_the_band_it_chose` | Implemented |
+| L3-SCR-003 | L2-SCR-001 | `tests/test_releases.py::test_every_measured_repository_saturates`<br>`tests/test_releases.py::test_every_release_band_boundary_scores_as_documented`<br>`tests/test_releases.py::test_it_saturates_at_the_documented_count`<br>`tests/test_releases.py::test_no_version_count_is_left_unmapped`<br>`tests/test_releases.py::test_the_release_band_table_renders_for_diagnostics`<br>`tests/test_releases.py::test_the_release_score_never_decreases_as_versions_rise`<br>`tests/test_releases.py::test_the_table_never_produces_nine_tenths`<br>`tests/test_releases.py::test_zero_versions_scores_zero_not_the_floor_closed_issues_uses` | Implemented |
+| L3-SCR-004 | L2-SCR-002 | `tests/test_releases.py::test_a_negative_version_count_is_reported_and_treated_as_zero`<br>`tests/test_releases.py::test_release_scoring_logs_the_band_it_chose` | Implemented |
 
 ### VAL: Name validation
 

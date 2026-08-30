@@ -254,7 +254,7 @@ def test_an_enabled_but_empty_tracker_is_noted_without_a_warning(
 ) -> None:
     stub = _StubClient(counts_payload(closed=0, open_=0, enabled=True))
 
-    with caplog.at_level(logging.INFO, logger="github_metrics.collect.closed_issues"):
+    with caplog.at_level(logging.DEBUG, logger="github_metrics.collect.closed_issues"):
         collect(stub)
 
     assert "no issues at all" in caplog.text
@@ -265,7 +265,7 @@ def test_an_enabled_but_empty_tracker_is_noted_without_a_warning(
 def test_collection_logs_the_counts_it_found(caplog: pytest.LogCaptureFixture) -> None:
     stub = _StubClient(counts_payload(closed=3770, open_=691))
 
-    with caplog.at_level(logging.INFO, logger="github_metrics.collect.closed_issues"):
+    with caplog.at_level(logging.DEBUG, logger="github_metrics.collect.closed_issues"):
         collect(stub, "cline", "cline")
 
     assert "cline/cline" in caplog.text

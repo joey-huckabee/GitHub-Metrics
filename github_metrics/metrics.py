@@ -68,7 +68,7 @@ def collect_repository_metrics(
     contributors: list[NamedUser] = list(repo.get_contributors()[:contributor_limit])
     if len(contributors) == contributor_limit:
         # The caller sees a truncated count, not the repository's real total.
-        LOGGER.info(
+        LOGGER.debug(
             "Contributor list for %s truncated at the --contributors limit of %d",
             full_name,
             contributor_limit,

@@ -145,7 +145,7 @@ def score_last_update(last_update_hours: float) -> float:
         0.0
     """
     score = LAST_UPDATE_POINTS * last_update_weight(last_update_hours)
-    LOGGER.info(
+    LOGGER.debug(
         "Last-update score %s/%s from %.2f hours since the last update",
         score,
         LAST_UPDATE_POINTS,

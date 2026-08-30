@@ -111,9 +111,9 @@ def get_timestamps(client: GitHubClient, owner: str, repoid: str) -> RepositoryT
     if timestamps.pushed_at is None:
         # A repository with no commits on any branch. Its updated_at still
         # moves, so the metric that uses it is unaffected.
-        LOGGER.info("%s has never been pushed to", slug)
+        LOGGER.debug("%s has never been pushed to", slug)
 
-    LOGGER.info(
+    LOGGER.debug(
         "%s: created %s, updated %s, pushed %s",
         slug,
         timestamps.created_at,

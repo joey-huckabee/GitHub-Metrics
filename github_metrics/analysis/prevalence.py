@@ -104,13 +104,13 @@ def score_prevalence(
     # table's floor of 0.1, which that table applies to any count below 20.
     if not issues_enabled:
         weight = release_weight
-        LOGGER.info(
+        LOGGER.debug(
             "Prevalence: issue tracker disabled, only the release signal counts (weight %s)",
             release_weight,
         )
     elif closed_issues <= 0:
         weight = release_weight
-        LOGGER.info(
+        LOGGER.debug(
             "Prevalence: no closed issues, so only the release signal counts (weight %s)",
             release_weight,
         )
@@ -135,12 +135,12 @@ def score_prevalence(
             MAX_PREVALENCE_SCORE,
         )
     elif weight == 0.0:
-        LOGGER.info(
+        LOGGER.debug(
             "Prevalence scored 0.0: no closed issues and no versions, so there is "
             "no evidence this project has shipped or been maintained"
         )
 
-    LOGGER.info(
+    LOGGER.debug(
         "Prevalence %s/%s (weight %s) from %d closed issues and %d versions",
         score,
         MAX_PREVALENCE_SCORE,

@@ -117,7 +117,7 @@ def test_a_disabled_tracker_still_scores_on_releases() -> None:
 
 @pytest.mark.requirement("L3-SCR-006")
 def test_a_disabled_tracker_is_reported(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         score_prevalence(0, 10, issues_enabled=False)
 
     assert "issue tracker disabled" in caplog.text
@@ -170,7 +170,7 @@ def test_saturation_is_logged_so_a_constant_score_is_explainable(
 
 @pytest.mark.requirement("L3-SCR-007")
 def test_no_evidence_at_all_is_logged(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         score_prevalence(0, 0)
 
     assert "no evidence" in caplog.text
@@ -210,7 +210,7 @@ def test_the_stronger_signal_is_named_in_the_log(caplog: pytest.LogCaptureFixtur
 def test_an_absent_issue_signal_is_reported_rather_than_compared(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         score_prevalence(0, 943)
 
     assert "no closed issues" in caplog.text

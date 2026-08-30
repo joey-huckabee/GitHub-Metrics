@@ -191,5 +191,5 @@ def score_trusted_org_bonus(owner: str, registry: TrustedOrganizations | None = 
         return 0.0
 
     institution = active.institution_for(owner)
-    LOGGER.info("Trusted-organisation bonus awarded to %r, backed by %s", owner, institution)
+    LOGGER.debug("Trusted-organisation bonus awarded to %r, backed by %s", owner, institution)
     return TRUSTED_ORG_BONUS

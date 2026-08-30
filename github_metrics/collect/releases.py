@@ -145,7 +145,7 @@ def _log_shape(slug: str, counts: ReleaseCounts) -> None:
     reader looking at `398` cannot tell whether that is most of the tags or a
     handful of them.
     """
-    LOGGER.info(
+    LOGGER.debug(
         "%s: %d releases, %d tags, %d distinct versions",
         slug,
         counts.releases,
@@ -165,14 +165,14 @@ def _log_shape(slug: str, counts: ReleaseCounts) -> None:
             counts.tags,
         )
     elif counts.releases == 0 and counts.tags > 0:
-        LOGGER.info(
+        LOGGER.debug(
             "%s tags versions (%d) but publishes no GitHub Releases; counting releases "
             "alone would score it zero",
             slug,
             counts.tags,
         )
     elif counts.tags == 0:
-        LOGGER.info("%s has no tags and no releases; it has shipped no versioned artifact", slug)
+        LOGGER.debug("%s has no tags and no releases; it has shipped no versioned artifact", slug)
     else:
         LOGGER.debug(
             "%s: %d of %d tags carry a release (%d tags without one)",

@@ -211,7 +211,7 @@ def test_a_long_abandoned_repository_scores_nothing() -> None:
 
 @pytest.mark.requirement("L3-SCR-011")
 def test_the_score_is_logged_with_its_budget(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         score_last_update(9_000.0)
 
     assert "3.0/15.0" in caplog.text

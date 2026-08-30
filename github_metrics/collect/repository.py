@@ -196,7 +196,7 @@ def _build(owner: str, repoid: str, slug: str, repository: dict[str, Any]) -> Re
 
 def _log_shape(slug: str, metadata: RepoMetaData) -> None:
     """Narrate what was collected, and anything unusual about it."""
-    LOGGER.info(
+    LOGGER.debug(
         "%s: %d stars, %d forks, %d closed issues, %d distinct versions, owned by %s (%s)",
         slug,
         metadata.stars,
@@ -220,7 +220,7 @@ def _log_shape(slug: str, metadata: RepoMetaData) -> None:
         )
 
     if not metadata.is_organization:
-        LOGGER.info(
+        LOGGER.debug(
             "%s is owned by an individual account, so its organization column is empty",
             slug,
         )

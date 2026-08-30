@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 17
-- L2 requirements: 62
-- L3 requirements: 84
-- Verified L2+L3: 146 of 146 (100.0%)
+- L2 requirements: 63
+- L3 requirements: 85
+- Verified L2+L3: 148 of 148 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -184,19 +184,21 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-LOG-001 | L2-LOG-001 | _(none)_ | Implemented |
+| L1-LOG-001 | L2-LOG-001, L2-LOG-002 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
 | L2-LOG-001 | L1-LOG-001 | L3-LOG-001 | _(none)_ | Implemented |
+| L2-LOG-002 | L1-LOG-001 | L3-LOG-002 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
 | L3-LOG-001 | L2-LOG-001 | `tests/test_ingest.py::test_row_issues_are_logged_at_debug` | Implemented |
+| L3-LOG-002 | L2-LOG-002 | `tests/test_repository.py::test_an_unremarkable_repository_is_collected_in_silence`<br>`tests/test_repository.py::test_something_worth_doubting_is_still_a_warning`<br>`tests/test_repository.py::test_the_detail_is_still_there_at_debug` | Implemented |
 
 ### MET: Metric collection
 

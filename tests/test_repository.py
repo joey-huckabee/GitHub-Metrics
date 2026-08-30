@@ -151,7 +151,7 @@ def test_a_personally_owned_repository_reports_no_organisation() -> None:
 
 @pytest.mark.requirement("L3-MET-013")
 def test_a_personally_owned_repository_is_noted(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         collect(_StubClient(payload(owner_type="User")))
 
     assert "organization column is empty" in caplog.text
@@ -237,6 +237,45 @@ def test_a_repository_never_pushed_to_is_handled() -> None:
     never["data"]["repository"]["pushedAt"] = None
 
     assert collect(_StubClient(never)).timestamps.pushed_at is None
+
+
+# ---------------------------------------------------------------------------
+# Log volume
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-LOG-002")
+def test_an_unremarkable_repository_is_collected_in_silence(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """One line per repository is four hundred lines on a real inventory.
+
+    Nothing here is wrong, so nothing here is worth an operator's attention at
+    the default level. The detail is still available; it is just a level down.
+    """
+    with caplog.at_level(logging.INFO, logger="github_metrics"):
+        collect(_StubClient(payload()))
+
+    assert caplog.records == []
+
+
+@pytest.mark.requirement("L3-LOG-002")
+def test_the_detail_is_still_there_at_debug(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
+        collect(_StubClient(payload()))
+
+    assert "64574 stars" in caplog.text
+
+
+@pytest.mark.requirement("L3-LOG-002")
+def test_something_worth_doubting_is_still_a_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # The rule quietens narration, not diagnosis.
+    with caplog.at_level(logging.WARNING, logger=LOGGER_NAME):
+        collect(_StubClient(payload(owner_login="fastapi")), "tiangolo", "fastapi")
+
+    assert caplog.records
 
 
 @pytest.mark.requirement("L3-MET-013")

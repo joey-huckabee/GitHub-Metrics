@@ -133,7 +133,7 @@ def test_collect_warns_when_the_contributor_list_is_truncated(
     )
     client = cast(GitHubClient, _StubClient(repo))
 
-    with caplog.at_level(logging.INFO, logger="github_metrics.metrics"):
+    with caplog.at_level(logging.DEBUG, logger="github_metrics.metrics"):
         metrics = collect_repository_metrics(client, "owner/repo", contributor_limit=3)
 
     assert metrics.contributors == 3
@@ -152,7 +152,7 @@ def test_collect_is_quiet_when_the_contributor_list_is_complete(
     )
     client = cast(GitHubClient, _StubClient(repo))
 
-    with caplog.at_level(logging.INFO, logger="github_metrics.metrics"):
+    with caplog.at_level(logging.DEBUG, logger="github_metrics.metrics"):
         metrics = collect_repository_metrics(client, "owner/repo", contributor_limit=25)
 
     assert metrics.contributors == 1

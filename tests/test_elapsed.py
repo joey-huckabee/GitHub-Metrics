@@ -192,7 +192,7 @@ def test_the_parsed_timestamps_are_timezone_aware() -> None:
 def test_a_repository_never_pushed_to_is_handled(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    with caplog.at_level(logging.INFO, logger=COLLECT_LOGGER):
+    with caplog.at_level(logging.DEBUG, logger=COLLECT_LOGGER):
         stamps = collect(_StubClient(payload(pushed=None)))
 
     assert stamps.pushed_at is None

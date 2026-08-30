@@ -20,10 +20,10 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 ## Coverage summary
 
-- L1 requirements: 11
-- L2 requirements: 32
-- L3 requirements: 33
-- Verified L2+L3: 65 of 65 (100.0%)
+- L1 requirements: 14
+- L2 requirements: 38
+- L3 requirements: 39
+- Verified L2+L3: 77 of 77 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -161,6 +161,33 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-LOG-001 | L2-LOG-001 | `tests/test_ingest.py::test_row_issues_are_logged_at_debug` | Implemented |
 
+### MET: Metric collection
+
+**L1 → L2**
+
+| L1 ID | L2 Children | Test Artifacts | Status |
+|-------|-------------|----------------|--------|
+| L1-MET-001 | L2-MET-001, L2-MET-002, L2-MET-003 | _(none)_ | Implemented |
+| L1-MET-002 | L2-MET-004 | _(none)_ | Implemented |
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-MET-001 | L1-MET-001 | L3-MET-001 | _(none)_ | Implemented |
+| L2-MET-002 | L1-MET-001 | L3-MET-002 | _(none)_ | Implemented |
+| L2-MET-003 | L1-MET-001 | L3-MET-003 | _(none)_ | Implemented |
+| L2-MET-004 | L1-MET-002 | L3-MET-004 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-MET-001 | L2-MET-001 | `tests/test_closed_issues.py::test_counts_are_read_from_the_response`<br>`tests/test_closed_issues.py::test_the_query_asks_only_for_issues_never_pull_requests` | Implemented |
+| L3-MET-002 | L2-MET-002 | `tests/test_closed_issues.py::test_a_repository_with_no_issues_reports_zero_not_one`<br>`tests/test_closed_issues.py::test_only_counts_are_requested_so_the_cost_stays_at_one_point` | Implemented |
+| L3-MET-003 | L2-MET-003 | `tests/test_closed_issues.py::test_a_not_found_error_is_classified_rather_than_generic`<br>`tests/test_closed_issues.py::test_a_null_repository_without_an_error_still_fails`<br>`tests/test_closed_issues.py::test_a_response_with_no_data_object_fails_loudly`<br>`tests/test_closed_issues.py::test_any_other_graphql_error_is_reported_with_its_message`<br>`tests/test_closed_issues.py::test_errors_are_detected_even_though_graphql_answers_http_200` | Implemented |
+| L3-MET-004 | L2-MET-004 | `tests/test_closed_issues.py::test_a_disabled_issue_tracker_is_flagged_rather_than_scored_as_inactivity`<br>`tests/test_closed_issues.py::test_an_enabled_but_empty_tracker_is_noted_without_a_warning`<br>`tests/test_closed_issues.py::test_collection_logs_the_counts_it_found` | Implemented |
+
 ### OUT: Result output and destinations
 
 **L1 → L2**
@@ -199,6 +226,28 @@ through their children, so counting them too would count the same work twice.
 | L3-OUT-008 | L2-OUT-004 | `tests/test_output.py::test_console_marks_an_unknown_value_rather_than_leaving_a_gap`<br>`tests/test_output.py::test_console_renders_vertically_one_label_per_line`<br>`tests/test_output.py::test_console_says_so_when_there_is_nothing_to_show`<br>`tests/test_output.py::test_console_separates_repositories` | Implemented |
 | L3-OUT-009 | L2-OUT-008 | `tests/test_output.py::test_a_directory_gets_the_default_filename`<br>`tests/test_output.py::test_a_missing_parent_directory_fails_early`<br>`tests/test_output.py::test_a_named_file_is_used_as_given`<br>`tests/test_output.py::test_a_trailing_separator_reads_as_a_directory_even_if_absent`<br>`tests/test_output.py::test_no_destination_means_the_console` | Implemented |
 | L3-OUT-010 | L2-OUT-009 | `tests/test_output.py::test_a_naive_scan_date_is_rejected`<br>`tests/test_output.py::test_a_scan_identifier_is_timezone_aware_and_unique`<br>`tests/test_output.py::test_one_identity_stamps_every_row_of_a_run` | Implemented |
+
+### SCR: Scoring
+
+**L1 → L2**
+
+| L1 ID | L2 Children | Test Artifacts | Status |
+|-------|-------------|----------------|--------|
+| L1-SCR-001 | L2-SCR-001, L2-SCR-002 | _(none)_ | Implemented |
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-SCR-001 | L1-SCR-001 | L3-SCR-001 | _(none)_ | Implemented |
+| L2-SCR-002 | L1-SCR-001 | L3-SCR-002 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-SCR-001 | L2-SCR-001 | `tests/test_closed_issues.py::test_bands_are_ordered_and_have_no_gaps`<br>`tests/test_closed_issues.py::test_every_band_boundary_scores_as_documented`<br>`tests/test_closed_issues.py::test_exactly_five_hundred_scores_rather_than_falling_through`<br>`tests/test_closed_issues.py::test_no_count_is_left_unmapped`<br>`tests/test_closed_issues.py::test_the_band_table_renders_for_diagnostics`<br>`tests/test_closed_issues.py::test_the_score_never_decreases_as_the_count_rises` | Implemented |
+| L3-SCR-002 | L2-SCR-002 | `tests/test_closed_issues.py::test_a_negative_count_is_reported_and_treated_as_zero`<br>`tests/test_closed_issues.py::test_scoring_logs_the_band_it_chose` | Implemented |
 
 ### VAL: Name validation
 

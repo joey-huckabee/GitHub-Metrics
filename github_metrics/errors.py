@@ -103,6 +103,34 @@ class StrictModeError(IngestError):
     code = "GM-ING-020"
 
 
+class CollectionError(GitHubMetricsError):
+    """Base class for failures collecting data from the GitHub API."""
+
+    code = "GM-COL-000"
+
+
+class RepositoryNotFoundError(CollectionError):
+    """The repository does not exist, is private, or was renamed.
+
+    Syntactic validation at ingestion cannot detect any of these: a
+    well-formed reference names a plausible repository, not one that exists.
+    This is where that distinction finally surfaces.
+    """
+
+    code = "GM-COL-001"
+
+
+class GraphQLQueryError(CollectionError):
+    """The GraphQL API returned errors for a query.
+
+    GraphQL answers with HTTP 200 and an `errors` array rather than an HTTP
+    error status, so a failure here is invisible to any check that only looks
+    at the status code.
+    """
+
+    code = "GM-COL-002"
+
+
 class OutputError(GitHubMetricsError):
     """Base class for failures producing output."""
 

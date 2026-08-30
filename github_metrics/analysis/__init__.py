@@ -8,7 +8,11 @@ lets the bands be tested exhaustively without a token.
 from github_metrics.analysis.closed_issues import score_closed_issues
 from github_metrics.analysis.prevalence import score_prevalence
 from github_metrics.analysis.releases import score_releases
-from github_metrics.analysis.trusted_orgs import TrustedOrganizations, is_trusted_org
+from github_metrics.analysis.trusted_orgs import (
+    TrustedOrganizations,
+    is_trusted_org,
+    score_trusted_org_bonus,
+)
 
 __all__ = [
     "TrustedOrganizations",
@@ -16,4 +20,5 @@ __all__ = [
     "score_closed_issues",
     "score_prevalence",
     "score_releases",
+    "score_trusted_org_bonus",
 ]

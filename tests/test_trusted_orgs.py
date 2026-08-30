@@ -8,8 +8,10 @@ import pytest
 
 from github_metrics.analysis.trusted_orgs import (
     DEFAULT_TRUSTED_ORGANIZATIONS,
+    TRUSTED_ORG_BONUS,
     TrustedOrganizations,
     is_trusted_org,
+    score_trusted_org_bonus,
 )
 
 LOGGER_NAME = "github_metrics.analysis.trusted_orgs"
@@ -125,3 +127,86 @@ def test_the_loaded_list_is_logged(caplog: pytest.LogCaptureFixture) -> None:
 
     assert "Trusted organisations loaded" in caplog.text
     assert "spring-projects" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# The bonus
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-TRU-005")
+@pytest.mark.parametrize("owner", ["spring-projects", "google", "hibernate"])
+def test_a_trusted_owner_earns_the_bonus(owner: str) -> None:
+    assert score_trusted_org_bonus(owner) == TRUSTED_ORG_BONUS
+
+
+@pytest.mark.requirement("L3-TRU-005")
+@pytest.mark.parametrize("owner", ["cline", "pypa", "urllib3", "torvalds"])
+def test_an_untrusted_owner_earns_nothing(owner: str) -> None:
+    assert score_trusted_org_bonus(owner) == 0.0
+
+
+@pytest.mark.requirement("L3-TRU-005")
+def test_the_bonus_is_ten_points() -> None:
+    # The reference row carries is_trusted_org false and a bonus of 0, giving
+    # a total_score of 72. The same repository under a trusted owner would
+    # score 82.
+    assert TRUSTED_ORG_BONUS == 10.0
+
+
+@pytest.mark.requirement("L3-TRU-005")
+def test_the_bonus_is_all_or_nothing() -> None:
+    # Trust is a yes-or-no judgement, so unlike every other component there is
+    # nothing for a weight to interpolate between.
+    awarded = {score_trusted_org_bonus(owner) for owner in ("google", "cline", "pypa")}
+
+    assert awarded == {TRUSTED_ORG_BONUS, 0.0}
+
+
+@pytest.mark.requirement("L3-TRU-005")
+@pytest.mark.parametrize("spelling", ["google", "Google", "GOOGLE", "  google  "])
+def test_the_bonus_follows_the_same_case_rules_as_the_check(spelling: str) -> None:
+    assert score_trusted_org_bonus(spelling) == TRUSTED_ORG_BONUS
+
+
+@pytest.mark.requirement("L3-TRU-005")
+def test_the_bonus_and_the_column_cannot_disagree() -> None:
+    # Both resolve through the same registry, so there is one answer to "is
+    # this owner trusted" rather than two that might drift.
+    registry = TrustedOrganizations({"apache": "ASF"})
+
+    for owner in ("apache", "google", "cline"):
+        expected = TRUSTED_ORG_BONUS if is_trusted_org(owner, registry) else 0.0
+        assert score_trusted_org_bonus(owner, registry) == expected
+
+
+@pytest.mark.requirement("L3-TRU-005")
+def test_a_caller_supplied_registry_changes_who_is_paid() -> None:
+    registry = TrustedOrganizations({"apache": "ASF"})
+
+    assert score_trusted_org_bonus("apache", registry) == TRUSTED_ORG_BONUS
+    assert score_trusted_org_bonus("google", registry) == 0.0
+
+
+@pytest.mark.requirement("L3-TRU-006")
+def test_an_awarded_bonus_names_the_institution(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        score_trusted_org_bonus("hibernate")
+
+    # The institution is why the bonus was paid, so it belongs in the record.
+    assert "Red Hat" in caplog.text
+    assert "hibernate" in caplog.text
+
+    # The amount deliberately does not: it is an invariant, so logging it adds
+    # a number that never varies and can only go stale against the documented
+    # value. See the module docstring.
+    assert str(TRUSTED_ORG_BONUS) not in caplog.text
+
+
+@pytest.mark.requirement("L3-TRU-006")
+def test_a_refused_bonus_is_logged_at_debug(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
+        score_trusted_org_bonus("cline")
+
+    assert "No trusted-organisation bonus" in caplog.text
+    assert "cline" in caplog.text

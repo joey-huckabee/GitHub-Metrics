@@ -20,10 +20,10 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 ## Coverage summary
 
-- L1 requirements: 14
-- L2 requirements: 44
-- L3 requirements: 49
-- Verified L2+L3: 93 of 93 (100.0%)
+- L1 requirements: 15
+- L2 requirements: 47
+- L3 requirements: 53
+- Verified L2+L3: 100 of 100 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -264,6 +264,31 @@ through their children, so counting them too would count the same work twice.
 | L3-SCR-005 | L2-SCR-003 | `tests/test_prevalence.py::test_the_original_cliff_at_one_closed_issue_is_gone`<br>`tests/test_prevalence.py::test_the_result_is_twenty_times_the_stronger_weight`<br>`tests/test_prevalence.py::test_the_score_never_decreases_as_either_input_rises`<br>`tests/test_prevalence.py::test_the_score_stays_within_its_points_budget`<br>`tests/test_prevalence.py::test_the_stronger_signal_wins` | Implemented |
 | L3-SCR-006 | L2-SCR-004 | `tests/test_prevalence.py::test_a_disabled_tracker_excludes_the_issue_signal_rather_than_scoring_it`<br>`tests/test_prevalence.py::test_a_disabled_tracker_is_reported`<br>`tests/test_prevalence.py::test_a_disabled_tracker_still_scores_on_releases`<br>`tests/test_prevalence.py::test_a_project_with_nothing_at_all_scores_zero`<br>`tests/test_prevalence.py::test_an_absent_issue_signal_is_reported_rather_than_compared` | Implemented |
 | L3-SCR-007 | L2-SCR-003 | `tests/test_prevalence.py::test_every_measured_repository_reaches_the_maximum`<br>`tests/test_prevalence.py::test_it_still_discriminates_below_the_ceilings`<br>`tests/test_prevalence.py::test_no_evidence_at_all_is_logged`<br>`tests/test_prevalence.py::test_saturation_is_logged_so_a_constant_score_is_explainable`<br>`tests/test_prevalence.py::test_the_reference_row_is_reproduced`<br>`tests/test_prevalence.py::test_the_stronger_signal_is_named_in_the_log` | Implemented |
+
+### TRU: Trust policy
+
+**L1 → L2**
+
+| L1 ID | L2 Children | Test Artifacts | Status |
+|-------|-------------|----------------|--------|
+| L1-TRU-001 | L2-TRU-001, L2-TRU-002, L2-TRU-003 | _(none)_ | Implemented |
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-TRU-001 | L1-TRU-001 | L3-TRU-001, L3-TRU-002 | _(none)_ | Implemented |
+| L2-TRU-002 | L1-TRU-001 | L3-TRU-003 | _(none)_ | Implemented |
+| L2-TRU-003 | L1-TRU-001 | L3-TRU-004 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-TRU-001 | L2-TRU-001 | `tests/test_trusted_orgs.py::test_an_unlisted_owner_is_not_trusted`<br>`tests/test_trusted_orgs.py::test_the_default_list_holds_exactly_the_three_agreed_entries`<br>`tests/test_trusted_orgs.py::test_the_listed_owners_are_trusted` | Implemented |
+| L3-TRU-002 | L2-TRU-001 | `tests/test_trusted_orgs.py::test_a_registry_folds_the_case_of_keys_it_is_given`<br>`tests/test_trusted_orgs.py::test_matching_ignores_case_and_padding`<br>`tests/test_trusted_orgs.py::test_the_lookup_is_logged` | Implemented |
+| L3-TRU-003 | L2-TRU-002 | `tests/test_trusted_orgs.py::test_an_untrusted_owner_has_no_institution`<br>`tests/test_trusted_orgs.py::test_the_institution_behind_an_owner_is_recoverable`<br>`tests/test_trusted_orgs.py::test_the_institutions_are_written_as_the_institutions_write_them` | Implemented |
+| L3-TRU-004 | L2-TRU-003 | `tests/test_trusted_orgs.py::test_a_caller_can_supply_its_own_list`<br>`tests/test_trusted_orgs.py::test_an_empty_list_trusts_nobody`<br>`tests/test_trusted_orgs.py::test_the_default_list_cannot_be_mutated_by_a_caller`<br>`tests/test_trusted_orgs.py::test_the_loaded_list_is_logged` | Implemented |
 
 ### VAL: Name validation
 

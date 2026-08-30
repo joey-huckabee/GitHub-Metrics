@@ -76,9 +76,9 @@ All six components are `float`. See the rendering conflict below.
 | `forks_score` | `float` | `forks` | `6900` → `15.0` | **TBD** |
 | `maturity_score` | `float` | `age_days` | `736.5466017006597` → `12.0` | **TBD** |
 | `last_update_score` | `float` | `last_update_hours` | `8.10177526` → `15` | **TBD** |
-| `trusted_org_bonus` | `float` | `is_trusted_org` | `false` → `0` | **TBD** |
+| `trusted_org_bonus` | `float` | `is_trusted_org` | `false` → `0`. The value for a trusted owner has not been supplied. | **TBD** |
 | `total_score` | `float` | the six above | Arithmetic sum. | **Settled** |
-| `is_trusted_org` | `bool` | ? | Rendered lowercase (`false`, not Python's `False`). The source of the trusted list, and whether it matches on `owner` or `organization`, are undecided. | **TBD** |
+| `is_trusted_org` | `bool` | policy | Owner is on the trusted list, matched case-insensitively. See [Trusted organisations](#trusted-organisations). | **Settled** |
 
 ### Resolved: all six components are floats
 
@@ -643,6 +643,66 @@ versions and 500 closed issues are both cleared by any established project.
    fine and the constant 20.0 is the intended answer. If it is meant to
    contribute to a ranking, the ceilings need raising, and that is a
    calibration exercise against a real inventory rather than a code change.
+
+---
+
+## Trusted organisations
+
+**Status: `is_trusted_org` is settled. `trusted_org_bonus` is not** - the
+points a trusted owner earns have not been supplied.
+
+### The list
+
+| Owner | Institution |
+|---|---|
+| `spring-projects` | `VMware` |
+| `google` | `Google` |
+| `hibernate` | `Red Hat` |
+
+Matching is case-insensitive, because GitHub account names are.
+
+### This is policy, not measurement
+
+Every other value in the output is something GitHub reports. This one is a
+judgement, and the API cannot supply it:
+
+| Owner | GitHub org name | `company` field | Trusted-list value |
+|---|---|---|---|
+| `spring-projects` | Spring | null | **VMware** |
+| `hibernate` | Hibernate | null | **Red Hat** |
+| `google` | Google | null | Google |
+
+The values are the **institution behind** the organisation. GitHub knows
+`spring-projects` as "Spring"; that VMware stands behind it is editorial
+knowledge held by this project. The `company` field is null for all three, so
+there is no API route to it either.
+
+Two consequences follow. The list must be maintained by hand, and it must be
+replaceable without a code change - an analysis that trusts a different set of
+institutions is a different analysis, not a different program. The registry
+accepts an explicit mapping today; a configuration source is the natural next
+step.
+
+### The institution names are the product
+
+These strings end up in a report, so their spelling matters. They are written
+as the institutions write them - "Red Hat", not "Redhat". An earlier revision
+carried a trailing colon on `VMware:` and an unspaced `Redhat`; both were
+transcription slips and are corrected. A test asserts the spellings and that no
+value ends in punctuation.
+
+### Open
+
+1. **What is `trusted_org_bonus` worth** when the owner is trusted? The
+   reference row has `is_trusted_org` false and the bonus `0`, so the non-zero
+   value has never been observed.
+2. **Does the `organization` column come from this map?** The institution names
+   are the only editorial data in the system, and `organization` is the only
+   column whose source is still unidentified. In the reference row it reads
+   `cline`, which equals the owner - consistent with a fallback to the owner
+   for an unlisted org, and equally consistent with the column simply echoing
+   the owner. Note that the API reports `organization` as **null** for a
+   user-owned repository, which the owner never is.
 
 ## Related documents
 

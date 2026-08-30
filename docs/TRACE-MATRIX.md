@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 17
-- L2 requirements: 52
-- L3 requirements: 62
-- Verified L2+L3: 114 of 114 (100.0%)
+- L2 requirements: 54
+- L3 requirements: 66
+- Verified L2+L3: 120 of 120 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -272,16 +272,18 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-SCR-001 | L2-SCR-001, L2-SCR-002, L2-SCR-003 | _(none)_ | Implemented |
+| L1-SCR-001 | L2-SCR-001, L2-SCR-002, L2-SCR-003, L2-SCR-005, L2-SCR-006 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-SCR-001 | L1-SCR-001 | L3-SCR-001, L3-SCR-003 | _(none)_ | Implemented |
-| L2-SCR-002 | L1-SCR-001 | L3-SCR-002, L3-SCR-004 | _(none)_ | Implemented |
+| L2-SCR-001 | L1-SCR-001 | L3-SCR-001, L3-SCR-003, L3-SCR-008 | _(none)_ | Implemented |
+| L2-SCR-002 | L1-SCR-001 | L3-SCR-002, L3-SCR-004, L3-SCR-010 | _(none)_ | Implemented |
 | L2-SCR-003 | L1-SCR-001 | L3-SCR-005, L3-SCR-007 | _(none)_ | Implemented |
 | L2-SCR-004 | L1-MET-002 | L3-SCR-006 | _(none)_ | Implemented |
+| L2-SCR-005 | L1-SCR-001 | L3-SCR-009 | _(none)_ | Implemented |
+| L2-SCR-006 | L1-SCR-001 | L3-SCR-011 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -294,6 +296,10 @@ through their children, so counting them too would count the same work twice.
 | L3-SCR-005 | L2-SCR-003 | `tests/test_prevalence.py::test_the_original_cliff_at_one_closed_issue_is_gone`<br>`tests/test_prevalence.py::test_the_result_is_twenty_times_the_stronger_weight`<br>`tests/test_prevalence.py::test_the_score_never_decreases_as_either_input_rises`<br>`tests/test_prevalence.py::test_the_score_stays_within_its_points_budget`<br>`tests/test_prevalence.py::test_the_stronger_signal_wins` | Implemented |
 | L3-SCR-006 | L2-SCR-004 | `tests/test_prevalence.py::test_a_disabled_tracker_excludes_the_issue_signal_rather_than_scoring_it`<br>`tests/test_prevalence.py::test_a_disabled_tracker_is_reported`<br>`tests/test_prevalence.py::test_a_disabled_tracker_still_scores_on_releases`<br>`tests/test_prevalence.py::test_a_project_with_nothing_at_all_scores_zero`<br>`tests/test_prevalence.py::test_an_absent_issue_signal_is_reported_rather_than_compared` | Implemented |
 | L3-SCR-007 | L2-SCR-003 | `tests/test_prevalence.py::test_every_measured_repository_reaches_the_maximum`<br>`tests/test_prevalence.py::test_it_still_discriminates_below_the_ceilings`<br>`tests/test_prevalence.py::test_no_evidence_at_all_is_logged`<br>`tests/test_prevalence.py::test_saturation_is_logged_so_a_constant_score_is_explainable`<br>`tests/test_prevalence.py::test_the_reference_row_is_reproduced`<br>`tests/test_prevalence.py::test_the_stronger_signal_is_named_in_the_log` | Implemented |
+| L3-SCR-008 | L2-SCR-001 | `tests/test_last_update.py::test_every_band_boundary_scores_as_documented`<br>`tests/test_last_update.py::test_every_non_negative_hour_scores_exactly_what_it_scored_before`<br>`tests/test_last_update.py::test_no_input_is_left_unmapped`<br>`tests/test_last_update.py::test_the_band_table_renders_for_diagnostics`<br>`tests/test_last_update.py::test_the_score_never_rises_as_a_repository_goes_stale` | Implemented |
+| L3-SCR-009 | L2-SCR-005 | `tests/test_last_update.py::test_the_bounds_are_exact_integers`<br>`tests/test_last_update.py::test_the_dropped_boundary_never_decided_anything`<br>`tests/test_last_update.py::test_the_table_has_no_redundant_edges_left` | Implemented |
+| L3-SCR-010 | L2-SCR-002 | `tests/test_last_update.py::test_a_negative_input_is_reported_rather_than_scored_as_fresh` | Implemented |
+| L3-SCR-011 | L2-SCR-006 | `tests/test_last_update.py::test_a_long_abandoned_repository_scores_nothing`<br>`tests/test_last_update.py::test_the_column_is_fifteen_points_times_the_weight`<br>`tests/test_last_update.py::test_the_reference_row_is_reproduced`<br>`tests/test_last_update.py::test_the_score_is_logged_with_its_budget` | Implemented |
 
 ### TRU: Trust policy
 

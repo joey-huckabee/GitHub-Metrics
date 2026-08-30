@@ -103,6 +103,32 @@ class StrictModeError(IngestError):
     code = "GM-ING-020"
 
 
+class CredentialsError(GitHubMetricsError):
+    """Base class for problems with the GitHub credentials."""
+
+    code = "GM-CFG-000"
+
+
+class MissingCredentialsError(CredentialsError):
+    """No token was supplied, by flag or by environment.
+
+    Distinct from a rejected token because the fix is different: this one is
+    "configure a token", not "your token no longer works".
+    """
+
+    code = "GM-CFG-001"
+
+
+class InvalidCredentialsError(CredentialsError):
+    """GitHub refused the token that was supplied.
+
+    Expired, revoked, mistyped, or scoped too narrowly for the endpoint. The
+    token exists; GitHub will not accept it.
+    """
+
+    code = "GM-CFG-002"
+
+
 class CollectionError(GitHubMetricsError):
     """Base class for failures collecting data from the GitHub API."""
 

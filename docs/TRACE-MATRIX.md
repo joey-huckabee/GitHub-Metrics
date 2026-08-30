@@ -20,15 +20,45 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 ## Coverage summary
 
-- L1 requirements: 15
-- L2 requirements: 47
-- L3 requirements: 53
-- Verified L2+L3: 100 of 100 (100.0%)
+- L1 requirements: 17
+- L2 requirements: 51
+- L3 requirements: 60
+- Verified L2+L3: 111 of 111 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
 
 ---
+
+### CFG: Credentials
+
+**L1 → L2**
+
+| L1 ID | L2 Children | Test Artifacts | Status |
+|-------|-------------|----------------|--------|
+| L1-CFG-001 | L2-CFG-001, L2-CFG-002, L2-CFG-003 | _(none)_ | Implemented |
+| L1-CFG-002 | L2-CFG-004 | _(none)_ | Implemented |
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-CFG-001 | L1-CFG-001 | L3-CFG-001 | _(none)_ | Implemented |
+| L2-CFG-002 | L1-CFG-001 | L3-CFG-003, L3-CFG-007 | _(none)_ | Implemented |
+| L2-CFG-003 | L1-CFG-001 | L3-CFG-004, L3-CFG-006 | _(none)_ | Implemented |
+| L2-CFG-004 | L1-CFG-002 | L3-CFG-002, L3-CFG-005 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-CFG-001 | L2-CFG-001 | `tests/test_config.py::test_a_blank_explicit_token_falls_back_to_the_environment`<br>`tests/test_config.py::test_an_explicit_token_beats_the_environment`<br>`tests/test_config.py::test_an_explicit_token_works_with_no_environment_at_all`<br>`tests/test_config.py::test_the_token_source_is_logged_but_never_the_token` | Implemented |
+| L3-CFG-002 | L2-CFG-004 | `tests/test_credentials.py::test_an_unknown_prefix_is_reported_as_such`<br>`tests/test_credentials.py::test_every_documented_prefix_is_recognised` | Implemented |
+| L3-CFG-003 | L2-CFG-002 | `tests/test_credentials.py::test_a_fine_grained_token_reporting_no_scopes_is_not_a_failure`<br>`tests/test_credentials.py::test_a_good_token_reports_scopes_and_budgets` | Implemented |
+| L3-CFG-004 | L2-CFG-003 | `tests/test_credentials.py::test_a_borrowed_client_is_not_closed_by_the_check`<br>`tests/test_credentials.py::test_a_rejected_token_raises_with_its_code`<br>`tests/test_credentials.py::test_any_other_api_failure_also_raises_rather_than_passing` | Implemented |
+| L3-CFG-005 | L2-CFG-004 | `tests/test_credentials.py::test_an_empty_scope_list_is_explained_rather_than_left_bare`<br>`tests/test_credentials.py::test_the_diagnostics_that_replace_it_are_logged`<br>`tests/test_credentials.py::test_the_token_never_appears_in_any_log_record` | Implemented |
+| L3-CFG-006 | L2-CFG-003 | `tests/test_credentials.py::test_a_rejected_token_exits_eight`<br>`tests/test_credentials.py::test_no_token_anywhere_exits_seven`<br>`tests/test_credentials.py::test_the_two_credential_failures_have_different_codes` | Implemented |
+| L3-CFG-007 | L2-CFG-002 | `tests/test_credentials.py::test_ingest_needs_no_token_and_is_never_verified`<br>`tests/test_credentials.py::test_verification_can_be_skipped` | Implemented |
 
 ### CLI: CLI capability surface
 

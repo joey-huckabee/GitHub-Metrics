@@ -66,6 +66,23 @@ class GitHubClient:
         """
         return int(self._github.get_rate_limit().resources.graphql.remaining)
 
+    def rate_limit_snapshot(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Fetch the rate-limit endpoint, headers included.
+
+        This is the cheapest way to confirm a token works: the endpoint does
+        not count against the rate limit, and it answers 401 for a token that
+        is not valid. The headers carry the OAuth scopes, so one call reports
+        both validity and permissions.
+
+        Returns:
+            The `(headers, payload)` pair, unparsed, so a caller can read the
+            scope headers as well as the budgets.
+        """
+        LOGGER.debug("Requesting the rate-limit snapshot")
+        return self._github.requester.requestJsonAndCheck(
+            "GET", f"{self._settings.api_url}/rate_limit"
+        )
+
     def rate_limit_remaining(self) -> int:
         """Return the number of core API requests still available."""
         return int(self._github.get_rate_limit().resources.core.remaining)

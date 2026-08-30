@@ -21,9 +21,15 @@ from github_metrics.analysis.releases import describe_bands as describe_release_
 from github_metrics.analysis.releases import score_releases
 from github_metrics.client import GitHubClient
 from github_metrics.collect.closed_issues import ClosedIssueCounts, get_closed_issues
+from github_metrics.collect.credentials import verify_credentials
 from github_metrics.collect.releases import ReleaseCounts, get_release_counts
-from github_metrics.config import ConfigError, Settings
-from github_metrics.errors import CollectionError, IngestError
+from github_metrics.config import Settings
+from github_metrics.errors import (
+    CollectionError,
+    IngestError,
+    InvalidCredentialsError,
+    MissingCredentialsError,
+)
 from github_metrics.geo import Geocoder
 from github_metrics.ingest import IngestResult, read_repository_csvs
 from github_metrics.logger import LogLevels, reset_logger
@@ -44,6 +50,12 @@ EXIT_RATE_LIMITED = 5
 EXIT_INPUT_UNREADABLE = 6
 """Aborted: the input file could not be read at all."""
 
+EXIT_NO_CREDENTIALS = 7
+"""Aborted: no GitHub token was supplied, by flag or by environment."""
+
+EXIT_BAD_CREDENTIALS = 8
+"""Aborted: GitHub rejected the token that was supplied."""
+
 
 class InputError(click.ClickException):
     """A CLI error that exits with `EXIT_INPUT_UNREADABLE`.
@@ -54,6 +66,22 @@ class InputError(click.ClickException):
     """
 
     exit_code = EXIT_INPUT_UNREADABLE
+
+
+class NoCredentialsError(click.ClickException):
+    """A CLI error that exits with `EXIT_NO_CREDENTIALS`.
+
+    Separate from a rejected token because the fix differs: this one means
+    "configure a token", not "your token stopped working".
+    """
+
+    exit_code = EXIT_NO_CREDENTIALS
+
+
+class BadCredentialsError(click.ClickException):
+    """A CLI error that exits with `EXIT_BAD_CREDENTIALS`."""
+
+    exit_code = EXIT_BAD_CREDENTIALS
 
 
 class RepositoryError(click.ClickException):
@@ -79,22 +107,40 @@ class CliContext:
     """
 
     env_file: Path | None = None
+    token: str | None = None
+    verify: bool = True
     _settings: Settings | None = None
 
     def settings(self) -> Settings:
-        """Resolve and cache the settings, or fail with a CLI-shaped error.
+        """Resolve, verify and cache the settings.
+
+        The token is checked against GitHub the first time it is needed. That
+        check is free - the rate-limit endpoint does not count against the
+        budget - and it converts a mid-run 401 into one message before any work
+        starts.
 
         Returns:
             The resolved settings.
 
         Raises:
-            click.ClickException: If required configuration is missing.
+            NoCredentialsError: No token was supplied by any route.
+            BadCredentialsError: GitHub rejected the token.
         """
-        if self._settings is None:
+        if self._settings is not None:
+            return self._settings
+
+        try:
+            settings = Settings.from_env(self.env_file, token=self.token)
+        except MissingCredentialsError as exc:
+            raise NoCredentialsError(str(exc)) from exc
+
+        if self.verify:
             try:
-                self._settings = Settings.from_env(self.env_file)
-            except ConfigError as exc:
-                raise click.ClickException(str(exc)) from exc
+                verify_credentials(settings)
+            except InvalidCredentialsError as exc:
+                raise BadCredentialsError(str(exc)) from exc
+
+        self._settings = settings
         return self._settings
 
 
@@ -108,8 +154,28 @@ class CliContext:
     type=click.Path(dir_okay=False, path_type=Path),
     help="Path to a .env file. Defaults to the nearest .env.",
 )
+@click.option(
+    "--token",
+    envvar="GITHUB_TOKEN",
+    default=None,
+    help=(
+        "GitHub token, overriding GITHUB_TOKEN. Note that a token passed as an "
+        "argument is visible to other processes and lands in shell history; "
+        "prefer the environment or a .env file where either will do."
+    ),
+)
+@click.option(
+    "--no-verify-token",
+    is_flag=True,
+    help="Skip the credential check. It is free and catches a bad token early.",
+)
 @click.pass_context
-def main(ctx: click.Context, env_file: Path | None) -> None:
+def main(
+    ctx: click.Context,
+    env_file: Path | None,
+    token: str | None,
+    no_verify_token: bool,
+) -> None:
     """Calculate GitHub metrics for FOSS analysis."""
     # Logging is configured from LOG_LEVEL alone, which is readable without a
     # token. Anything needing credentials goes through CliContext.settings().
@@ -119,7 +185,7 @@ def main(ctx: click.Context, env_file: Path | None) -> None:
         load_dotenv(override=False)
 
     reset_logger(LogLevels.from_name(os.getenv("LOG_LEVEL", "INFO")))
-    ctx.obj = CliContext(env_file=env_file)
+    ctx.obj = CliContext(env_file=env_file, token=token, verify=not no_verify_token)
 
 
 @main.command("repo")

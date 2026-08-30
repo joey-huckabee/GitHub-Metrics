@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from github_metrics.cli import EXIT_INPUT_ERROR, EXIT_ROWS_REJECTED, main
+from github_metrics.cli import EXIT_INPUT_UNREADABLE, EXIT_ROWS_REJECTED, main
 
 DATA = Path(__file__).parent / "data"
 
@@ -71,7 +71,7 @@ def test_rejected_rows_produce_a_distinct_exit_status() -> None:
 def test_an_unreadable_file_produces_its_own_exit_status(tmp_path: Path) -> None:
     result = CliRunner().invoke(main, ["ingest", str(tmp_path / "absent.csv")])
 
-    assert result.exit_code == EXIT_INPUT_ERROR
+    assert result.exit_code == EXIT_INPUT_UNREADABLE
     assert "GM-ING-001" in result.output
 
 
@@ -124,7 +124,7 @@ def test_output_can_be_written_to_a_file(tmp_path: Path) -> None:
 def test_strict_mode_reports_the_first_bad_row_and_stops() -> None:
     result = CliRunner().invoke(main, ["ingest", str(DATA / "invalid-rows.csv"), "--strict"])
 
-    assert result.exit_code == EXIT_INPUT_ERROR
+    assert result.exit_code == EXIT_INPUT_UNREADABLE
     assert "strict mode" in result.output
     # Nothing is reported as loaded, because the read did not complete.
     assert "bokeh/bokeh" not in result.output

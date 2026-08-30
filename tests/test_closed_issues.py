@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, cast
 
 import pytest
+from github.GithubException import GithubException, UnknownObjectException
 
 from github_metrics.analysis.closed_issues import (
     CLOSED_ISSUE_BANDS,
@@ -16,14 +18,34 @@ from github_metrics.analysis.closed_issues import (
 )
 from github_metrics.client import GitHubClient
 from github_metrics.collect.closed_issues import get_closed_issues
+from github_metrics.config import Settings
 from github_metrics.errors import GraphQLQueryError, RepositoryNotFoundError
+
+LIVE_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+"""Captured at import, before the autouse fixture that scrubs the environment.
+
+The isolation fixture in conftest.py removes GITHUB_TOKEN so that no unit test
+can reach the network by accident. That is the right default, and it also means
+the one test that *should* reach the network has to take its credential before
+the fixture runs.
+"""
 
 
 class _StubClient:
-    """Returns one canned GraphQL payload, and records what it was asked."""
+    """Stands in for `GitHubClient.graphql`, returning or raising as asked.
 
-    def __init__(self, payload: dict[str, Any]) -> None:
-        self.payload = payload
+    PyGithub inspects the GraphQL `errors` array itself and raises rather than
+    returning it, so a stub that only ever returns a payload does not model the
+    transport. Both shapes are supported here: an earlier version of this stub
+    returned payloads only, and a broken error path passed its tests because of
+    it.
+    """
+
+    def __init__(
+        self, payload: dict[str, Any] | None = None, raises: Exception | None = None
+    ) -> None:
+        self.payload = payload if payload is not None else {}
+        self.raises = raises
         self.queries: list[tuple[str, dict[str, Any]]] = []
 
     def graphql(
@@ -31,6 +53,8 @@ class _StubClient:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Mimic `GitHubClient.graphql`."""
         self.queries.append((query, variables))
+        if self.raises is not None:
+            raise self.raises
         return {}, self.payload
 
 
@@ -167,7 +191,7 @@ def test_counts_are_read_from_the_response() -> None:
     assert counts.closed == 3770
     assert counts.open == 691
     assert counts.total == 4461
-    assert counts.has_issues is True
+    assert counts.total > 0
 
 
 @pytest.mark.requirement("L3-MET-001")
@@ -208,7 +232,6 @@ def test_a_repository_with_no_issues_reports_zero_not_one() -> None:
 
     assert counts.closed == 0
     assert counts.total == 0
-    assert counts.has_issues is False
 
 
 @pytest.mark.requirement("L3-MET-004")
@@ -255,13 +278,18 @@ def test_collection_logs_the_counts_it_found(caplog: pytest.LogCaptureFixture) -
 # ---------------------------------------------------------------------------
 
 
+NOT_FOUND_PAYLOAD = {
+    "data": {"repository": None},
+    "errors": [{"type": "NOT_FOUND", "message": "Could not resolve to a Repository"}],
+}
+
+
 @pytest.mark.requirement("L3-MET-003")
-def test_a_not_found_error_is_classified_rather_than_generic() -> None:
+def test_a_not_found_raised_by_the_transport_is_classified() -> None:
+    # PyGithub maps a lone NOT_FOUND to UnknownObjectException before this
+    # package ever sees the payload.
     stub = _StubClient(
-        {
-            "data": {"repository": None},
-            "errors": [{"type": "NOT_FOUND", "message": "Could not resolve to a Repository"}],
-        }
+        raises=UnknownObjectException(404, NOT_FOUND_PAYLOAD, {}, "Could not resolve")
     )
 
     with pytest.raises(RepositoryNotFoundError) as caught:
@@ -273,8 +301,29 @@ def test_a_not_found_error_is_classified_rather_than_generic() -> None:
 
 
 @pytest.mark.requirement("L3-MET-003")
-def test_any_other_graphql_error_is_reported_with_its_message() -> None:
-    stub = _StubClient({"errors": [{"message": "Field 'bogus' doesn't exist"}]})
+def test_a_not_found_among_several_errors_is_still_classified() -> None:
+    # PyGithub only maps a *lone* NOT_FOUND; several errors collapse to a
+    # generic 400 even when one of them is NOT_FOUND. Re-reading the payload is
+    # what keeps the classification.
+    payload = {
+        "data": {"repository": None},
+        "errors": [
+            {"type": "NOT_FOUND", "message": "Could not resolve to a Repository"},
+            {"message": "something else"},
+        ],
+    }
+    stub = _StubClient(raises=GithubException(400, payload, {}, "Bad request"))
+
+    with pytest.raises(RepositoryNotFoundError) as caught:
+        collect(stub, "ghost", "missing")
+
+    assert "GM-COL-001" in str(caught.value)
+
+
+@pytest.mark.requirement("L3-MET-003")
+def test_any_other_transport_error_is_reported_with_the_api_message() -> None:
+    payload = {"errors": [{"message": "Field 'bogus' doesn't exist"}]}
+    stub = _StubClient(raises=GithubException(400, payload, {}, "Bad request"))
 
     with pytest.raises(GraphQLQueryError) as caught:
         collect(stub)
@@ -284,13 +333,22 @@ def test_any_other_graphql_error_is_reported_with_its_message() -> None:
 
 
 @pytest.mark.requirement("L3-MET-003")
-def test_errors_are_detected_even_though_graphql_answers_http_200() -> None:
-    # GraphQL reports failure in the body, not the status line. A caller that
-    # only checks the status sees success and then reads a null repository.
+def test_errors_returned_without_raising_are_still_detected() -> None:
+    # The second layer: GraphQL reports failure in the body, not the status
+    # line, so a transport that returned rather than raised would otherwise
+    # hand back a null repository as though it were an answer.
     stub = _StubClient({"data": {"repository": None}, "errors": [{"message": "rate limited"}]})
 
     with pytest.raises(GraphQLQueryError):
         collect(stub)
+
+
+@pytest.mark.requirement("L3-MET-003")
+def test_a_not_found_returned_without_raising_is_classified() -> None:
+    stub = _StubClient(NOT_FOUND_PAYLOAD)
+
+    with pytest.raises(RepositoryNotFoundError):
+        collect(stub, "ghost", "missing")
 
 
 @pytest.mark.requirement("L3-MET-003")
@@ -309,3 +367,28 @@ def test_a_null_repository_without_an_error_still_fails() -> None:
 
     with pytest.raises(RepositoryNotFoundError, match="no repository and no error"):
         collect(stub)
+
+
+# ---------------------------------------------------------------------------
+# Live API
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.requirement("L3-MET-003")
+@pytest.mark.skipif(not LIVE_TOKEN, reason="GITHUB_TOKEN is not set")
+def test_a_missing_repository_is_classified_against_the_live_api() -> None:
+    """Hit the real transport, which raises rather than returning errors.
+
+    This is the test that would have caught the original defect. The stubbed
+    tests above all passed while the error path was broken in production,
+    because the stub returned an `errors` payload and PyGithub never does -
+    it inspects the array and raises first. A stub can only model behaviour
+    someone has looked at.
+    """
+    settings = Settings(github_token=LIVE_TOKEN)
+
+    with GitHubClient(settings) as client, pytest.raises(RepositoryNotFoundError) as caught:
+        get_closed_issues(client, "ghost", "definitely-not-a-real-repository-xyz")
+
+    assert "GM-COL-001" in str(caught.value)

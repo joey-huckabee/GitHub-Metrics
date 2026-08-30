@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 14
-- L2 requirements: 38
-- L3 requirements: 39
-- Verified L2+L3: 77 of 77 (100.0%)
+- L2 requirements: 39
+- L3 requirements: 40
+- Verified L2+L3: 79 of 79 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -36,7 +36,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-CLI-001 | L2-CLI-001, L2-CLI-002, L2-CLI-003, L2-CLI-004 | _(none)_ | Implemented |
+| L1-CLI-001 | L2-CLI-001, L2-CLI-002, L2-CLI-003, L2-CLI-004, L2-CLI-005 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -46,6 +46,7 @@ through their children, so counting them too would count the same work twice.
 | L2-CLI-002 | L1-CLI-001 | L3-CLI-002 | _(none)_ | Implemented |
 | L2-CLI-003 | L1-CLI-001 | L3-CLI-003 | _(none)_ | Implemented |
 | L2-CLI-004 | L1-CLI-001 | L3-CLI-004 | _(none)_ | Implemented |
+| L2-CLI-005 | L1-CLI-001 | L3-CLI-005 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -55,6 +56,7 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-002 | L2-CLI-002 | `tests/test_cli_ingest.py::test_ingest_needs_no_github_token` | Implemented |
 | L3-CLI-003 | L2-CLI-003 | `tests/test_cli_ingest.py::test_json_output_is_machine_readable`<br>`tests/test_cli_ingest.py::test_output_can_be_written_to_a_file` | Implemented |
 | L3-CLI-004 | L2-CLI-004 | `tests/test_cli_ingest.py::test_a_clean_file_exits_zero`<br>`tests/test_cli_ingest.py::test_an_unreadable_file_produces_its_own_exit_status`<br>`tests/test_cli_ingest.py::test_rejected_rows_produce_a_distinct_exit_status`<br>`tests/test_cli_ingest.py::test_strict_mode_reports_the_first_bad_row_and_stops` | Implemented |
+| L3-CLI-005 | L2-CLI-005 | `tests/test_cli_closed_issues.py::test_a_disabled_tracker_is_called_out`<br>`tests/test_cli_closed_issues.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_cli_closed_issues.py::test_an_unreadable_repository_exits_four`<br>`tests/test_cli_closed_issues.py::test_explain_appends_the_bands`<br>`tests/test_cli_closed_issues.py::test_it_appears_in_the_command_list`<br>`tests/test_cli_closed_issues.py::test_it_reports_counts_the_tracker_state_and_the_weight`<br>`tests/test_cli_closed_issues.py::test_json_carries_the_same_values`<br>`tests/test_cli_closed_issues.py::test_json_includes_the_bands_only_when_explained` | Implemented |
 
 ### CON: Concurrency
 
@@ -185,7 +187,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-MET-001 | L2-MET-001 | `tests/test_closed_issues.py::test_counts_are_read_from_the_response`<br>`tests/test_closed_issues.py::test_the_query_asks_only_for_issues_never_pull_requests` | Implemented |
 | L3-MET-002 | L2-MET-002 | `tests/test_closed_issues.py::test_a_repository_with_no_issues_reports_zero_not_one`<br>`tests/test_closed_issues.py::test_only_counts_are_requested_so_the_cost_stays_at_one_point` | Implemented |
-| L3-MET-003 | L2-MET-003 | `tests/test_closed_issues.py::test_a_not_found_error_is_classified_rather_than_generic`<br>`tests/test_closed_issues.py::test_a_null_repository_without_an_error_still_fails`<br>`tests/test_closed_issues.py::test_a_response_with_no_data_object_fails_loudly`<br>`tests/test_closed_issues.py::test_any_other_graphql_error_is_reported_with_its_message`<br>`tests/test_closed_issues.py::test_errors_are_detected_even_though_graphql_answers_http_200` | Implemented |
+| L3-MET-003 | L2-MET-003 | `tests/test_closed_issues.py::test_a_missing_repository_is_classified_against_the_live_api`<br>`tests/test_closed_issues.py::test_a_not_found_among_several_errors_is_still_classified`<br>`tests/test_closed_issues.py::test_a_not_found_raised_by_the_transport_is_classified`<br>`tests/test_closed_issues.py::test_a_not_found_returned_without_raising_is_classified`<br>`tests/test_closed_issues.py::test_a_null_repository_without_an_error_still_fails`<br>`tests/test_closed_issues.py::test_a_response_with_no_data_object_fails_loudly`<br>`tests/test_closed_issues.py::test_any_other_transport_error_is_reported_with_the_api_message`<br>`tests/test_closed_issues.py::test_errors_returned_without_raising_are_still_detected` | Implemented |
 | L3-MET-004 | L2-MET-004 | `tests/test_closed_issues.py::test_a_disabled_issue_tracker_is_flagged_rather_than_scored_as_inactivity`<br>`tests/test_closed_issues.py::test_an_enabled_but_empty_tracker_is_noted_without_a_warning`<br>`tests/test_closed_issues.py::test_collection_logs_the_counts_it_found` | Implemented |
 
 ### OUT: Result output and destinations

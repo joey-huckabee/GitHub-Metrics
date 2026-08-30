@@ -114,7 +114,7 @@ value — enough to fix the row without opening the file to work out what
 happened. Every code is explained in
 [`ERROR-CATALOG.md`](ERROR-CATALOG.md).
 
-Exit status `3` means "loaded, but degraded". `0` means clean; `2` means the
+Exit status `3` means "loaded, but degraded". `0` means clean; `6` means the
 file could not be read at all.
 
 ### The two mistakes almost everyone makes
@@ -175,6 +175,73 @@ LOG_LEVEL=DEBUG github-metrics ingest inventory.csv --format json | jq '.[0].rep
 Each reference carries `source_line`, the physical line it came from, so a
 failure three stages later can still be traced back to the row that asked for
 it.
+
+## Checking a single metric
+
+Metrics are defined one at a time, and each gets a command of its own so a
+definition can be checked against real repositories before it is wired into a
+full run.
+
+```console
+$ github-metrics closed-issues pypa/virtualenv
+pypa/virtualenv
+  closed issues      1429
+  open issues           0
+  tracker         enabled
+  weight              1.0
+```
+
+The weight is a 0.0-1.0 multiplier, not a final score. To see where it came
+from, ask:
+
+```console
+$ github-metrics closed-issues pypa/virtualenv --explain
+...
+closed-issue bands:
+  <20    -> 0.1
+  <50    -> 0.2
+  <100   -> 0.3
+  <150   -> 0.4
+  <300   -> 0.6
+  <400   -> 0.8
+  <500   -> 0.9
+  >=500  -> 1.0
+```
+
+The bands are deliberately uneven. The informative range is at the low end: the
+difference between 10 and 100 closed issues says a great deal about whether a
+project is maintained, while the difference between 3,000 and 4,000 says almost
+nothing.
+
+### Two things worth knowing about this number
+
+**Pull requests are excluded.** GitHub's REST API models pull requests as
+issues, so the obvious route counts both. For `cline/cline` that is 3,770
+closed issues against 7,001 closed pull requests - a combined figure nearly
+triples the number and measures development throughput rather than issue
+triage. This tool asks GraphQL, where the two are separate.
+
+**Zero has two meanings.** A repository with its issue tracker turned off
+reports zero closed issues, but that describes its configuration, not its
+maintenance - the project may track work on a mailing list or another forge.
+The command says so rather than leaving you to guess:
+
+```console
+  tracker        DISABLED
+  note: the issue tracker is off, so zero is a configuration fact rather than a maintenance one
+```
+
+For JSON, add `--format json`. Diagnostics go to stderr as always, so the
+output pipes cleanly:
+
+```console
+$ github-metrics closed-issues cline/cline --format json | jq .closed_issues
+3770
+```
+
+Exit status is 0 when the repository was read and **4** when it could not be -
+deleted, renamed, or private. Syntactic validation at ingestion cannot detect
+any of those, so this is where a stale inventory entry finally surfaces.
 
 ## In a pipeline
 

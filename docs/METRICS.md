@@ -49,7 +49,7 @@ result set groupable later.
 | `age_days` | `float` | derived | Elapsed days since repository creation. The anchor (`scan_date` vs. wall clock) and the end point are undecided. Reference value `736.5466017006597` is full float precision. | **TBD** |
 | `last_update_hours` | `float` | derived | Elapsed hours since the repository was last updated. Undecided whether "updated" means `pushed_at` (last commit) or `updated_at` (any metadata change, including a star). These differ materially. | **TBD** |
 | `closed_issues` | `int` | API | Closed issues, all time, **excluding pull requests**. See [Closed issues](#closed-issues) below. | **Settled** |
-| `releases` | `int` | API | Count of releases. Reference value `825`. Undecided whether drafts and prereleases count, and whether tags without releases count. | **TBD** |
+| `releases` | `int` | API | Distinct versions, which is the tag count. See [Releases](#releases). Counting settled; bands pending. | **Partial** |
 
 ## Scores
 
@@ -311,6 +311,134 @@ is now data rather than control flow and why the whole domain is swept in tests.
 
 ---
 
+---
+
+## Releases
+
+**Status: settled.** Counting, bands and cost are all decided.
+
+### Definition
+
+Two numbers are collected, in one GraphQL query costing one point:
+
+```graphql
+repository(owner: $owner, name: $name) {
+  releases { totalCount }
+  tags: refs(refPrefix: "refs/tags/") { totalCount }
+}
+```
+
+The scored value is **distinct versions**, which is the tag count.
+
+### Why not `releases + tags`
+
+The original implementation summed them:
+
+```python
+repo_meta_data.releases = get_releases(repo) + get_tags(repo)
+```
+
+This is what produced the reference row's `825` - a figure matching neither
+the release count nor the tag count on its own, which is why it could not be
+reconciled earlier.
+
+**Creating a GitHub Release requires a tag**, so releases are a subset of tags.
+Measured directly by comparing tag names:
+
+| Repository | Releases | Tags | Release tags present in tag list | Missing |
+|---|---|---|---|---|
+| `urllib3/urllib3` | 58 | 108 | 58 | **0** |
+| `pypa/virtualenv` | 98 | 285 | 98 | **0** |
+
+Adding the two therefore counts every release twice. Worse, the inflation is
+not a constant that could be divided out:
+
+| Repository | Releases | Tags | Sum | Distinct | Inflation |
+|---|---|---|---|---|---|
+| `cline/cline` | 398 | 717 | 1115 | 717 | **1.56x** |
+| `urllib3/urllib3` | 58 | 108 | 166 | 108 | **1.54x** |
+| `pypa/virtualenv` | 98 | 285 | 383 | 285 | **1.34x** |
+| `bokeh/bokeh` | 0 | 151 | 151 | 151 | **1.00x** |
+| `torvalds/linux` | 0 | 943 | 943 | 943 | **1.00x** |
+
+The inflation tracks how many tags carry a release, which is a **publishing
+workflow preference**, not a measure of how established a project is. Under
+the sum, `cline/cline` is rewarded over `torvalds/linux` partly for using
+GitHub's release feature.
+
+### Why tags rather than releases
+
+Counting releases alone is the other obvious option, and it fails badly on
+real repositories: **`torvalds/linux` has 0 releases and 943 tags**, and
+`bokeh/bokeh` has 0 and 151. Both would score zero for a metric meant to
+capture how much a project has shipped.
+
+Tags have a second advantage. Draft releases are visible only to a token with
+push access, so a release count can differ between two people scanning the
+same repository. Tag counts are the same for everyone, which makes the metric
+reproducible.
+
+### What is still collected
+
+Both numbers are kept even though only one is scored. The release count
+distinguishes a project that publishes formal artifacts from one that only
+tags, which is worth having available, and it costs nothing extra to collect.
+
+`legacy_sum` is retained solely so a log line can state what the previous
+definition would have reported. A stored score that changes should be
+explainable.
+
+### Consequence for the bands
+
+Changing from the sum to the distinct count **lowers every input**, by between
+0% and 36% depending on the repository. Whatever bands are chosen have to be
+set against the new scale; carrying over thresholds calibrated on the inflated
+figures would systematically under-score every project that publishes
+releases.
+
+### Scoring bands
+
+| Distinct versions | Weight |
+|-------------------|--------|
+| 0                 | 0.0    |
+| 1 - 4             | 0.1    |
+| 5 - 9             | 0.2    |
+| 10 - 19           | 0.3    |
+| 20 - 39           | 0.4    |
+| 40 - 49           | 0.5    |
+| 50 - 59           | 0.6    |
+| 60 - 69           | 0.7    |
+| 70 - 79           | 0.8    |
+| 80 or more        | 1.0    |
+
+Unlike the closed-issue chain, this one is **total as written** - the final
+branch is `>= 80`, so no input falls between branches. There was no gap to fix.
+
+Two asymmetries are carried over deliberately rather than by oversight, and
+both are asserted by tests so a later reader does not "fix" them unknowingly:
+
+- **Zero scores 0.0**, where zero closed issues scores 0.1. A project that has
+  never cut a version gets no floor.
+- **0.9 never occurs.** The step from 0.8 to 1.0 is double every other step.
+
+### It saturates, and that matters
+
+The top band starts at **80 distinct versions**, which every established
+project clears comfortably:
+
+| Repository | Distinct versions | Release weight |
+|---|---|---|
+| `urllib3/urllib3` | 108 | 1.0 |
+| `bokeh/bokeh` | 151 | 1.0 |
+| `pypa/virtualenv` | 285 | 1.0 |
+| `cline/cline` | 717 | 1.0 |
+| `torvalds/linux` | 943 | 1.0 |
+
+The smallest measured is 108, comfortably above the 80 needed for full marks.
+Combined with the closed-issue weight, which saturates at 500, this makes
+`prevalence_score` a constant for mature projects - see
+[Prevalence score](#prevalence-score) for what that does to the component.
+
 ## Prevalence score
 
 **Status: the formula is known; how the two signals combine is being decided.**
@@ -399,21 +527,49 @@ previously collected data would not be comparable with new data.
 
 ### Recommendation
 
-**Option A now, revisited once `score_releases` is defined.**
+**The saturation concern is now measured, and it is worse than a concern.**
 
-It is the smallest change that fixes the defect, it removes a branch rather
-than adding one, and it keeps existing rows comparable. The saturation concern
-is real but unmeasurable until the release bands exist: if they turn out to
-reach 1.0 at a low count, prevalence collapses to a near-constant 20.0 and
-option C becomes the better answer.
+Both signals reach 1.0 on every established project. Closed issues saturate at
+500, releases at 80 distinct versions. Measured:
 
-Whichever is chosen, a disabled issue tracker should be excluded from the
-comparison rather than scored as 0.1 - the signal is absent, not low.
+| Repository | Closed issues | Distinct versions | `w_issues` | `w_releases` | Original | `max()` |
+|---|---|---|---|---|---|---|
+| `cline/cline` | 3770 | 717 | 1.0 | 1.0 | 20.0 | 20.0 |
+| `pypa/virtualenv` | 1429 | 285 | 1.0 | 1.0 | 20.0 | 20.0 |
+| `urllib3/urllib3` | 1241 | 108 | 1.0 | 1.0 | 20.0 | 20.0 |
+| `bokeh/bokeh` | 7511 | 151 | 1.0 | 1.0 | 20.0 | 20.0 |
+| `torvalds/linux` | 0 | 943 | 0.1 | 1.0 | 20.0 | 20.0 |
 
-**Open question for the release bands:** at what count does `score_releases`
-reach 1.0? That number decides whether option A discriminates or saturates,
-so it is worth settling deliberately rather than by analogy with the
-closed-issue bands.
+**`prevalence_score` is 20.0 for all five, under both rules.** The component
+contributes a constant to `total_score` and does no ranking work at all for
+mature projects. It only discriminates below 500 closed issues *and* below 80
+versions - that is, among young or small projects.
+
+Two consequences follow.
+
+**The cliff is now mostly unreachable.** The `closed_issues == 0` branch fired
+in the reference row only because the closed-issue count was broken and
+reported 0. With the count fixed, that branch is reached only by a project
+with genuinely no closed issues, such as `torvalds/linux`. Fixing the cliff is
+still right, but it is no longer urgent.
+
+**The real question is the ceilings, not the combination rule.** Choosing
+between the original rule, `max()`, and a blend changes nothing in the table
+above - every one produces 20.0. If `prevalence_score` is meant to rank
+projects rather than to gate them, the saturation points have to move: 80
+versions and 500 closed issues are both cleared by any established project.
+
+### Recommendation
+
+1. **Adopt `max()`** for the combination. It removes the cliff, removes a
+   branch, keeps existing rows comparable, and costs nothing. A disabled issue
+   tracker should be excluded from the comparison rather than scored as 0.1,
+   since the signal is absent rather than low.
+2. **Decide separately what `prevalence_score` is for.** If it is a gate - "has
+   this project shipped and been maintained at all" - the current ceilings are
+   fine and the constant 20.0 is the intended answer. If it is meant to
+   contribute to a ranking, the ceilings need raising, and that is a
+   calibration exercise against a real inventory rather than a code change.
 
 ## Related documents
 

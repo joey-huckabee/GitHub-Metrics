@@ -6,5 +6,6 @@ lets the bands be tested exhaustively without a token.
 """
 
 from github_metrics.analysis.closed_issues import score_closed_issues
+from github_metrics.analysis.releases import score_releases
 
-__all__ = ["score_closed_issues"]
+__all__ = ["score_closed_issues", "score_releases"]

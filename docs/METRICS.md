@@ -71,7 +71,7 @@ All six components are `float`. See the rendering conflict below.
 
 | Column | Type | Driven by | Bands | Status |
 |---|---|---|---|---|
-| `prevalence_score` | `float` | closed issues, releases | `20 × weight`. See [Prevalence score](#prevalence-score). Formula known; the combination rule is being decided. | **Partial** |
+| `prevalence_score` | `float` | closed issues, releases | `20 × max(issue weight, release weight)`. See [Prevalence score](#prevalence-score). | **Settled** |
 | `stars_score` | `float` | `stars` | `64574` → `10.0` | **TBD** |
 | `forks_score` | `float` | `forks` | `6900` → `15.0` | **TBD** |
 | `maturity_score` | `float` | `age_days` | `736.5466017006597` → `12.0` | **TBD** |
@@ -441,7 +441,7 @@ Combined with the closed-issue weight, which saturates at 500, this makes
 
 ## Prevalence score
 
-**Status: the formula is known; how the two signals combine is being decided.**
+**Status: settled.** The combination rule is fixed; the ceilings are not revisited.
 
 `prevalence_score` is 20 points multiplied by a 0.0-1.0 weight. The original
 rule picks *which* signal supplies that weight:
@@ -525,7 +525,62 @@ contribute. The costs are two: the weights need justifying, and it does not
 reproduce the reference row - that row would become 6.5 rather than 20.0, so
 previously collected data would not be comparable with new data.
 
-### Recommendation
+### Decision
+
+**`prevalence_score = 20 x max(issue weight, release weight)`**, with the issue
+signal excluded when the tracker is disabled.
+
+```python
+release_weight = score_releases(distinct_versions)
+if issues_enabled:
+    weight = max(score_closed_issues(closed_issues), release_weight)
+else:
+    weight = release_weight
+prevalence_score = 20.0 * weight
+```
+
+This removes the cliff, removes the branch, and makes the score non-decreasing
+in both inputs - closing an issue or cutting a release can never lower it.
+
+### It is a gate, and that is the intended reading
+
+Both ceilings are cleared by any established project, so the component reports
+a constant 20.0 for mature repositories and does no ordering work among them.
+That is accepted deliberately: the question it answers is **"has this project
+shipped anything and been maintained at all"**, and for a mature project the
+answer is yes.
+
+Where it earns its keep is the bottom of the range. Below 500 closed issues and
+80 versions it still separates:
+
+| Project shape | Closed issues | Versions | Score |
+|---|---|---|---|
+| Nothing at all | 0 | 0 | 2.0 |
+| Just started | 25 | 2 | 4.0 |
+| Getting going | 160 | 25 | 12.0 |
+| Established | 600 | 100 | 20.0 |
+
+**The consequence to be aware of:** for a portfolio of established projects,
+`prevalence_score` contributes a fixed 20 points to every row. It cannot help
+rank them, and the ordering of `total_score` is decided entirely by the other
+five components. If ranking mature projects is wanted later, the change is to
+the band *boundaries* - the 500 and the 80 - not to the weights, which stay
+0.0 to 1.0 either way.
+
+### One behaviour change to note
+
+The two band tables disagree about zero. The closed-issue table floors at 0.1;
+the release table scores 0 as 0.0. The original rule sent a repository with no
+closed issues down the release branch, so a project with nothing at all scored
+**0.0**. Taking the stronger signal surfaces the disagreement, and the floor
+wins, so the same project now scores **2.0**.
+
+A repository whose tracker is *disabled* and which has no versions still scores
+0.0, because the issue signal is excluded rather than floored. An enabled but
+empty tracker is treated as weak evidence of intent; a disabled one as no
+evidence at all.
+
+### Earlier recommendation, now adopted
 
 **The saturation concern is now measured, and it is worse than a concern.**
 

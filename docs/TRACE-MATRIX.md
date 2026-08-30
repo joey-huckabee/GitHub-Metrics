@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 17
-- L2 requirements: 56
-- L3 requirements: 70
-- Verified L2+L3: 126 of 126 (100.0%)
+- L2 requirements: 58
+- L3 requirements: 79
+- Verified L2+L3: 137 of 137 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -278,18 +278,20 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-SCR-001 | L2-SCR-001, L2-SCR-002, L2-SCR-003, L2-SCR-005, L2-SCR-006 | _(none)_ | Implemented |
+| L1-SCR-001 | L2-SCR-001, L2-SCR-002, L2-SCR-003, L2-SCR-005, L2-SCR-006, L2-SCR-007, L2-SCR-008 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-SCR-001 | L1-SCR-001 | L3-SCR-001, L3-SCR-003, L3-SCR-008 | _(none)_ | Implemented |
-| L2-SCR-002 | L1-SCR-001 | L3-SCR-002, L3-SCR-004, L3-SCR-010 | _(none)_ | Implemented |
+| L2-SCR-001 | L1-SCR-001 | L3-SCR-001, L3-SCR-003, L3-SCR-008, L3-SCR-013, L3-SCR-018 | _(none)_ | Implemented |
+| L2-SCR-002 | L1-SCR-001 | L3-SCR-002, L3-SCR-004, L3-SCR-010, L3-SCR-014, L3-SCR-019 | _(none)_ | Implemented |
 | L2-SCR-003 | L1-SCR-001 | L3-SCR-005, L3-SCR-007 | _(none)_ | Implemented |
 | L2-SCR-004 | L1-MET-002 | L3-SCR-006 | _(none)_ | Implemented |
-| L2-SCR-005 | L1-SCR-001 | L3-SCR-009 | _(none)_ | Implemented |
-| L2-SCR-006 | L1-SCR-001 | L3-SCR-011 | _(none)_ | Implemented |
+| L2-SCR-005 | L1-SCR-001 | L3-SCR-009, L3-SCR-017 | _(none)_ | Implemented |
+| L2-SCR-006 | L1-SCR-001 | L3-SCR-011, L3-SCR-015, L3-SCR-020 | _(none)_ | Implemented |
+| L2-SCR-007 | L1-SCR-001 | L3-SCR-012 | _(none)_ | Implemented |
+| L2-SCR-008 | L1-SCR-001 | L3-SCR-016 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -306,6 +308,15 @@ through their children, so counting them too would count the same work twice.
 | L3-SCR-009 | L2-SCR-005 | `tests/test_last_update.py::test_the_bounds_are_exact_integers`<br>`tests/test_last_update.py::test_the_restored_boundary_now_decides_something`<br>`tests/test_last_update.py::test_the_table_has_no_redundant_edges_left` | Implemented |
 | L3-SCR-010 | L2-SCR-002 | `tests/test_last_update.py::test_a_negative_input_is_reported_rather_than_scored_as_fresh` | Implemented |
 | L3-SCR-011 | L2-SCR-006 | `tests/test_last_update.py::test_a_long_abandoned_repository_scores_nothing`<br>`tests/test_last_update.py::test_the_column_is_fifteen_points_times_the_weight`<br>`tests/test_last_update.py::test_the_reference_row_is_reproduced`<br>`tests/test_last_update.py::test_the_score_is_logged_with_its_budget` | Implemented |
+| L3-SCR-012 | L2-SCR-007 | `tests/test_maturity.py::test_a_young_repository_no_longer_scores_as_though_it_were_months_old`<br>`tests/test_maturity.py::test_the_conversion_happens_once`<br>`tests/test_maturity.py::test_the_correction_applies_to_exactly_the_affected_range` | Implemented |
+| L3-SCR-013 | L2-SCR-001 | `tests/test_maturity.py::test_every_band_boundary_scores_as_documented`<br>`tests/test_maturity.py::test_every_remaining_boundary_separates_two_weights`<br>`tests/test_maturity.py::test_no_age_is_left_unmapped`<br>`tests/test_maturity.py::test_the_five_year_boundary_decided_nothing_and_is_gone`<br>`tests/test_maturity.py::test_the_score_never_decreases_as_a_repository_ages` | Implemented |
+| L3-SCR-014 | L2-SCR-002 | `tests/test_maturity.py::test_a_negative_age_is_reported_rather_than_silently_scored` | Implemented |
+| L3-SCR-015 | L2-SCR-006 | `tests/test_maturity.py::test_the_band_table_renders_for_diagnostics`<br>`tests/test_maturity.py::test_the_column_is_fifteen_points_times_the_weight`<br>`tests/test_maturity.py::test_the_reference_row_is_reproduced` | Implemented |
+| L3-SCR-016 | L2-SCR-008 | `tests/test_popularity.py::test_more_forks_never_scores_lower_than_fewer`<br>`tests/test_popularity.py::test_the_original_fork_function_returned_none_for_every_input`<br>`tests/test_popularity.py::test_the_restored_band_is_nine_tenths_at_one_hundred_and_ten` | Implemented |
+| L3-SCR-017 | L2-SCR-005 | `tests/test_popularity.py::test_every_threshold_is_shared_vocabulary`<br>`tests/test_popularity.py::test_forks_are_harder_to_max_than_stars_in_absolute_terms`<br>`tests/test_popularity.py::test_the_tables_agree_below_ninety` | Implemented |
+| L3-SCR-018 | L2-SCR-001 | `tests/test_popularity.py::test_every_star_boundary_scores_as_documented`<br>`tests/test_popularity.py::test_no_fork_count_is_left_unmapped`<br>`tests/test_popularity.py::test_no_star_count_is_left_unmapped` | Implemented |
+| L3-SCR-019 | L2-SCR-002 | `tests/test_popularity.py::test_a_negative_count_is_reported_and_treated_as_zero` | Implemented |
+| L3-SCR-020 | L2-SCR-006 | `tests/test_popularity.py::test_the_band_tables_render_side_by_side`<br>`tests/test_popularity.py::test_the_budgets_are_ten_and_fifteen`<br>`tests/test_popularity.py::test_the_columns_are_the_budget_times_the_weight`<br>`tests/test_popularity.py::test_the_reference_row_is_reproduced` | Implemented |
 
 ### TRU: Trust policy
 

@@ -33,6 +33,30 @@ cp .env.example .env
 # then edit .env and set GITHUB_TOKEN
 ```
 
+If a `.env` does not suit - a CI job, or a container with the secret mounted at
+a path - use `--token-file`:
+
+```bash
+github-metrics --token-file /run/secrets/github rate-limit
+```
+
+There is also a `--token` flag, but prefer either of the other two where you
+can. A value on the command line is visible to every other process on the
+machine and is written to your shell history; a *path* is not a secret, so
+`--token-file` gives up nothing.
+
+Whichever you use, the tool checks the token before doing any work. The check
+costs no rate limit, and it turns an authentication failure that would
+otherwise appear halfway through a long run into one message up front:
+
+```console
+$ github-metrics rate-limit
+Error: [GM-CFG-002] GitHub rejected the token (401). It may be expired, revoked,
+or mistyped. Kind detected from its prefix: classic personal access token.
+```
+
+The token's value is never logged, at any level.
+
 ## Your first inventory
 
 Create `inventory.csv`:
@@ -242,6 +266,66 @@ $ github-metrics closed-issues cline/cline --format json | jq .closed_issues
 Exit status is 0 when the repository was read and **4** when it could not be -
 deleted, renamed, or private. Syntactic validation at ingestion cannot detect
 any of those, so this is where a stale inventory entry finally surfaces.
+
+### Release cadence
+
+`releases` is the same shape of probe for how often a project ships:
+
+```console
+$ github-metrics releases pypa/virtualenv
+pypa/virtualenv
+  releases                  98
+  tags                     285
+  distinct versions        285
+  weight                   1.0
+  tags with no release     187
+  note: releases + tags would report 383 (1.34x), counting every release twice
+  note: at or above 80 versions the weight is capped at 1.0, so this project is indistinguishable from any other above that line
+```
+
+Three things to read out of that.
+
+**The scored number is 285, not 383.** Publishing a GitHub Release creates a
+tag, so every release is already among the tags and adding the two counts it
+twice. The overstatement is not a constant either - it grows with how
+consistently a project uses the Releases feature, so summing would have
+rewarded a project's tooling rather than its release cadence.
+
+**187 tags have no release.** That is normal and is not a defect. Plenty of
+projects tag every version and publish release notes for only the notable ones,
+and a tag is still a shipped version.
+
+**The weight has saturated.** Anything at or above 80 distinct versions scores
+1.0, so this metric stops separating projects above that line. If your
+inventory is mostly mature software, expect this column to be 1.0 nearly
+everywhere and do your ranking elsewhere.
+
+A repository that has never tagged anything scores 0.0 - a project with nothing
+at all scores nothing, rather than collecting the lowest non-zero band for
+existing.
+
+### Seeing the whole scoring model
+
+Every band table can be printed without a token and without touching the
+network:
+
+```console
+$ github-metrics bands              # all five
+$ github-metrics bands maturity     # just one
+maturity bands (on age in days):
+  <0.25 years (   91.2 days) -> 0.0
+  <0.5  years (  182.5 days) -> 0.2
+  <1.0  years (  365.0 days) -> 0.4
+  <2.0  years (  730.0 days) -> 0.6
+  <3.0  years ( 1095.0 days) -> 0.8
+  <4.0  years ( 1460.0 days) -> 0.9
+  >=4.0 years ( 1460.0 days) -> 1.0
+```
+
+These are rendered from the same tables the scoring code reads, so they cannot
+drift from it. Reviewing the model here before starting a collection run is
+cheaper than discovering a disagreement about a boundary once the results are
+in a spreadsheet.
 
 ## In a pipeline
 

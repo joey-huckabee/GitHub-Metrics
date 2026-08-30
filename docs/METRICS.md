@@ -32,13 +32,47 @@ cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa
 |---|---|---|---|---|
 | `client_name` | `str` | input | The `owner` value from the input row. | **Settled** |
 | `owner` | `str` | input | The `owner` value from the input row, verbatim. | **Settled** |
-| `organization` | `str` | ? | Equal to `owner` in the reference row. Unclear whether this is the org login from the API, the input owner echoed, or blank for a user account. | **TBD** |
+| `organization` | `str` | API | The owning organisation's login, or **empty** when the repository is owned by an individual account. | **Settled** |
 | `scan_date` | `datetime` | run | One timestamp for the entire run, identical in every row. UTC, rendered as Python `str(datetime)` — `2026-07-12 20:33:07.254804+00:00`. | **Settled** |
 | `scan_id` | `UUID` | run | One UUID4 for the entire run, identical in every row. | **Settled** |
 
 `scan_date` and `scan_id` are per-**run**, not per-repository. Two rows from
 the same invocation always carry the same pair, which is what makes a stored
 result set groupable later.
+
+### Organisation and owner
+
+A GitHub repository is owned by either a **user account** or an
+**organisation**, and the API says which: `owner.__typename` is exactly `User`
+or `Organization`. The column follows from it.
+
+| Owner kind | `owner` | `organization` |
+|---|---|---|
+| Organisation | `urllib3` | `urllib3` |
+| Individual | `torvalds` | *(empty)* |
+
+Empty is the answer for a personally owned repository, not a missing value.
+It is the only place a row records that the repository belongs to a person,
+and echoing the user's login into the column would make the two kinds of
+ownership indistinguishable downstream - every aggregate by organisation would
+silently acquire one bucket per individual maintainer.
+
+**A transferred repository reports two different owners, and both are kept.**
+GitHub follows a rename silently, so an inventory entry survives a move:
+
+| | |
+|---|---|
+| the inventory says | `tiangolo/fastapi` |
+| GitHub reports | `fastapi/fastapi` |
+
+The row carries `owner = tiangolo` and `organization = fastapi`, which looks
+like a defect and is not. `owner` is the value someone has to edit to correct
+the inventory; the organisation is where the repository actually lives.
+Recording only one of them loses either the ability to fix the list or the
+knowledge that it is stale, so collection logs the move at WARNING.
+
+Comparison is case-insensitive, because GitHub account names are: `PyPA` and
+`pypa` are the same owner and do not constitute a transfer.
 
 ## Raw metrics
 
@@ -189,18 +223,24 @@ computed from, and it cannot be completed until the definitions above are.
 | Metric | Route | Cost per repository | Status |
 |---|---|---|---|
 | `closed_issues` | GraphQL `issues(states: CLOSED) { totalCount }` | 1 point | **Settled** |
-| `stars`, `forks`, `organization`, dates | GraphQL, same query | 0 additional | **TBD — confirm** |
-| `releases` | GraphQL `releases { totalCount }` | 0 additional | **TBD** |
+| `stars`, `forks`, `organization`, dates | GraphQL, same query | 0 additional | **Settled** |
+| `releases`, `tags` | GraphQL, same query | 0 additional | **Settled** |
 
 Because GraphQL bills per query rather than per field, folding every count into
 one document costs **one point per repository** regardless of how many metrics
 are collected. That is 5,000 repositories per hour, against roughly 1,600 for
 the three-request REST equivalent - which would still be wrong.
 
-A repository with 825 releases cannot be counted from one page, so `releases`
-alone may cost several requests unless a cheaper route exists. This is the kind
-of thing that turns a 400-repository run from feasible into impossible, so it
-is being settled before implementation rather than after.
+Confirmed against the live API. `collect.repository` sends one document
+returning eleven fields and the response reports a cost of **1**. The whole
+per-repository cost is therefore one point, whatever the size of the
+repository - a run of 400 repositories spends 400 of 5,000.
+
+The condition that keeps it there is that the query asks for `totalCount` and
+never for `nodes`. A `nodes` selection prices a query by the number of objects
+it could return, so a repository with 825 releases would cost more than one
+with 3 - the cheapest route would become the most expensive one for exactly
+the largest projects. A test asserts the query contains no `nodes`.
 
 ---
 
@@ -716,15 +756,17 @@ carried by stars, forks, maturity and last-update. Whether that is the intended
 balance is a calibration question, and the levers are the list's length and the
 band boundaries rather than the weights.
 
-### Open
+### Resolved: `organization` does not come from this map
 
-1. **Does the `organization` column come from this map?** The institution names
-   are the only editorial data in the system, and `organization` is the only
-   column whose source is still unidentified. In the reference row it reads
-   `cline`, which equals the owner - consistent with a fallback to the owner
-   for an unlisted org, and equally consistent with the column simply echoing
-   the owner. Note that the API reports `organization` as **null** for a
-   user-owned repository, which the owner never is.
+It comes from the API. The two are separate things that happened to look alike
+in the reference row, where `organization` reads `cline` and the owner is also
+`cline`.
+
+The trusted map's values are *institution* names - `spring-projects` maps to
+`VMware`, not to `spring-projects` - so if the column were sourced from it, a
+trusted repository would carry `VMware` and every untrusted one would carry
+nothing. It carries the owner's login instead. See **Organisation and owner**
+under *Identity and provenance*.
 
 ---
 

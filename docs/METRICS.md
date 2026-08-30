@@ -48,7 +48,7 @@ result set groupable later.
 | `forks` | `int` | API | Presumed `forks_count`. Not yet confirmed. Whether this counts direct forks only or the whole network is undecided. | **TBD** |
 | `age_days` | `float` | derived | Elapsed days since repository creation. The anchor (`scan_date` vs. wall clock) and the end point are undecided. Reference value `736.5466017006597` is full float precision. | **TBD** |
 | `last_update_hours` | `float` | derived | Elapsed hours since the repository was last updated. Undecided whether "updated" means `pushed_at` (last commit) or `updated_at` (any metadata change, including a star). These differ materially. | **TBD** |
-| `closed_issues` | `int` | API | Count of closed issues. The reference row shows `0` for a repository that has many, so the definition is narrower than "all closed issues" — possibly a time window, possibly excluding pull requests, possibly something else. Also the most expensive value to collect, so its definition drives the rate-limit budget. | **TBD** |
+| `closed_issues` | `int` | API | Closed issues, all time, **excluding pull requests**. See [Closed issues](#closed-issues) below. | **Settled** |
 | `releases` | `int` | API | Count of releases. Reference value `825`. Undecided whether drafts and prereleases count, and whether tags without releases count. | **TBD** |
 
 ## Scores
@@ -186,16 +186,127 @@ cost, which multiplies across the inventory and determines whether a run fits
 inside the token's budget. This table is what the pre-flight check will be
 computed from, and it cannot be completed until the definitions above are.
 
-| Metric | Endpoint | Requests per repository | Status |
+| Metric | Route | Cost per repository | Status |
 |---|---|---|---|
-| `stars`, `forks`, `organization`, dates | `GET /repos/{owner}/{repo}` | 1 | **TBD — confirm** |
-| `closed_issues` | depends on the definition | ? | **TBD** |
-| `releases` | depends on whether a count needs pagination | ? | **TBD** |
+| `closed_issues` | GraphQL `issues(states: CLOSED) { totalCount }` | 1 point | **Settled** |
+| `stars`, `forks`, `organization`, dates | GraphQL, same query | 0 additional | **TBD — confirm** |
+| `releases` | GraphQL `releases { totalCount }` | 0 additional | **TBD** |
+
+Because GraphQL bills per query rather than per field, folding every count into
+one document costs **one point per repository** regardless of how many metrics
+are collected. That is 5,000 repositories per hour, against roughly 1,600 for
+the three-request REST equivalent - which would still be wrong.
 
 A repository with 825 releases cannot be counted from one page, so `releases`
 alone may cost several requests unless a cheaper route exists. This is the kind
 of thing that turns a 400-repository run from feasible into impossible, so it
 is being settled before implementation rather than after.
+
+---
+
+## Closed issues
+
+**Definition.** The total number of issues in state `CLOSED`, all time,
+**excluding pull requests**. Collected in one GraphQL request per repository.
+
+```graphql
+repository(owner: $owner, name: $name) {
+  hasIssuesEnabled
+  closedIssues: issues(states: CLOSED) { totalCount }
+  openIssues:   issues(states: OPEN)   { totalCount }
+}
+```
+
+### Why not REST
+
+The REST API cannot answer this question correctly at any price. Three separate
+obstacles, each verified against the live API:
+
+1. **The repository object has no closed-issue count.** It exposes only
+   `open_issues_count`, and that number *includes pull requests*. For
+   `cline/cline` it reads `1148`, which is 691 open issues plus 457 open pull
+   requests.
+2. **The issues endpoint returns pull requests too**, with no server-side
+   filter. For `cline/cline` that is 3,770 closed issues against 7,001 closed
+   pull requests, so a combined count nearly triples the figure and measures
+   development throughput rather than issue triage.
+3. **Counting by pagination no longer works.** GitHub moved the issues endpoint
+   to cursor pagination, so responses carry `rel="next"` but no `rel="last"`.
+   Any total derived from the last-page link now returns **1** for every
+   repository. This was confirmed directly: PyGithub's
+   `repo.get_issues(state="closed").totalCount` returns `1` for `cline/cline`
+   and for `pypa/virtualenv` alike.
+
+Obstacle 3 is silent. It produces a plausible small integer rather than an
+error, which is why the reference row's `closed_issues` value cannot be trusted
+and why this metric is verified against live counts rather than against it.
+
+### Cost
+
+One GraphQL point per repository, out of 5,000 per hour. Only `totalCount` is
+requested; asking for `nodes` would page through every issue and make the cost
+proportional to the repository's history.
+
+| Route | Requests/repo | Ceiling | Correct? |
+|---|---|---|---|
+| REST repo object | 1 | 5,000/hr | No - no closed count exists |
+| REST issues pagination | 1+ | 5,000/hr | No - includes PRs, and now returns 1 |
+| Search API (`type:issue`) | 1 | **30/min = 1,800/hr** | Yes, with index lag |
+| **GraphQL** | **1** | **5,000/hr** | **Yes** |
+
+Search was measured within 1 of GraphQL on three repositories - index lag, not
+error - but its 30-requests-per-minute ceiling would be the binding constraint
+on any inventory over a few hundred repositories.
+
+### Issues disabled versus no issues
+
+`hasIssuesEnabled` is collected alongside the counts because zero closed issues
+has two very different causes. A repository with its tracker turned off reports
+zero, but that is a fact about its configuration, not about its maintenance -
+the project may track its work in a mailing list or another forge entirely.
+Scoring the two identically would penalise the second unfairly, so the flag is
+carried and a disabled tracker is logged at WARNING.
+
+### Scoring bands
+
+The weight is a 0.0-1.0 multiplier. How it combines into `prevalence_score` is
+settled separately.
+
+| Closed issues | Weight |
+|---------------|--------|
+| 0 - 19        | 0.1    |
+| 20 - 49       | 0.2    |
+| 50 - 99       | 0.3    |
+| 100 - 149     | 0.4    |
+| 150 - 299     | 0.6    |
+| 300 - 399     | 0.8    |
+| 400 - 499     | 0.9    |
+| 500 or more   | 1.0    |
+
+The edges are deliberately uneven: the informative range is at the low end. The
+gap between 10 and 100 closed issues says a great deal about whether a project
+is maintained; the gap between 3,000 and 4,000 says almost nothing.
+
+A count of zero scores 0.1 rather than 0.0, preserving the original behaviour -
+having no closed issues costs most of the weight without zeroing the component.
+
+### Defects corrected from the original implementation
+
+Three, all silent, all in `analysis/prevalence.py`:
+
+1. **The scoring function always returned 0.0.** Every branch assigned to
+   `cloased_issue_weight` while the `return` read `closed_issue_weight`. Python
+   creates the misspelled local without complaint, so the function returned its
+   initial `0` for every input.
+2. **A count of exactly 500 matched no branch.** The chain ended
+   `< 500 -> 0.9` and `> 500 -> 1.0`. Even with defect 1 fixed, 500 alone would
+   still have scored 0.0. The bands are now an ordered table with no
+   fallthrough by construction, and every boundary is tested individually.
+3. **The count itself was wrong**, per obstacles 2 and 3 above.
+
+Defects 1 and 3 both yield a plausible number rather than an error, which is why
+the band table is now data rather than control flow and why the whole domain is
+swept in tests.
 
 ## Related documents
 

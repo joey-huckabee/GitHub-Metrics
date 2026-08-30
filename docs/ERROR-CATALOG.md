@@ -34,6 +34,10 @@ rest of your file.
 | Codes | `GM-ING-001`–`006`, `020` | `GM-ING-010`–`015` |
 | CLI exit | 2 | 3 |
 
+Collection errors (`GM-COL-*`) are a third kind: they concern one repository
+rather than a whole file, so the run continues and the affected repository
+yields a row with empty metrics.
+
 Row-level issues become fatal under `--strict`, which converts the first one
 into `GM-ING-020`. See
 [`adr/0003-lenient-ingestion-by-default-with-strict-opt-in.md`](adr/0003-lenient-ingestion-by-default-with-strict-opt-in.md).
@@ -176,6 +180,40 @@ Matching is case-insensitive, so `PyPA/virtualenv` and `pypa/virtualenv`
 collide.
 
 ---
+
+---
+
+## Collection errors
+
+Raised while fetching data from the GitHub API. Unlike ingestion errors, these
+concern one repository rather than a whole file: the run continues, and the
+affected repository produces a row with its identity columns filled and its
+metrics empty.
+
+### `GM-COL-001` - Repository not found
+
+**Class**: `RepositoryNotFoundError`
+**Meaning**: The repository does not exist, is private to this token, or was
+renamed.
+**Typical cause**: An inventory entry that has gone stale. Syntactic validation
+at ingestion cannot detect any of these - a well-formed reference names a
+*plausible* repository, not one that exists - so this is where the distinction
+finally surfaces.
+**Resolution**: Check the repository on github.com. If it was renamed, GitHub
+redirects the web UI but the API reports the old name as absent, so the
+inventory needs updating.
+
+### `GM-COL-002` - GraphQL query failed
+
+**Class**: `GraphQLQueryError`
+**Meaning**: The API returned an `errors` array for a query, for a reason other
+than the repository being absent.
+**Typical cause**: A malformed query (a defect in this program), an expired or
+insufficiently scoped token, or a rate-limit rejection.
+**Resolution**: The message carries the API's own text. Note that GraphQL
+reports failures with HTTP 200 and an `errors` array rather than an error
+status, so a failure here is invisible to any check that only inspects the
+status code - which is why this code exists at all.
 
 ## Reserved and unused
 

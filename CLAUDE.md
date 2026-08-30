@@ -208,6 +208,27 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   helper might not.
 - **Modules name a logger; they never configure one.** `logging.getLogger(__name__)`
   and nothing else. Only `logger.py` attaches handlers.
+- **Counts come from GraphQL, never REST.** REST cannot count closed issues
+  correctly at any price: the repository object has no closed count, its
+  `open_issues_count` includes pull requests, the issues endpoint returns pull
+  requests with no server-side filter, and since GitHub moved that endpoint to
+  cursor pagination there is no `rel="last"` - so PyGithub's
+  `PaginatedList.totalCount` now returns **1** for every repository, silently.
+  GraphQL returns an exact `totalCount`, excludes pull requests by
+  construction, and costs one point per repository for the whole query.
+  `Requester.graphql_query()` is on PyGithub already, so this adds no
+  dependency.
+- **GraphQL reports failure with HTTP 200 and an `errors` array.** Any code
+  path that checks only the status sees success and then reads a null
+  repository. Always inspect `errors`, and classify `NOT_FOUND` separately - a
+  deleted or renamed repository is an expected outcome of a valid reference,
+  not a defect.
+- **Score bands are data, not if/elif chains.** The implementation this
+  replaced had a count of exactly 500 matching no branch, and a misspelled
+  local that made the whole function return 0.0 for every input. Both produced
+  a plausible number rather than an error. Tables cannot have gaps, can be
+  tested as one object, and can be rendered into the docs rather than
+  transcribed.
 - **Python's `csv` module no longer rejects a NUL byte** — it passes one
   through. We check explicitly, because without it a binary file renamed
   `.csv` produces one misleading "invalid owner" per row instead of one

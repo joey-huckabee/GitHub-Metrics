@@ -1,0 +1,9 @@
+"""Collecting data from the GitHub API.
+
+Everything in this package reaches the network. Nothing in it parses a disk
+format; that belongs to `github_metrics.sources`. See `docs/ARCHITECTURE.md`.
+"""
+
+from github_metrics.collect.closed_issues import ClosedIssueCounts, get_closed_issues
+
+__all__ = ["ClosedIssueCounts", "get_closed_issues"]

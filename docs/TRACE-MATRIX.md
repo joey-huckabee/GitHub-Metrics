@@ -20,10 +20,10 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 ## Coverage summary
 
-- L1 requirements: 8
-- L2 requirements: 23
-- L3 requirements: 23
-- Verified L2+L3: 46 of 46 (100.0%)
+- L1 requirements: 11
+- L2 requirements: 32
+- L3 requirements: 33
+- Verified L2+L3: 65 of 65 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -160,6 +160,45 @@ through their children, so counting them too would count the same work twice.
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
 | L3-LOG-001 | L2-LOG-001 | `tests/test_ingest.py::test_row_issues_are_logged_at_debug` | Implemented |
+
+### OUT: Result output and destinations
+
+**L1 → L2**
+
+| L1 ID | L2 Children | Test Artifacts | Status |
+|-------|-------------|----------------|--------|
+| L1-OUT-001 | L2-OUT-001, L2-OUT-002, L2-OUT-003, L2-OUT-004, L2-OUT-008, L2-OUT-009 | _(none)_ | Implemented |
+| L1-OUT-002 | L2-OUT-005, L2-OUT-006 | _(none)_ | Implemented |
+| L1-OUT-003 | L2-OUT-007 | _(none)_ | Implemented |
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-OUT-001 | L1-OUT-001 | L3-OUT-001 | _(none)_ | Implemented |
+| L2-OUT-002 | L1-OUT-001 | L3-OUT-002 | _(none)_ | Implemented |
+| L2-OUT-003 | L1-OUT-001 | L3-OUT-003 | _(none)_ | Implemented |
+| L2-OUT-004 | L1-OUT-001 | L3-OUT-008 | _(none)_ | Implemented |
+| L2-OUT-005 | L1-OUT-002 | L3-OUT-006 | _(none)_ | Implemented |
+| L2-OUT-006 | L1-OUT-002 | L3-OUT-007 | _(none)_ | Implemented |
+| L2-OUT-007 | L1-OUT-003 | L3-OUT-004, L3-OUT-005 | _(none)_ | Implemented |
+| L2-OUT-008 | L1-OUT-001 | L3-OUT-009 | _(none)_ | Implemented |
+| L2-OUT-009 | L1-OUT-001 | L3-OUT-010 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-OUT-001 | L2-OUT-001 | `tests/test_output.py::test_the_header_is_derived_from_the_dataclass_not_a_parallel_list`<br>`tests/test_output.py::test_the_header_is_the_agreed_column_set_in_the_agreed_order`<br>`tests/test_output.py::test_the_reference_row_renders_exactly_as_documented` | Implemented |
+| L3-OUT-002 | L2-OUT-002 | `tests/test_output.py::test_csv_preserves_the_order_it_was_given`<br>`tests/test_output.py::test_csv_uses_lf_regardless_of_platform`<br>`tests/test_output.py::test_csv_writes_a_header_even_with_no_rows` | Implemented |
+| L3-OUT-003 | L2-OUT-003 | `tests/test_output.py::test_json_is_an_array_of_objects_keyed_by_column_name`<br>`tests/test_output.py::test_json_keeps_native_types_rather_than_stringifying`<br>`tests/test_output.py::test_json_repeats_the_run_identity_in_every_object` | Implemented |
+| L3-OUT-004 | L2-OUT-007 | `tests/test_output.py::test_an_unfetchable_row_keeps_its_identity_and_empties_the_rest`<br>`tests/test_output.py::test_not_collected_is_distinguishable_from_collected_zero`<br>`tests/test_output.py::test_unknown_values_are_null_in_json_not_zero` | Implemented |
+| L3-OUT-005 | L2-OUT-007 | `tests/test_output.py::test_booleans_render_lowercase`<br>`tests/test_output.py::test_floats_keep_full_precision` | Implemented |
+| L3-OUT-006 | L2-OUT-005 | `tests/test_output.py::test_a_command_line_field_list_splits_forgivingly`<br>`tests/test_output.py::test_selecting_nothing_selects_everything`<br>`tests/test_output.py::test_selection_applies_to_every_format`<br>`tests/test_output.py::test_selection_is_returned_in_canonical_order_not_the_order_given`<br>`tests/test_output.py::test_selection_tolerates_case_padding_and_duplicates` | Implemented |
+| L3-OUT-007 | L2-OUT-006 | `tests/test_output.py::test_a_near_miss_gets_a_suggestion`<br>`tests/test_output.py::test_an_unknown_field_is_rejected_with_its_code` | Implemented |
+| L3-OUT-008 | L2-OUT-004 | `tests/test_output.py::test_console_marks_an_unknown_value_rather_than_leaving_a_gap`<br>`tests/test_output.py::test_console_renders_vertically_one_label_per_line`<br>`tests/test_output.py::test_console_says_so_when_there_is_nothing_to_show`<br>`tests/test_output.py::test_console_separates_repositories` | Implemented |
+| L3-OUT-009 | L2-OUT-008 | `tests/test_output.py::test_a_directory_gets_the_default_filename`<br>`tests/test_output.py::test_a_missing_parent_directory_fails_early`<br>`tests/test_output.py::test_a_named_file_is_used_as_given`<br>`tests/test_output.py::test_a_trailing_separator_reads_as_a_directory_even_if_absent`<br>`tests/test_output.py::test_no_destination_means_the_console` | Implemented |
+| L3-OUT-010 | L2-OUT-009 | `tests/test_output.py::test_a_naive_scan_date_is_rejected`<br>`tests/test_output.py::test_a_scan_identifier_is_timezone_aware_and_unique`<br>`tests/test_output.py::test_one_identity_stamps_every_row_of_a_run` | Implemented |
 
 ### VAL: Name validation
 

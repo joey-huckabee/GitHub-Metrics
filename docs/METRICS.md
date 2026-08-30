@@ -80,35 +80,22 @@ All six components are `float`. See the rendering conflict below.
 | `total_score` | `float` | the six above | Arithmetic sum. | **Settled** |
 | `is_trusted_org` | `bool` | ? | Rendered lowercase (`false`, not Python's `False`). The source of the trusted list, and whether it matches on `owner` or `organization`, are undecided. | **TBD** |
 
-### Conflict: float types vs. the reference row
+### Resolved: all six components are floats
 
-`last_update_score` and `trusted_org_bonus` are now specified as `float`, but
-the reference row writes them without a decimal point while every other score
-has one:
+The reference row writes `last_update_score` and `trusted_org_bonus` without a
+decimal point (`...,12.0,15,0,72.0,false`) while every other score has one.
+That was raised and **decided in favour of the types**: all six components are
+`float`, and all six render with a decimal point.
 
+The reference row above is therefore superseded in those two columns. Current
+output for the same repository is:
+
+```csv
+cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false
 ```
-...,12.0,15,0,72.0,false
-      ^    ^  ^
-      |    |  trusted_org_bonus
-      |    last_update_score
-      maturity_score
-```
 
-A Python `float` renders as `15.0` and `0.0`. So one of these is true, and it
-needs deciding before the writer is built:
-
-1. **The types win.** All six components are floats and the output becomes
-   `...,12.0,15.0,0.0,72.0,false`. The reference row above is superseded.
-2. **The reference row wins.** Those two columns are integers after all, and
-   the earlier `int` typing was right.
-3. **Both, via a formatting rule** — floats are written with trailing `.0`
-   stripped. This would also change `12.0` to `12` and `72.0` to `72`, so it
-   does not reproduce the reference row either.
-
-Option 3 does not actually fit the data, which leaves 1 or 2. Proceeding on
-**option 1** as instructed, with the reference row treated as superseded — but
-flagging it, because the reference row came from a working implementation and
-may be the more reliable witness.
+Every other column is unchanged. A test asserts this exact line, so the
+rendering cannot drift silently.
 
 ### An observation worth preserving
 
@@ -140,9 +127,10 @@ points before it is worth discussing.
 |---|---|---|
 | Booleans | Lowercase `true` / `false`, not Python's `True` / `False` | **Settled** |
 | `scan_date` | Python `str(datetime)`, UTC, microsecond precision | **Settled** |
-| Floats | Reference row shows full precision (`736.5466017006597`), no rounding | **TBD — confirm** |
-| Score columns | All six components are `float`; see the conflict above | **Conflicted** |
+| Floats | Full precision, no rounding (`736.5466017006597`) | **Settled** |
+| Score columns | All six components are `float` and render with a decimal point | **Settled** |
 | Unfetchable repositories | Identity columns filled, everything else empty | **Settled** |
+| Unknown vs. zero | Empty field in CSV, `null` in JSON — never `0` | **Settled** |
 
 ## Unfetchable repositories
 
@@ -162,10 +150,12 @@ cline,cline,cline,<scan_date>,<scan_id>,,,,,,,,,,,,,,
 The run exits with a **non-zero** status; see
 [`adr/0004-exit-code-scheme.md`](adr/0004-exit-code-scheme.md).
 
-> **Open:** `scan_date` and `scan_id` are per-run values, known before any
-> repository is fetched. The example above fills them, on the grounds that a
-> row which cannot be attributed to a run is not much use in a later database.
-> Confirm, or blank them with the rest.
+`scan_date` and `scan_id` **are** filled on such a row. They are per-run
+values, assigned before any repository is fetched, so they are known regardless
+of what happened to this one — and a row that cannot be attributed to a run is
+of little use once results are stored. How the run identity is represented in
+the v0.3.0 schema, where it is likely a foreign key rather than a repeated
+column, is a separate question deferred to that design.
 
 ## Field selection
 

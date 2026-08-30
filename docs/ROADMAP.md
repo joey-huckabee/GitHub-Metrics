@@ -15,9 +15,17 @@ about and deliberately scheduled; that is different from being promised.
 - Single-repository collection via `github-metrics repo`
 - A three-level requirements tree traced to tests, checked in CI
 
+**Merged, output half of v0.1.0:** the `SoftwareRow` column definition, the CSV,
+JSON and console renderers, field selection, destination resolution and the run
+identity. These do not depend on how a metric is calculated - only on which
+columns exist - so they were built while the definitions were being settled.
+
 **In progress — see [`METRICS.md`](METRICS.md):** the metric definitions and
-scoring bands that produce `githubmetrics.csv`. Nothing is implemented until it
-is defined there.
+scoring bands. Nothing is implemented until it is defined there.
+
+**Blocked on those definitions:** the collection layer, because which API calls
+a run makes is decided by what the metrics mean, and the rate-limit pre-flight
+budget is computed from that same request count.
 
 ---
 

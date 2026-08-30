@@ -20,15 +20,21 @@ ALL_FIELDS: Final[tuple[str, ...]] = SoftwareRow.to_header()
 """Every emittable column, in canonical output order."""
 
 IDENTITY_FIELDS: Final[tuple[str, ...]] = (
-    "client_name",
+    "repo_name",
     "owner",
-    "organization",
     "scan_date",
     "scan_id",
 )
 """Columns that identify the row and the run rather than measuring anything.
 
-These need no API call, so selecting them costs nothing.
+Every one of these survives a failed read: they come from the input row and
+from the scan, so a repository that 404s still produces a row that says which
+repository it was. `repo_name` prefers GitHub's value when there is one, but it
+has an answer either way.
+
+`organization` is deliberately not among them. It reads like identity, but only
+the API can report it — so it costs a call, and it is empty for an
+unfetchable repository like every other collected value.
 """
 
 

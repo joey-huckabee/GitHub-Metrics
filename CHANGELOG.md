@@ -61,6 +61,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   length and scopes; the value itself is never logged, at any level.
 - **`github_metrics.analysis.trusted_orgs`** with a replaceable registry of
   trusted owners and a 10-point bonus.
+- **`github_metrics.analysis.total`** sums the six components. The ceiling of
+  **85.0** is computed from their weights rather than clamped, so a component
+  that drifts past its own share shows up as a total that overshoots — and is
+  reported with the offending component named, instead of being flattened back
+  to 85.0 with nothing to say why.
 
 - Initial project scaffolding: Poetry packaging, CLI entry point, tooling
   configuration (black, isort, ruff, pylint, mypy, vulture, pytest), pre-commit
@@ -99,6 +104,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   whose tracker is disabled.
 - **A project with no evidence at all scores 0.0**, rather than collecting the
   lowest non-zero band for existing.
+- **`client_name` is renamed `repo_name` and holds what it always held.** The
+  original header was misleading and this tool read it, wrongly, as a second
+  copy of the owner — a mistake only possible because the reference row is
+  `cline/cline`, where the owner and the repository are spelled the same. It is
+  the repository's name, and together with `owner` it is what makes a row
+  identifiable at all. Still nineteen columns.
+- **`repo_name` is verified against the API rather than echoed from the input.**
+  A rename redirects silently, exactly as a transfer does, so an inventory
+  entry can be stale and still resolve. The column carries the name GitHub
+  reports, falls back to the input value when the repository could not be read,
+  and a rename is logged at WARNING. The name comes from the query already
+  being sent, so verification costs nothing.
+- **`organization` is empty for an unfetchable repository**, alongside the
+  metrics, rather than being treated as an always-known identity column. It
+  reads like identity but only the API can report it, and a repository that
+  could not be read reported nothing.
 - **Collection and scoring narrate at DEBUG rather than INFO.** Twenty log
   lines moved. Every one of them fires once per repository, so on an inventory
   of four hundred they were four hundred copies each — enough to bury the one

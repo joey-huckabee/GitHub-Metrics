@@ -27,6 +27,11 @@ Repositories move, and the API follows the redirect silently:
 Both are kept. `owner` stays as the inventory wrote it, because that is the
 value someone has to edit to fix the list; `resolved_owner` records where the
 repository actually lives now.
+
+The same is true of the repository's own name, which is why the query asks for
+it rather than trusting the inventory. A rename redirects exactly as a transfer
+does, so `repoid` can be stale and still work. `resolved_name` is GitHub's
+answer, and it is what the `repo_name` column carries.
 """
 
 from __future__ import annotations
@@ -49,6 +54,7 @@ ORGANIZATION_TYPE: Final = "Organization"
 REPOSITORY_QUERY = """
 query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
+    name
     owner { login __typename }
     stargazerCount
     forkCount
@@ -75,6 +81,8 @@ class RepoMetaData:
         repoid: The repository name as the inventory wrote it.
         resolved_owner: The owner GitHub reports, which differs when a
             repository has been transferred.
+        resolved_name: The name GitHub reports, which differs when a repository
+            has been renamed.
         owner_type: `Organization` or `User`.
         stars: Stargazers.
         forks: Forks.
@@ -89,6 +97,7 @@ class RepoMetaData:
     owner: str
     repoid: str
     resolved_owner: str
+    resolved_name: str
     owner_type: str
     stars: int
     forks: int
@@ -118,6 +127,11 @@ class RepoMetaData:
     def was_transferred(self) -> bool:
         """Whether GitHub reports a different owner than the inventory asked for."""
         return self.resolved_owner.casefold() != self.owner.casefold()
+
+    @property
+    def was_renamed(self) -> bool:
+        """Whether GitHub reports a different name than the inventory asked for."""
+        return self.resolved_name.casefold() != self.repoid.casefold()
 
     @property
     def distinct_versions(self) -> int:
@@ -178,6 +192,7 @@ def _build(owner: str, repoid: str, slug: str, repository: dict[str, Any]) -> Re
         owner=owner,
         repoid=repoid,
         resolved_owner=str(owner_node.get("login", owner)),
+        resolved_name=str(repository.get("name") or repoid),
         owner_type=str(owner_node.get("__typename", "")),
         stars=int(repository["stargazerCount"]),
         forks=int(repository["forkCount"]),
@@ -206,6 +221,15 @@ def _log_shape(slug: str, metadata: RepoMetaData) -> None:
         metadata.resolved_owner,
         metadata.owner_type or "unknown",
     )
+
+    if metadata.was_renamed:
+        # Same situation as a transfer, and just as invisible: GitHub redirects,
+        # so the entry works while no longer matching what the inventory says.
+        LOGGER.warning(
+            "%s is now named %s; the inventory entry still resolves but no longer matches",
+            slug,
+            metadata.resolved_name,
+        )
 
     if metadata.was_transferred:
         # The inventory is out of date but still resolves, because GitHub

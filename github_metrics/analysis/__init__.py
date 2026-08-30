@@ -12,6 +12,7 @@ from github_metrics.analysis.maturity import score_maturity
 from github_metrics.analysis.popularity import score_forks, score_stars
 from github_metrics.analysis.prevalence import score_prevalence
 from github_metrics.analysis.releases import score_releases
+from github_metrics.analysis.total import MAX_TOTAL_SCORE, score_total
 from github_metrics.analysis.trusted_orgs import (
     TrustedOrganizations,
     is_trusted_org,
@@ -19,6 +20,7 @@ from github_metrics.analysis.trusted_orgs import (
 )
 
 __all__ = [
+    "MAX_TOTAL_SCORE",
     "age_days",
     "last_update_hours",
     "TrustedOrganizations",
@@ -30,5 +32,6 @@ __all__ = [
     "score_prevalence",
     "score_releases",
     "score_stars",
+    "score_total",
     "score_trusted_org_bonus",
 ]

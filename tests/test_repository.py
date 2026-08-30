@@ -31,6 +31,7 @@ class _StubClient:
 
 
 OVERRIDABLE: dict[str, tuple[str, ...]] = {
+    "name": ("name",),
     "owner_login": ("owner", "login"),
     "owner_type": ("owner", "__typename"),
     "stars": ("stargazerCount",),
@@ -52,6 +53,7 @@ def payload(**overrides: Any) -> dict[str, Any]:
     the code that limit is meant to police.
     """
     repository: dict[str, Any] = {
+        "name": "cline",
         "owner": {"login": "cline", "__typename": "Organization"},
         "stargazerCount": 64_574,
         "forkCount": 6_900,
@@ -115,6 +117,8 @@ def test_the_query_asks_for_totals_only() -> None:
     # instead of staying at one point.
     assert "nodes" not in query
     assert query.count("totalCount") == 4
+    # The name is verified from the same query, so verification is free.
+    assert any(line.strip() == "name" for line in query.splitlines())
     assert variables == {"owner": "cline", "name": "cline"}
 
 
@@ -166,8 +170,55 @@ def test_an_unknown_owner_type_is_not_treated_as_an_organisation() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Transferred repositories
+# Renamed and transferred repositories
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-MET-015")
+def test_the_name_is_taken_from_the_api_not_from_the_inventory() -> None:
+    """The column is verified rather than echoed.
+
+    A repository name can be stale in the inventory and still work, because
+    GitHub redirects a rename exactly as it redirects a transfer.
+    """
+    metadata = collect(_StubClient(payload(name="virtualenv")), "pypa", "virtualenv")
+
+    assert metadata.resolved_name == "virtualenv"
+    assert metadata.was_renamed is False
+
+
+@pytest.mark.requirement("L3-MET-015")
+def test_a_renamed_repository_keeps_both_names() -> None:
+    metadata = collect(_StubClient(payload(name="pyproject-hooks")), "pypa", "pep517")
+
+    assert metadata.repoid == "pep517"
+    assert metadata.resolved_name == "pyproject-hooks"
+    assert metadata.was_renamed is True
+
+
+@pytest.mark.requirement("L3-MET-015")
+def test_a_rename_is_reported(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger=LOGGER_NAME):
+        collect(_StubClient(payload(name="pyproject-hooks")), "pypa", "pep517")
+
+    assert "now named pyproject-hooks" in caplog.text
+
+
+@pytest.mark.requirement("L3-MET-015")
+def test_a_case_difference_is_not_a_rename() -> None:
+    metadata = collect(_StubClient(payload(name="CPython")), "python", "cpython")
+
+    assert metadata.was_renamed is False
+
+
+@pytest.mark.requirement("L3-MET-015")
+def test_a_missing_name_falls_back_to_the_inventory() -> None:
+    # Defensive: the column has to have an answer either way, since it is what
+    # says which repository the row is about.
+    broken = payload()
+    broken["data"]["repository"]["name"] = None
+
+    assert collect(_StubClient(broken), "cline", "cline").resolved_name == "cline"
 
 
 @pytest.mark.requirement("L3-MET-014")

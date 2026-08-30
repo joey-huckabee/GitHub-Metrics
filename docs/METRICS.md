@@ -15,7 +15,7 @@ One row per accepted input row, in input order. Column order is fixed and is
 the order below.
 
 ```csv
-client_name,owner,organization,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org
+repo_name,owner,organization,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org
 ```
 
 Reference row (the worked example this document is calibrated against):
@@ -30,7 +30,7 @@ cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa
 
 | Column | Type | Source | Definition | Status |
 |---|---|---|---|---|
-| `client_name` | `str` | input | The `owner` value from the input row. | **Settled** |
+| `repo_name` | `str` | API, input fallback | The repository's name. GitHub's value when the repository was read; the `repoid` from the input row otherwise. | **Settled** |
 | `owner` | `str` | input | The `owner` value from the input row, verbatim. | **Settled** |
 | `organization` | `str` | API | The owning organisation's login, or **empty** when the repository is owned by an individual account. | **Settled** |
 | `scan_date` | `datetime` | run | One timestamp for the entire run, identical in every row. UTC, rendered as Python `str(datetime)` — `2026-07-12 20:33:07.254804+00:00`. | **Settled** |
@@ -39,6 +39,37 @@ cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa
 `scan_date` and `scan_id` are per-**run**, not per-repository. Two rows from
 the same invocation always carry the same pair, which is what makes a stored
 result set groupable later.
+
+### `repo_name`, formerly `client_name`
+
+The first column was named `client_name` and was read — by this tool, wrongly
+— as another copy of the owner. It is the **repository's name**, and the
+mistake was possible only because the reference row is `cline/cline`, where the
+owner and the repository are spelled the same. The column is renamed to say
+what it holds.
+
+Together with `owner` it is what makes a row identifiable: without it a file of
+four hundred rows cannot say which repository any of them describes except by
+position in the input.
+
+**It is verified rather than echoed.** The query asks GitHub for the name, so
+the column carries the name the repository has now rather than the name the
+inventory believes it has. That costs nothing — it is a field in a query
+already being sent — and it matters because a rename redirects silently, in
+exactly the way a transfer does:
+
+| | |
+|---|---|
+| the inventory says | `pypa/pep517` |
+| GitHub reports | `pypa/pyproject-hooks` |
+
+The entry still resolves, so nothing fails; without asking, every row would
+agree with the file and disagree with GitHub. A rename is logged at WARNING,
+and a difference of case alone is not a rename.
+
+When the repository could not be read there is no reported name, so the column
+falls back to the `repoid` from the input row. It is the one column that has an
+answer in every case, which is what a failed row needs most.
 
 ### Organisation and owner
 
@@ -144,16 +175,44 @@ not on a shared scale, and neither is a simple monotonic function of raw count
 with the same banding. Any proposed formula has to reproduce both of these
 points before it is worth discussing.
 
-### Open scoring questions
+### Resolved scoring questions
 
-1. Are the bands **step functions** (thresholds, e.g. `>= 1000 → 15.0`) or
-   **continuous** (e.g. logarithmic with a cap)?
-2. Is each component individually capped? What is the maximum `total_score`?
-3. Which components are integers and which are floats? The reference row shows
-   `12.0` but `15` and `0`, which suggests the types genuinely differ rather
-   than being a formatting artifact.
-4. What score does a repository that could not be fetched receive — zeros, or
-   is the row excluded from scoring entirely?
+**The bands are step functions.** Every one of them is a threshold table, and
+the tables are data rather than branches so that each can be tested across its
+whole domain. `github-metrics bands` prints them.
+
+**Each component is capped at its own weight, and `total_score` at 85.**
+
+| Component | Maximum |
+|---|---|
+| `prevalence_score` | 20.0 |
+| `forks_score` | 15.0 |
+| `maturity_score` | 15.0 |
+| `last_update_score` | 15.0 |
+| `stars_score` | 10.0 |
+| **Subtotal** | **75.0** |
+| `trusted_org_bonus` | 10.0 |
+| **`total_score`** | **85.0** |
+
+A component is `weight x points` where the weight is at most 1.0, so each one
+is capped by construction; the total is the sum of the six and cannot exceed
+85 without one of the six weights changing. 85 is therefore a ceiling that
+falls out of the design rather than a clamp applied over it, which is the
+better kind: a clamp hides a weight that has drifted, while a ceiling that is
+also a sum makes the drift visible as a total that no longer reaches 85. A
+test asserts the six values still sum to it.
+
+**Every score is a float, rendered with a decimal.** The reference row shows
+`12.0` beside `15` and `0`, which reads like a type difference and is not —
+it is a formatting artifact of the spreadsheet the row was copied from. All six
+components and the total are floats.
+
+**A repository that could not be fetched keeps its row and scores nothing.**
+Not zero: empty. Zero is a legitimate score for a repository that was measured
+and found wanting, so using it here would put an unreadable repository and a
+genuinely inactive one in the same bucket, and every average over the file
+would absorb the difference. See *Unfetchable repositories* below for what the
+row contains and what the run does about it.
 
 ## Formatting rules
 
@@ -163,7 +222,7 @@ points before it is worth discussing.
 | `scan_date` | Python `str(datetime)`, UTC, microsecond precision | **Settled** |
 | Floats | Full precision, no rounding (`736.5466017006597`) | **Settled** |
 | Score columns | All six components are `float` and render with a decimal point | **Settled** |
-| Unfetchable repositories | Identity columns filled, everything else empty | **Settled** |
+| Unfetchable repositories | Input and scan columns filled, everything else empty, run exits 4 | **Settled** |
 | Unknown vs. zero | Empty field in CSV, `null` in JSON — never `0` | **Settled** |
 
 ## Unfetchable repositories
@@ -172,14 +231,26 @@ A repository that 404s, is private, or otherwise cannot be read still produces
 a row — the output has one row per accepted input row regardless of what
 happened to it.
 
-Filled: `client_name`, `owner`, `organization`. Empty: every metric and every
-score, written as an empty field rather than a zero. Zero is a legitimate
+Filled: `repo_name`, `owner`, `scan_date`, `scan_id` — everything that comes
+from the input row and from the scan. Empty: `organization`, every metric and
+every score, written as an empty field rather than a zero. Zero is a legitimate
 value — a repository really can have zero releases — so using it for "not
 known" would make the two indistinguishable in the output.
 
+`organization` is empty here for the same reason as the metrics: only the API
+can report it, and the API reported nothing. It is the one identity-looking
+column a failed read cannot fill.
+
 ```csv
-cline,cline,cline,<scan_date>,<scan_id>,,,,,,,,,,,,,,
+cpython,python,,<scan_date>,<scan_id>,,,,,,,,,,,,,,
 ```
+
+**The run reports which repositories failed and exits non-zero.** A row of
+empty measurements is not a result, and a file that contains some of those
+without saying so would be read as a set of very low scores. The failures are
+named on stderr and the exit status is 4 — degraded, output still written —
+so a pipeline can tell "some rows could not be collected" from "the run
+produced nothing".
 
 The run exits with a **non-zero** status; see
 [`adr/0004-exit-code-scheme.md`](adr/0004-exit-code-scheme.md).

@@ -108,11 +108,12 @@ def test_the_default_list_cannot_be_mutated_by_a_caller() -> None:
 
 
 @pytest.mark.requirement("L3-TRU-002")
-def test_the_check_is_logged(caplog: pytest.LogCaptureFixture) -> None:
+def test_the_lookup_is_logged(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         is_trusted_org("google")
 
     assert "google" in caplog.text
+    assert "True" in caplog.text
 
 
 @pytest.mark.requirement("L3-TRU-004")

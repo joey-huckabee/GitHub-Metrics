@@ -49,9 +49,7 @@ class ClosedIssueCounts:
             which is indistinguishable from an enabled tracker nobody has
             closed anything in, unless this flag is carried alongside.
 
-    The derived `total` and `has_issues` properties are computed from these
-    three; `has_issues` preserves the signal the original implementation
-    returned alongside the count.
+    `total` is derived from the two counts.
     """
 
     closed: int
@@ -62,11 +60,6 @@ class ClosedIssueCounts:
     def total(self) -> int:
         """Open plus closed issues, excluding pull requests."""
         return self.open + self.closed
-
-    @property
-    def has_issues(self) -> bool:
-        """Whether the repository has any issue at all."""
-        return self.total > 0
 
 
 def get_closed_issues(client: GitHubClient, owner: str, repoid: str) -> ClosedIssueCounts:
@@ -121,7 +114,7 @@ def get_closed_issues(client: GitHubClient, owner: str, repoid: str) -> ClosedIs
             slug,
             counts.closed,
         )
-    elif not counts.has_issues:
+    elif counts.total == 0:
         LOGGER.info("%s has an issue tracker enabled but no issues at all", slug)
 
     LOGGER.info(

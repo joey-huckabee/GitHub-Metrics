@@ -71,7 +71,7 @@ All six components are `float`. See the rendering conflict below.
 
 | Column | Type | Driven by | Bands | Status |
 |---|---|---|---|---|
-| `prevalence_score` | `float` | ? | Reference value `20.0`. The driving input is not yet identified — it is separate from stars and forks, which have their own components. | **TBD** |
+| `prevalence_score` | `float` | closed issues, releases | `20 × weight`. See [Prevalence score](#prevalence-score). Formula known; the combination rule is being decided. | **Partial** |
 | `stars_score` | `float` | `stars` | `64574` → `10.0` | **TBD** |
 | `forks_score` | `float` | `forks` | `6900` → `15.0` | **TBD** |
 | `maturity_score` | `float` | `age_days` | `736.5466017006597` → `12.0` | **TBD** |
@@ -308,6 +308,112 @@ is now data rather than control flow and why the whole domain is swept in tests.
 > (`cloased_issue_weight`) that would have made the function return `0.0` for
 > every input. That was a transcription slip when the original was quoted into
 > a conversation, not a defect in the code, and the claim has been withdrawn.
+
+---
+
+## Prevalence score
+
+**Status: the formula is known; how the two signals combine is being decided.**
+
+`prevalence_score` is 20 points multiplied by a 0.0-1.0 weight. The original
+rule picks *which* signal supplies that weight:
+
+```python
+if closed_issues == 0:
+    prevalence_score = 20 * score_releases(releases)
+else:
+    prevalence_score = 20 * score_closed_issues(closed_issues)
+```
+
+Closed issues are the primary signal; releases are a fallback used only when
+there are no closed issues at all.
+
+This also explains the reference row. It carries `closed_issues = 0` and
+`releases = 825`, so the fallback branch ran, and `prevalence_score = 20.0`
+means `score_releases(825)` returned `1.0`.
+
+### The discontinuity
+
+Selecting on `closed_issues == 0` puts a cliff at exactly one closed issue.
+Using the reference row's own numbers, where the release weight is 1.0:
+
+| closed issues | original | `max()` |
+|---|---|---|
+| 0 | **20.0** | 20.0 |
+| 1 | **2.0** | 20.0 |
+| 19 | 2.0 | 20.0 |
+| 50 | 6.0 | 20.0 |
+| 400 | 18.0 | 20.0 |
+| 500+ | 20.0 | 20.0 |
+
+**A project's score drops from 20.0 to 2.0 when it closes its first issue.**
+That is not a judgement anyone would defend on purpose; it is what "fallback"
+semantics produce when the fallback is richer than the primary signal.
+
+The property being violated is worth naming, because it should hold for every
+component: **the score must be non-decreasing in every input.** Closing an
+issue, cutting a release, or gaining a star must never lower a project's
+score. Any replacement has to satisfy that.
+
+### Options
+
+**A. Take the higher of the two.**
+
+```python
+prevalence_score = 20 * max(score_closed_issues(closed), score_releases(releases))
+```
+
+Monotone in both inputs, no cliff, no branch to get wrong, and it preserves
+the reference row's 20.0. The cost is saturation: a project strong in either
+signal scores full marks, and the other signal then contributes nothing. How
+much that matters depends entirely on where `score_releases` saturates - if a
+handful of releases reaches 1.0, prevalence becomes 20.0 for almost everything
+and stops discriminating.
+
+**B. Fall back only when the signal is unavailable.**
+
+```python
+if not issues_enabled:
+    prevalence_score = 20 * score_releases(releases)
+else:
+    prevalence_score = 20 * score_closed_issues(closed)
+```
+
+Keeps the original intent - issues are primary - and removes the cliff, since
+0 and 1 closed issues now both score 2.0. It uses `issues_enabled`, which is
+already collected, and it draws the line where it belongs: a disabled tracker
+means the signal is *missing*, whereas zero closed issues is a *measurement*.
+The cost is that release activity is invisible for the great majority of
+repositories.
+
+**C. Blend both, issues dominant.**
+
+```python
+prevalence_score = 20 * (0.75 * score_closed_issues(closed) + 0.25 * score_releases(releases))
+```
+
+Monotone, no cliff, no saturation by a single signal, and both always
+contribute. The costs are two: the weights need justifying, and it does not
+reproduce the reference row - that row would become 6.5 rather than 20.0, so
+previously collected data would not be comparable with new data.
+
+### Recommendation
+
+**Option A now, revisited once `score_releases` is defined.**
+
+It is the smallest change that fixes the defect, it removes a branch rather
+than adding one, and it keeps existing rows comparable. The saturation concern
+is real but unmeasurable until the release bands exist: if they turn out to
+reach 1.0 at a low count, prevalence collapses to a near-constant 20.0 and
+option C becomes the better answer.
+
+Whichever is chosen, a disabled issue tracker should be excluded from the
+comparison rather than scored as 0.1 - the signal is absent, not low.
+
+**Open question for the release bands:** at what count does `score_releases`
+reach 1.0? That number decides whether option A discriminates or saturates,
+so it is worth settling deliberately rather than by analogy with the
+closed-issue bands.
 
 ## Related documents
 

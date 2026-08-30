@@ -11,30 +11,57 @@ import click
 from dotenv import load_dotenv
 
 from github_metrics import __version__
+from github_metrics.analysis.closed_issues import (
+    CLOSED_ISSUE_BANDS,
+    describe_bands,
+    score_closed_issues,
+)
 from github_metrics.client import GitHubClient
+from github_metrics.collect.closed_issues import ClosedIssueCounts, get_closed_issues
 from github_metrics.config import ConfigError, Settings
-from github_metrics.errors import IngestError
+from github_metrics.errors import CollectionError, IngestError
 from github_metrics.geo import Geocoder
 from github_metrics.ingest import IngestResult, read_repository_csvs
 from github_metrics.logger import LogLevels, reset_logger
 from github_metrics.metrics import DEFAULT_CONTRIBUTOR_LIMIT, collect_repository_metrics
 
-EXIT_INPUT_ERROR = 2
-"""Exit status for a malformed or unreadable input file."""
-
+# Exit statuses, severity-ordered; the highest applicable one wins. Codes 1 and
+# 2 belong to click (ClickException and UsageError) and are listed for
+# completeness rather than chosen. See docs/adr/0004-exit-code-scheme.md.
 EXIT_ROWS_REJECTED = 3
-"""Exit status when ingestion succeeded but rejected at least one row."""
+"""Degraded: the input was read but at least one row was rejected."""
+
+EXIT_REPOSITORY_UNFETCHABLE = 4
+"""Degraded: a repository could not be read from the API."""
+
+EXIT_RATE_LIMITED = 5
+"""Aborted: the API budget was exhausted, or pre-flight refused the run."""
+
+EXIT_INPUT_UNREADABLE = 6
+"""Aborted: the input file could not be read at all."""
 
 
 class InputError(click.ClickException):
-    """A CLI error that exits with `EXIT_INPUT_ERROR` rather than click's 1.
+    """A CLI error that exits with `EXIT_INPUT_UNREADABLE`.
 
     Click's own exit code for a `ClickException` is 1, which a shell cannot
-    tell apart from a generic failure. Ingestion promises a distinct status for
-    "the input could not be read", so it needs its own exception type.
+    tell apart from a generic failure. Reading the input is the one thing that
+    must be distinguishable, so it gets its own status.
     """
 
-    exit_code = EXIT_INPUT_ERROR
+    exit_code = EXIT_INPUT_UNREADABLE
+
+
+class RepositoryError(click.ClickException):
+    """A CLI error that exits with `EXIT_REPOSITORY_UNFETCHABLE`.
+
+    A repository that is deleted, renamed or private is an expected outcome of
+    a syntactically valid reference, not a failure of the run. It gets a status
+    below the aborting ones so a caller can tell "some repositories are stale"
+    from "nothing usable came out".
+    """
+
+    exit_code = EXIT_REPOSITORY_UNFETCHABLE
 
 
 @dataclass
@@ -225,3 +252,104 @@ def ingest_command(
         # A distinct status lets a pipeline tell "nothing loaded" from "loaded,
         # but the inventory needs fixing" without parsing the report.
         ctx.exit(EXIT_ROWS_REJECTED)
+
+
+def _closed_issue_lines(
+    owner: str,
+    repoid: str,
+    counts: ClosedIssueCounts,
+    weight: float,
+    *,
+    explain: bool,
+) -> list[str]:
+    """Render a closed-issue result as aligned label-and-value lines."""
+    tracker = "enabled" if counts.issues_enabled else "DISABLED"
+    lines = [
+        f"{owner}/{repoid}",
+        f"  closed issues  {counts.closed:>8}",
+        f"  open issues    {counts.open:>8}",
+        f"  tracker        {tracker:>8}",
+        f"  weight         {weight:>8}",
+    ]
+    if not counts.issues_enabled:
+        lines.append(
+            "  note: the issue tracker is off, so zero is a configuration fact "
+            "rather than a maintenance one"
+        )
+    if explain:
+        lines.append("")
+        lines.append(describe_bands())
+    return lines
+
+
+@main.command("closed-issues")
+@click.argument("full_name")
+@click.option(
+    "--explain",
+    is_flag=True,
+    help="Print the scoring bands alongside the result.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+    help="Report format.",
+)
+@click.pass_obj
+def closed_issues_command(
+    context: CliContext,
+    full_name: str,
+    explain: bool,
+    output_format: str,
+) -> None:
+    """Report closed-issue counts and score for one OWNER/REPOID repository.
+
+    A probe for one metric at a time. Each metric gets one of these as it is
+    defined, so a definition can be checked against real repositories before it
+    is wired into the full collection run.
+
+    Counts exclude pull requests, and cost one GraphQL point.
+
+    Exit status is 0 on success and 4 when the repository cannot be read.
+    """
+    if "/" not in full_name:
+        raise click.BadParameter(
+            f"expected OWNER/REPOID, got {full_name!r}", param_hint="FULL_NAME"
+        )
+    owner, _, repoid = full_name.partition("/")
+
+    try:
+        with GitHubClient(context.settings()) as client:
+            counts = get_closed_issues(client, owner, repoid)
+    except CollectionError as exc:
+        raise RepositoryError(str(exc)) from exc
+
+    weight = score_closed_issues(counts.closed)
+
+    if output_format == "json":
+        click.echo(
+            json.dumps(
+                {
+                    "owner": owner,
+                    "repoid": repoid,
+                    "closed_issues": counts.closed,
+                    "open_issues": counts.open,
+                    "issues_enabled": counts.issues_enabled,
+                    "weight": weight,
+                    "bands": (
+                        [
+                            {"below": bound, "weight": band_weight}
+                            for bound, band_weight in CLOSED_ISSUE_BANDS
+                        ]
+                        if explain
+                        else None
+                    ),
+                },
+                indent=2,
+            )
+        )
+        return
+
+    click.echo("\n".join(_closed_issue_lines(owner, repoid, counts, weight, explain=explain)))

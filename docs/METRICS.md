@@ -67,16 +67,48 @@ trusted_org_bonus  0
 total_score       72.0
 ```
 
+All six components are `float`. See the rendering conflict below.
+
 | Column | Type | Driven by | Bands | Status |
 |---|---|---|---|---|
 | `prevalence_score` | `float` | ? | Reference value `20.0`. The driving input is not yet identified — it is separate from stars and forks, which have their own components. | **TBD** |
 | `stars_score` | `float` | `stars` | `64574` → `10.0` | **TBD** |
 | `forks_score` | `float` | `forks` | `6900` → `15.0` | **TBD** |
 | `maturity_score` | `float` | `age_days` | `736.5466017006597` → `12.0` | **TBD** |
-| `last_update_score` | `int`? | `last_update_hours` | `8.10177526` → `15` | **TBD** |
-| `trusted_org_bonus` | `int`? | `is_trusted_org` | `false` → `0` | **TBD** |
+| `last_update_score` | `float` | `last_update_hours` | `8.10177526` → `15` | **TBD** |
+| `trusted_org_bonus` | `float` | `is_trusted_org` | `false` → `0` | **TBD** |
 | `total_score` | `float` | the six above | Arithmetic sum. | **Settled** |
 | `is_trusted_org` | `bool` | ? | Rendered lowercase (`false`, not Python's `False`). The source of the trusted list, and whether it matches on `owner` or `organization`, are undecided. | **TBD** |
+
+### Conflict: float types vs. the reference row
+
+`last_update_score` and `trusted_org_bonus` are now specified as `float`, but
+the reference row writes them without a decimal point while every other score
+has one:
+
+```
+...,12.0,15,0,72.0,false
+      ^    ^  ^
+      |    |  trusted_org_bonus
+      |    last_update_score
+      maturity_score
+```
+
+A Python `float` renders as `15.0` and `0.0`. So one of these is true, and it
+needs deciding before the writer is built:
+
+1. **The types win.** All six components are floats and the output becomes
+   `...,12.0,15.0,0.0,72.0,false`. The reference row above is superseded.
+2. **The reference row wins.** Those two columns are integers after all, and
+   the earlier `int` typing was right.
+3. **Both, via a formatting rule** — floats are written with trailing `.0`
+   stripped. This would also change `12.0` to `12` and `72.0` to `72`, so it
+   does not reproduce the reference row either.
+
+Option 3 does not actually fit the data, which leaves 1 or 2. Proceeding on
+**option 1** as instructed, with the reference row treated as superseded — but
+flagging it, because the reference row came from a working implementation and
+may be the more reliable witness.
 
 ### An observation worth preserving
 
@@ -109,8 +141,53 @@ points before it is worth discussing.
 | Booleans | Lowercase `true` / `false`, not Python's `True` / `False` | **Settled** |
 | `scan_date` | Python `str(datetime)`, UTC, microsecond precision | **Settled** |
 | Floats | Reference row shows full precision (`736.5466017006597`), no rounding | **TBD — confirm** |
-| Integer-valued scores | `15` and `0` render without a decimal point | **TBD — confirm** |
-| Empty values | What an unfetchable repository writes into each column | **TBD** |
+| Score columns | All six components are `float`; see the conflict above | **Conflicted** |
+| Unfetchable repositories | Identity columns filled, everything else empty | **Settled** |
+
+## Unfetchable repositories
+
+A repository that 404s, is private, or otherwise cannot be read still produces
+a row — the output has one row per accepted input row regardless of what
+happened to it.
+
+Filled: `client_name`, `owner`, `organization`. Empty: every metric and every
+score, written as an empty field rather than a zero. Zero is a legitimate
+value — a repository really can have zero releases — so using it for "not
+known" would make the two indistinguishable in the output.
+
+```csv
+cline,cline,cline,<scan_date>,<scan_id>,,,,,,,,,,,,,,
+```
+
+The run exits with a **non-zero** status; see
+[`adr/0004-exit-code-scheme.md`](adr/0004-exit-code-scheme.md).
+
+> **Open:** `scan_date` and `scan_id` are per-run values, known before any
+> repository is fetched. The example above fills them, on the grounds that a
+> row which cannot be attributed to a run is not much use in a later database.
+> Confirm, or blank them with the rest.
+
+## Field selection
+
+The caller may choose which columns to emit; selecting none emits all of them.
+
+Selection drives collection, not just rendering: **if no selected column needs
+a given API call, that call is not made.** On a large inventory this is the
+difference between fitting inside the token's budget and not.
+
+The dependency is not one-to-one, because scores derive from raw metrics. A
+selection of `stars_score` alone still requires the repository fetch that
+provides `stars`; a selection that excludes everything derived from releases
+skips the release request entirely. The mapping from selected column to
+required request is the table below, and it cannot be finalised until the
+metric definitions are.
+
+## JSON output
+
+An array of objects, one per row, using the same field names as the CSV
+columns. `scan_date` and `scan_id` repeat in every object, exactly as they
+repeat in every CSV row — the two formats carry the same information in the
+same shape, so a consumer can switch between them without a mapping layer.
 
 ## Rate-limit cost per repository
 

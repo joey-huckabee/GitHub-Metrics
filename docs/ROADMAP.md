@@ -30,21 +30,50 @@ The current release target. Everything below is in scope now.
 Replaces `ingest`. Collects metrics for every repository named by the input and
 writes `githubmetrics.csv`.
 
-- **Input:** exactly one CSV file (multiple files are not accepted), or the
-  `--owner` / `--repoid` parameters for a single repository. Directories are
-  not walked.
+- **Input:** exactly one CSV file (multiple files are not accepted), or
+  `--owner` with `--repoid` for a single repository. The two forms are mutually
+  exclusive, the two flags must be given together, and only one repository can
+  be named this way. Directories are not walked.
 - **Output:** one row per accepted input row, **in input order**.
 - **Destination:** a file named by `--output`. When only a directory is given,
   the file is written there as `githubmetrics.csv`. With no `--output` at all,
   the report goes to the console.
-- **Console format:** a formatted table, one per input row.
-- **Field selection:** the caller may select which fields to emit. Selecting
-  none returns all of them.
-- **JSON:** available both as a file and to the console.
+- **Console format:** a **vertical** table, one block per input row. Nineteen
+  columns do not fit across a terminal, so the columns become rows.
+- **Field selection:** the caller selects which columns to emit; selecting none
+  emits all. Selection also **skips the API calls no selected column needs**,
+  which is a rate-limit lever, not just a rendering filter.
+- **JSON:** an array of objects using the CSV column names, available both as a
+  file and to the console.
+- **`--dry-run`:** validates the input and reports, with no network access and
+  no token required — the capability the `ingest` command provided, kept as a
+  flag rather than as a command of its own. Checking a 400-row inventory before
+  spending any quota is worth keeping.
 - **Duplicates:** dropped, with a warning naming them.
 - **Invalid rows:** rejected, as today.
-- **Unfetchable repositories:** a 404 or a private repository still has to be
-  accounted for — see the open question in [`METRICS.md`](METRICS.md).
+- **Unfetchable repositories:** identity columns filled, metrics and scores
+  empty, non-zero exit. See [`METRICS.md`](METRICS.md).
+- **Exit codes:** severity-ordered 0–6, per
+  [`adr/0004-exit-code-scheme.md`](adr/0004-exit-code-scheme.md).
+
+### Package layout
+
+The current flat module set grows into packages, shaped by where things are
+headed rather than by what exists today:
+
+```
+github_metrics/
+  sources/     where inventories come from - CSV now, URLs in v0.2.0
+  model/       ScanIdentifier, RepoMetaData, the output row
+  collect/     API access, rate limiting, concurrency
+  analysis/    the scoring calculations
+  output/      CSV, JSON and console rendering
+```
+
+`sources/` and `output/` are separate rather than one `csv_io` package because
+they diverge immediately: v0.2.0 adds a URL *source* and v0.3.0 adds a database
+*destination*, and neither belongs in a package named for CSV. Nothing named
+`csv_io` would still be honest by v0.3.0.
 
 ### Rate limiting
 
@@ -61,8 +90,17 @@ Integrated with the per-repository concurrency, not bolted beside it.
 ### Library use
 
 The package must be usable as a dependency, so that a larger project can
-collect metrics in the background rather than shelling out to the CLI. The CLI
-becomes one caller of the library rather than the only way in.
+collect metrics in the background rather than shelling out to the CLI.
+
+No separate facade or wrapper API: a caller imports the classes and functions
+directly and instantiates them. The CLI becomes one caller among others rather
+than the only way in, which means every capability the CLI has must be reachable
+without it — including output selection, rate-limit configuration and the
+scan identity.
+
+Collection is synchronous. A caller wanting it in the background runs it in
+their own thread or task; the package does not impose a concurrency model on
+the program embedding it.
 
 ### Documentation
 
@@ -87,6 +125,13 @@ This is why URL parsing was kept out of the CSV contract in
 [ADR-0001](adr/0001-two-column-csv-as-the-inventory-contract.md): the ambiguity
 is real, and it belongs in one clearly-marked place with its own error code
 rather than spread across every row of an inventory.
+
+### Naming more than one repository on the command line
+
+`--owner` / `--repoid` names exactly one repository in v0.1.0. Repeating the
+pair to name several without writing a CSV is a natural extension, deferred
+because the single-repository form covers the common case and the CSV covers
+the rest.
 
 ### Rate-limit behaviour made configurable
 

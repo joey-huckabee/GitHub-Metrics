@@ -292,21 +292,22 @@ having no closed issues costs most of the weight without zeroing the component.
 
 ### Defects corrected from the original implementation
 
-Three, all silent, all in `analysis/prevalence.py`:
+Two, both silent, both in `analysis/prevalence.py`:
 
-1. **The scoring function always returned 0.0.** Every branch assigned to
-   `cloased_issue_weight` while the `return` read `closed_issue_weight`. Python
-   creates the misspelled local without complaint, so the function returned its
-   initial `0` for every input.
-2. **A count of exactly 500 matched no branch.** The chain ended
-   `< 500 -> 0.9` and `> 500 -> 1.0`. Even with defect 1 fixed, 500 alone would
-   still have scored 0.0. The bands are now an ordered table with no
-   fallthrough by construction, and every boundary is tested individually.
-3. **The count itself was wrong**, per obstacles 2 and 3 above.
+1. **A count of exactly 500 matched no branch.** The chain ended
+   `< 500 -> 0.9` and `> 500 -> 1.0`, so 500 itself returned the initial `0`.
+   The bands are now an ordered table with no fallthrough by construction: the
+   last band's bound is 500 and anything not below it takes the maximum weight,
+   which is exactly `>= 500 -> 1.0`. Every boundary is tested individually.
+2. **The count itself was wrong**, per obstacles 2 and 3 above.
 
-Defects 1 and 3 both yield a plausible number rather than an error, which is why
-the band table is now data rather than control flow and why the whole domain is
-swept in tests.
+Both yield a plausible number rather than an error, which is why the band table
+is now data rather than control flow and why the whole domain is swept in tests.
+
+> An earlier revision of this document also listed a misspelled local
+> (`cloased_issue_weight`) that would have made the function return `0.0` for
+> every input. That was a transcription slip when the original was quoted into
+> a conversation, not a defect in the code, and the claim has been withdrawn.
 
 ## Related documents
 

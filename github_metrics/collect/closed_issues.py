@@ -47,10 +47,11 @@ class ClosedIssueCounts:
             This is the honest version of "does this project use issues": a
             repository with the tracker disabled reports zero closed issues,
             which is indistinguishable from an enabled tracker nobody has
-            closed anything in unless this flag is carried alongside.
-        has_issues: Whether the repository has any issue at all, open or
-            closed. Preserved because the original implementation exposed this
-            signal, and something downstream may still want it.
+            closed anything in, unless this flag is carried alongside.
+
+    The derived `total` and `has_issues` properties are computed from these
+    three; `has_issues` preserves the signal the original implementation
+    returned alongside the count.
     """
 
     closed: int

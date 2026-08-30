@@ -93,9 +93,9 @@ def test_exactly_five_hundred_scores_rather_than_falling_through() -> None:
 
 @pytest.mark.requirement("L3-SCR-001")
 def test_no_count_is_left_unmapped() -> None:
-    # The original always returned 0.0 because every branch assigned to a
-    # misspelled local. Sweeping the whole domain is what makes that class of
-    # defect impossible to reintroduce quietly.
+    # A band that matches nothing returns a plausible number rather than an
+    # error, so sweeping the whole domain is what makes that class of defect
+    # impossible to reintroduce quietly.
     top = CLOSED_ISSUE_BANDS[-1][0]
     weights = {score_closed_issues(count) for count in range(0, top + 50)}
 

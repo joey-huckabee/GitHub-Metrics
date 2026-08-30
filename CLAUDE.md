@@ -224,11 +224,10 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   deleted or renamed repository is an expected outcome of a valid reference,
   not a defect.
 - **Score bands are data, not if/elif chains.** The implementation this
-  replaced had a count of exactly 500 matching no branch, and a misspelled
-  local that made the whole function return 0.0 for every input. Both produced
-  a plausible number rather than an error. Tables cannot have gaps, can be
-  tested as one object, and can be rendered into the docs rather than
-  transcribed.
+  replaced ended `< 500 -> 0.9` and `> 500 -> 1.0`, so a count of exactly 500
+  matched no branch and returned the initial 0 - a plausible number rather than
+  an error. A table cannot have that gap, can be tested as one object, and can
+  be rendered into the docs rather than transcribed.
 - **Python's `csv` module no longer rejects a NUL byte** — it passes one
   through. We check explicitly, because without it a binary file renamed
   `.csv` produces one misleading "invalid owner" per row instead of one

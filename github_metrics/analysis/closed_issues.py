@@ -30,25 +30,21 @@ it combines into `prevalence_score` is settled separately; see
 
 Corrections to the original implementation
 ------------------------------------------
-Three defects in the version this replaces are fixed here, all of them silent:
+Two defects in the version this replaces are fixed here, both of them silent:
 
-1. **The scoring function always returned 0.0.** Every branch assigned to
-   `cloased_issue_weight` while the return statement read
-   `closed_issue_weight`. Python happily creates the misspelled local, so the
-   function returned its initial `0` for every input and no error was ever
-   raised.
-2. **A count of exactly 500 fell through every branch.** The chain ended
-   `< 500 -> 0.9` and `> 500 -> 1.0`, leaving 500 itself matching neither.
-   Even with defect 1 fixed, that one input would still have scored 0.0. The
-   band table below has no fallthrough by construction.
-3. **The count itself was wrong.** It came from
+1. **A count of exactly 500 fell through every branch.** The chain ended
+   `< 500 -> 0.9` and `> 500 -> 1.0`, leaving 500 itself matching neither, so
+   it returned the initial `0`. The band table below has no fallthrough by
+   construction: the last band is an exclusive bound of 500, and anything not
+   below it takes the maximum weight, which is `>= 500 -> 1.0`.
+2. **The count itself was wrong.** It came from
    `repo.get_issues(state=...).totalCount`, which counts pull requests as
    issues and, since GitHub moved the issues endpoint to cursor pagination,
    now returns 1 for every repository regardless of its contents.
 
-Defects 1 and 3 both produce a plausible-looking number rather than an error,
-which is why the bands are now data rather than control flow, and why the
-boundaries are tested individually.
+Both produce a plausible-looking number rather than an error, which is why the
+bands are now data rather than control flow, and why every boundary is tested
+individually.
 """
 
 from __future__ import annotations

@@ -15,13 +15,13 @@ One row per accepted input row, in input order. Column order is fixed and is
 the order below.
 
 ```csv
-client_name,owner,organization,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org
+owner,organization,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org
 ```
 
 Reference row (the worked example this document is calibrated against):
 
 ```csv
-cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15,0,72.0,false
+cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15,0,72.0,false
 ```
 
 ---
@@ -30,7 +30,6 @@ cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa
 
 | Column | Type | Source | Definition | Status |
 |---|---|---|---|---|
-| `client_name` | `str` | input | The `owner` value from the input row. | **Settled** |
 | `owner` | `str` | input | The `owner` value from the input row, verbatim. | **Settled** |
 | `organization` | `str` | API | The owning organisation's login, or **empty** when the repository is owned by an individual account. | **Settled** |
 | `scan_date` | `datetime` | run | One timestamp for the entire run, identical in every row. UTC, rendered as Python `str(datetime)` — `2026-07-12 20:33:07.254804+00:00`. | **Settled** |
@@ -39,6 +38,21 @@ cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa
 `scan_date` and `scan_id` are per-**run**, not per-repository. Two rows from
 the same invocation always carry the same pair, which is what makes a stored
 result set groupable later.
+
+### Removed: `client_name`
+
+The original column set carried both `client_name` and `owner`, and in the
+reference row they read `cline` and `cline`. They were the same value from the
+same place: nothing computed `client_name`, nothing read it differently, and no
+input could make the two disagree. A duplicated column is not free — it is one
+more thing to keep in step, one more column a consumer has to decide to ignore,
+and a standing invitation to populate the two differently later and produce a
+row that contradicts itself.
+
+If a run ever needs a *label* — the client or engagement a scan was performed
+for — that is a per-run value like `scan_id`, supplied on the command line and
+not derived from the input row at all. Adding it then is a smaller change than
+keeping an empty seat for it now.
 
 ### Organisation and owner
 
@@ -125,7 +139,7 @@ The reference row above is therefore superseded in those two columns. Current
 output for the same repository is:
 
 ```csv
-cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false
+cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false
 ```
 
 Every other column is unchanged. A test asserts this exact line, so the
@@ -163,7 +177,7 @@ points before it is worth discussing.
 | `scan_date` | Python `str(datetime)`, UTC, microsecond precision | **Settled** |
 | Floats | Full precision, no rounding (`736.5466017006597`) | **Settled** |
 | Score columns | All six components are `float` and render with a decimal point | **Settled** |
-| Unfetchable repositories | Identity columns filled, everything else empty | **Settled** |
+| Unfetchable repositories | Input and scan columns filled, everything else empty | **Settled** |
 | Unknown vs. zero | Empty field in CSV, `null` in JSON — never `0` | **Settled** |
 
 ## Unfetchable repositories
@@ -172,13 +186,18 @@ A repository that 404s, is private, or otherwise cannot be read still produces
 a row — the output has one row per accepted input row regardless of what
 happened to it.
 
-Filled: `client_name`, `owner`, `organization`. Empty: every metric and every
+Filled: `owner`, `scan_date`, `scan_id` — the columns that come from the
+input row and from the scan. Empty: `organization`, every metric and every
 score, written as an empty field rather than a zero. Zero is a legitimate
 value — a repository really can have zero releases — so using it for "not
 known" would make the two indistinguishable in the output.
 
+`organization` is empty here for the same reason as the metrics: the API
+reports it, and the API reported nothing. It is the one identity-looking column
+that a failed read cannot fill.
+
 ```csv
-cline,cline,cline,<scan_date>,<scan_id>,,,,,,,,,,,,,,
+cline,,<scan_date>,<scan_id>,,,,,,,,,,,,,,
 ```
 
 The run exits with a **non-zero** status; see

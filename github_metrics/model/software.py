@@ -20,7 +20,7 @@ EMPTY: Final = ""
 """How an unknown value is rendered in every output format."""
 
 
-# The attribute count is the output contract: nineteen columns, defined in
+# The attribute count is the output contract: eighteen columns, defined in
 # docs/METRICS.md. The design check is aimed at classes that carry behaviour,
 # not at a record whose whole purpose is to hold one row.
 @dataclass
@@ -36,12 +36,14 @@ class SoftwareRow(DataClassJsonMixin):  # pylint: disable=too-many-instance-attr
 
     The identity fields default to empty strings instead, because they are
     always known: they come from the input row and the scan, not from the API,
-    so they are populated even for a repository that 404s.
+    so they are populated even for a repository that 404s. `organization` is
+    the exception — it reads like identity but the API reports it, so it is
+    empty for a repository that could not be read.
 
     Attributes:
-        client_name: The `owner` value from the input row.
         owner: The `owner` value from the input row, verbatim.
-        organization: The owning organisation. Definition pending.
+        organization: The owning organisation's login, or empty when the
+            repository is owned by an individual account.
         scan_date: Start of the run that produced this row, UTC.
         scan_id: UUID4 of the run that produced this row.
         stars: Raw star count.
@@ -60,7 +62,6 @@ class SoftwareRow(DataClassJsonMixin):  # pylint: disable=too-many-instance-attr
         is_trusted_org: Whether the owner is on the trusted list.
     """
 
-    client_name: str = ""
     owner: str = ""
     organization: str = ""
     scan_date: datetime | None = None

@@ -99,6 +99,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   whose tracker is disabled.
 - **A project with no evidence at all scores 0.0**, rather than collecting the
   lowest non-zero band for existing.
+- **`client_name` is gone; the output is eighteen columns.** It held the
+  `owner` value from the input row, and so did `owner` — the same value from
+  the same place, with no input able to make the two disagree. A duplicated
+  column is one more thing to keep in step and a standing invitation to
+  populate the two differently later. A per-run *label* remains possible, but
+  that is a command-line value like `scan_id` rather than a copy of a column.
+- **`organization` is empty for an unfetchable repository**, alongside the
+  metrics, rather than being treated as an always-known identity column. It
+  reads like identity but the API reports it, and a repository that could not
+  be read reported nothing.
 
 ### Fixed
 

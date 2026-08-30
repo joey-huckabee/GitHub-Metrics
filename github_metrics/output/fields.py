@@ -20,15 +20,18 @@ ALL_FIELDS: Final[tuple[str, ...]] = SoftwareRow.to_header()
 """Every emittable column, in canonical output order."""
 
 IDENTITY_FIELDS: Final[tuple[str, ...]] = (
-    "client_name",
     "owner",
-    "organization",
     "scan_date",
     "scan_id",
 )
 """Columns that identify the row and the run rather than measuring anything.
 
-These need no API call, so selecting them costs nothing.
+These come from the input row and from the scan, so they need no API call and
+are populated even for a repository that could not be read.
+
+`organization` is deliberately not among them. It reads like identity, but the
+API reports it — so it costs a call, and it is empty for an unfetchable
+repository like every other collected value.
 """
 
 

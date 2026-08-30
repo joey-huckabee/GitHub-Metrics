@@ -103,6 +103,29 @@ class StrictModeError(IngestError):
     code = "GM-ING-020"
 
 
+class OutputError(GitHubMetricsError):
+    """Base class for failures producing output."""
+
+    code = "GM-OUT-000"
+
+
+class UnknownFieldError(OutputError):
+    """A selected field is not a column of the output."""
+
+    code = "GM-OUT-001"
+
+
+class OutputDestinationError(OutputError):
+    """The requested output file cannot be written.
+
+    Raised before collection begins where possible. Discovering that the
+    destination directory does not exist after a run has spent its API budget
+    is the expensive way to find out.
+    """
+
+    code = "GM-OUT-002"
+
+
 # --------------------------------------------------------------------------
 # Row-level issue codes
 # --------------------------------------------------------------------------

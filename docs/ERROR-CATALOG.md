@@ -215,6 +215,36 @@ reports failures with HTTP 200 and an `errors` array rather than an error
 status, so a failure here is invisible to any check that only inspects the
 status code - which is why this code exists at all.
 
+---
+
+## Credential errors
+
+Raised before any work starts. A command that needs no credentials - `ingest`,
+or any run with `--dry-run` - never reaches them.
+
+### `GM-CFG-001` - No credentials
+
+**Class**: `MissingCredentialsError`
+**Exit status**: 7
+**Meaning**: No token was supplied, by `--token` or by `GITHUB_TOKEN` in the
+environment or a `.env` file.
+**Resolution**: Supply one by any of those routes. Prefer the environment or a
+`.env` file: a token passed as a command-line argument is visible to other
+processes on the machine and is written to shell history.
+
+### `GM-CFG-002` - Credentials rejected
+
+**Class**: `InvalidCredentialsError`
+**Exit status**: 8
+**Meaning**: GitHub refused the token - expired, revoked, mistyped, or scoped
+too narrowly. The message names the token's kind, inferred from its prefix.
+**Typical cause**: An expired fine-grained token, which unlike a classic token
+has a mandatory expiry.
+**Resolution**: Check the token at
+https://github.com/settings/tokens. Run with `LOG_LEVEL=DEBUG` to see the
+kind, length and scopes the tool observed - the token value itself is never
+logged.
+
 ## Reserved and unused
 
 `GM-000` is the base code on `GitHubMetricsError` and should never be seen in

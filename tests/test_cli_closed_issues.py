@@ -32,8 +32,14 @@ def token(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def offline(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace the client so no command under test opens a connection."""
+    """Replace the client, and the credential check, so nothing dials out.
+
+    The check is a real request against the rate-limit endpoint, made through
+    a client it creates itself, so stubbing `GitHubClient` alone does not
+    contain it.
+    """
     monkeypatch.setattr("github_metrics.cli.GitHubClient", lambda _settings: _NullClient())
+    monkeypatch.setattr("github_metrics.cli.verify_credentials", lambda _settings: None)
 
 
 def stub_counts(monkeypatch: pytest.MonkeyPatch, counts: ClosedIssueCounts) -> None:

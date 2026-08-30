@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 17
-- L2 requirements: 51
-- L3 requirements: 60
-- Verified L2+L3: 111 of 111 (100.0%)
+- L2 requirements: 52
+- L3 requirements: 62
+- Verified L2+L3: 114 of 114 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -301,7 +301,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-TRU-001 | L2-TRU-001, L2-TRU-002, L2-TRU-003 | _(none)_ | Implemented |
+| L1-TRU-001 | L2-TRU-001, L2-TRU-002, L2-TRU-003, L2-TRU-004 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -310,6 +310,7 @@ through their children, so counting them too would count the same work twice.
 | L2-TRU-001 | L1-TRU-001 | L3-TRU-001, L3-TRU-002 | _(none)_ | Implemented |
 | L2-TRU-002 | L1-TRU-001 | L3-TRU-003 | _(none)_ | Implemented |
 | L2-TRU-003 | L1-TRU-001 | L3-TRU-004 | _(none)_ | Implemented |
+| L2-TRU-004 | L1-TRU-001 | L3-TRU-005, L3-TRU-006 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -319,6 +320,8 @@ through their children, so counting them too would count the same work twice.
 | L3-TRU-002 | L2-TRU-001 | `tests/test_trusted_orgs.py::test_a_registry_folds_the_case_of_keys_it_is_given`<br>`tests/test_trusted_orgs.py::test_matching_ignores_case_and_padding`<br>`tests/test_trusted_orgs.py::test_the_lookup_is_logged` | Implemented |
 | L3-TRU-003 | L2-TRU-002 | `tests/test_trusted_orgs.py::test_an_untrusted_owner_has_no_institution`<br>`tests/test_trusted_orgs.py::test_the_institution_behind_an_owner_is_recoverable`<br>`tests/test_trusted_orgs.py::test_the_institutions_are_written_as_the_institutions_write_them` | Implemented |
 | L3-TRU-004 | L2-TRU-003 | `tests/test_trusted_orgs.py::test_a_caller_can_supply_its_own_list`<br>`tests/test_trusted_orgs.py::test_an_empty_list_trusts_nobody`<br>`tests/test_trusted_orgs.py::test_the_default_list_cannot_be_mutated_by_a_caller`<br>`tests/test_trusted_orgs.py::test_the_loaded_list_is_logged` | Implemented |
+| L3-TRU-005 | L2-TRU-004 | `tests/test_trusted_orgs.py::test_a_caller_supplied_registry_changes_who_is_paid`<br>`tests/test_trusted_orgs.py::test_a_trusted_owner_earns_the_bonus`<br>`tests/test_trusted_orgs.py::test_an_untrusted_owner_earns_nothing`<br>`tests/test_trusted_orgs.py::test_the_bonus_and_the_column_cannot_disagree`<br>`tests/test_trusted_orgs.py::test_the_bonus_follows_the_same_case_rules_as_the_check`<br>`tests/test_trusted_orgs.py::test_the_bonus_is_all_or_nothing`<br>`tests/test_trusted_orgs.py::test_the_bonus_is_ten_points` | Implemented |
+| L3-TRU-006 | L2-TRU-004 | `tests/test_trusted_orgs.py::test_a_refused_bonus_is_logged_at_debug`<br>`tests/test_trusted_orgs.py::test_an_awarded_bonus_names_the_institution` | Implemented |
 
 ### VAL: Name validation
 

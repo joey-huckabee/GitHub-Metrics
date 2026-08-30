@@ -38,6 +38,15 @@ from typing import Final
 
 LOGGER = logging.getLogger(__name__)
 
+TRUSTED_ORG_BONUS: Final = 10.0
+"""Points added to `total_score` when the owner is on the trusted list.
+
+A flat award rather than a band. Every other component scales a points
+budget by a 0.0-1.0 weight because its input is a count that varies; trust
+is a yes-or-no judgement, so there is nothing for a weight to interpolate
+between.
+"""
+
 DEFAULT_TRUSTED_ORGANIZATIONS: Final[Mapping[str, str]] = MappingProxyType(
     {
         "spring-projects": "VMware",
@@ -138,3 +147,42 @@ def is_trusted_org(owner: str, registry: TrustedOrganizations | None = None) -> 
         False
     """
     return (registry or TrustedOrganizations()).is_trusted(owner)
+
+
+def score_trusted_org_bonus(owner: str, registry: TrustedOrganizations | None = None) -> float:
+    """Award the trusted-organisation bonus for a repository owner.
+
+    This is the `trusted_org_bonus` column. It is `TRUSTED_ORG_BONUS` for an
+    owner on the list and `0.0` for every other, with nothing in between.
+
+    Taking the owner rather than a boolean keeps one source of truth: the
+    column and the bonus both resolve through the same registry, so they cannot
+    disagree about who is trusted.
+
+    Args:
+        owner: The repository owner.
+        registry: Registry to consult. Defaults to the built-in list.
+
+    Returns:
+        `TRUSTED_ORG_BONUS` or `0.0`.
+
+    Examples:
+        >>> score_trusted_org_bonus("google")
+        10.0
+        >>> score_trusted_org_bonus("cline")
+        0.0
+    """
+    active = registry or TrustedOrganizations()
+
+    if not active.is_trusted(owner):
+        LOGGER.debug("No trusted-organisation bonus for %r", owner)
+        return 0.0
+
+    institution = active.institution_for(owner)
+    LOGGER.info(
+        "Trusted-organisation bonus of %s awarded to %r, backed by %s",
+        TRUSTED_ORG_BONUS,
+        owner,
+        institution,
+    )
+    return TRUSTED_ORG_BONUS

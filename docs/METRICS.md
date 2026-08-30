@@ -76,7 +76,7 @@ All six components are `float`. See the rendering conflict below.
 | `forks_score` | `float` | `forks` | `6900` → `15.0` | **TBD** |
 | `maturity_score` | `float` | `age_days` | `736.5466017006597` → `12.0` | **TBD** |
 | `last_update_score` | `float` | `last_update_hours` | `8.10177526` → `15` | **TBD** |
-| `trusted_org_bonus` | `float` | `is_trusted_org` | `false` → `0`. The value for a trusted owner has not been supplied. | **TBD** |
+| `trusted_org_bonus` | `float` | `is_trusted_org` | `10.0` when trusted, `0.0` otherwise. See [Trusted organisations](#trusted-organisations). | **Settled** |
 | `total_score` | `float` | the six above | Arithmetic sum. | **Settled** |
 | `is_trusted_org` | `bool` | policy | Owner is on the trusted list, matched case-insensitively. See [Trusted organisations](#trusted-organisations). | **Settled** |
 
@@ -691,12 +691,34 @@ carried a trailing colon on `VMware:` and an unspaced `Redhat`; both were
 transcription slips and are corrected. A test asserts the spellings and that no
 value ends in punctuation.
 
+### The bonus
+
+`trusted_org_bonus` is **10.0** for an owner on the list and **0.0** for every
+other. A flat award, not a band: every other component scales a points budget
+by a 0.0-1.0 weight because its input is a count that varies, whereas trust is
+a yes-or-no judgement with nothing to interpolate between.
+
+The reference row carries `is_trusted_org` false and a bonus of 0, for a
+`total_score` of 72. The same repository under a trusted owner would score
+**82**.
+
+### What that means for a ranking
+
+Ten points is a large award - half of what prevalence pays - and it applies to
+a **three-entry list**. For a typical FOSS inventory almost every row scores 0
+here, so like `prevalence_score` this component varies for very few
+repositories.
+
+That is worth knowing rather than worrying about. Two of the six components now
+contribute little to ordering a portfolio of mature projects: prevalence
+because it saturates, and this one because the list is short. The ranking is
+carried by stars, forks, maturity and last-update. Whether that is the intended
+balance is a calibration question, and the levers are the list's length and the
+band boundaries rather than the weights.
+
 ### Open
 
-1. **What is `trusted_org_bonus` worth** when the owner is trusted? The
-   reference row has `is_trusted_org` false and the bonus `0`, so the non-zero
-   value has never been observed.
-2. **Does the `organization` column come from this map?** The institution names
+1. **Does the `organization` column come from this map?** The institution names
    are the only editorial data in the system, and `organization` is the only
    column whose source is still unidentified. In the reference row it reads
    `cline`, which equals the owner - consistent with a fallback to the owner

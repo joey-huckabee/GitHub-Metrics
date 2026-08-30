@@ -6,6 +6,7 @@ lets the bands be tested exhaustively without a token.
 """
 
 from github_metrics.analysis.closed_issues import score_closed_issues
+from github_metrics.analysis.elapsed import age_days, last_update_hours
 from github_metrics.analysis.last_update import score_last_update
 from github_metrics.analysis.prevalence import score_prevalence
 from github_metrics.analysis.releases import score_releases
@@ -16,6 +17,8 @@ from github_metrics.analysis.trusted_orgs import (
 )
 
 __all__ = [
+    "age_days",
+    "last_update_hours",
     "TrustedOrganizations",
     "is_trusted_org",
     "score_closed_issues",

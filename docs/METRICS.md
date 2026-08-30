@@ -46,8 +46,8 @@ result set groupable later.
 |---|---|---|---|---|
 | `stars` | `int` | API | Presumed `stargazers_count`. Not yet confirmed. | **TBD** |
 | `forks` | `int` | API | Presumed `forks_count`. Not yet confirmed. Whether this counts direct forks only or the whole network is undecided. | **TBD** |
-| `age_days` | `float` | derived | Elapsed days since repository creation. The anchor (`scan_date` vs. wall clock) and the end point are undecided. Reference value `736.5466017006597` is full float precision. | **TBD** |
-| `last_update_hours` | `float` | derived | Elapsed hours since the repository was last updated. Undecided whether "updated" means `pushed_at` (last commit) or `updated_at` (any metadata change, including a star). These differ materially. | **TBD** |
+| `age_days` | `float` | derived | `created_at` to `scan_date`, in days, at full precision. See [Last update](#last-update) for the anchor. | **Settled** |
+| `last_update_hours` | `float` | derived | `updated_at` to `scan_date`, in hours. See [Last update](#last-update). | **Settled** |
 | `closed_issues` | `int` | API | Closed issues, all time, **excluding pull requests**. See [Closed issues](#closed-issues) below. | **Settled** |
 | `releases` | `int` | API | Distinct versions, which is the tag count. See [Releases](#releases). Counting settled; bands pending. | **Partial** |
 
@@ -75,7 +75,7 @@ All six components are `float`. See the rendering conflict below.
 | `stars_score` | `float` | `stars` | `64574` → `10.0` | **TBD** |
 | `forks_score` | `float` | `forks` | `6900` → `15.0` | **TBD** |
 | `maturity_score` | `float` | `age_days` | `736.5466017006597` → `12.0` | **TBD** |
-| `last_update_score` | `float` | `last_update_hours` | `15 × weight`. See [Last update](#last-update). Scoring settled; the input is not. | **Partial** |
+| `last_update_score` | `float` | `last_update_hours` | `15 × weight`. See [Last update](#last-update). | **Settled** |
 | `trusted_org_bonus` | `float` | `is_trusted_org` | `10.0` when trusted, `0.0` otherwise. See [Trusted organisations](#trusted-organisations). | **Settled** |
 | `total_score` | `float` | the six above | Arithmetic sum. See [Total score](#total-score). | **Settled** |
 | `is_trusted_org` | `bool` | policy | Owner is on the trusted list, matched case-insensitively. See [Trusted organisations](#trusted-organisations). | **Settled** |
@@ -740,14 +740,15 @@ here, unlike every other table.
 
 | Hours since update | In years | Weight | Points |
 |---|---|---|---|
-| 0 - 876 | <= 0.1 | 1.0 | 15.0 |
+| 0 - 438 | <= 0.05 | 1.0 | 15.0 |
+| 439 - 876 | <= 0.1 | 0.9 | 13.5 |
 | 877 - 2,190 | <= 0.25 | 0.8 | 12.0 |
 | 2,191 - 4,380 | <= 0.5 | 0.6 | 9.0 |
 | 4,381 - 8,760 | <= 1 | 0.4 | 6.0 |
 | 8,761 - 26,280 | <= 3 | 0.2 | 3.0 |
 | more than 26,280 | > 3 | 0.0 | 0.0 |
 
-Roughly: touched in the last five weeks earns full marks, untouched for three
+Roughly: touched in the last 18 days earns full marks, untouched for three
 years earns nothing.
 
 The reference row carries `last_update_hours` of 8.10177526 and
@@ -759,11 +760,17 @@ The reference row carries `last_update_hours` of 8.10177526 and
 years against a transcription of the original chain and asserts the weights
 match. Three things around them are fixed:
 
-1. **A boundary that decided nothing.** The chain ended `> 0.05 year -> 1`
+1. **A band that had lost its weight.** The chain ended `> 0.05 year -> 1`
    followed by `<= 0.05 year -> 1`. Both sides produced 1.0, so the edge could
    not change an answer - sweeping 0 to 40,000 hours found no input where
-   removing it mattered. It is dropped, because a boundary that decides nothing
-   still reads as though it does.
+   removing it mattered. The intended weight for that band was **0.9**, and it
+   is restored.
+
+   This is the only change that alters output. A repository last updated
+   between 18 days and five weeks ago now scores 0.9 rather than 1.0, and 13.5
+   points rather than 15. A test sweeps five years of hourly inputs and asserts
+   that the differing hours are **exactly 439 to 876** - the change is surgical,
+   not merely intended.
 2. **A negative input scored full marks.** Hours since an update cannot be
    negative from a correct measurement, but clock skew between GitHub and the
    local machine can produce one, and `<= 0.05 year` accepted it silently as
@@ -771,9 +778,9 @@ match. Three things around them are fixed:
 3. **The bounds are exact integers.** `0.1 * 8760` is not exactly 876 in
    binary floating point.
 
-### Open: what the input measures
+### What the input measures
 
-Two questions, and they apply to `age_days` as well.
+Both settled, and both apply to `age_days` as well.
 
 **Which timestamp?** GitHub reports two, and they are not close together:
 
@@ -784,26 +791,37 @@ Two questions, and they apply to `age_days` as well.
 | `torvalds/linux` | 1.64 h | 0.11 h | 1.5 h |
 | `cline/cline` | 0.65 h | 0.69 h | 0.05 h |
 
-`pushed_at` moves when code is pushed to any branch. `updated_at` moves when
-repository metadata changes - a description edit, a topic, a settings change -
-so it can report a project as fresh when no code has been written for months.
-For a metric asking whether a project is maintained, `pushed_at` is the
-defensible reading. Both are free fields in the query already being made.
+**`updated_at` is the one used.** `pushed_at` moves only when code is pushed
+to a branch; `updated_at` also moves when repository metadata changes - a
+description edit, a topic, a settings change. `updated_at` is therefore the
+broader reading of "something happened here", which is what this metric takes
+activity to mean.
 
-**Measured from when?** The reference row's `age_days` implies a "now" of
-`20:35:16`, which is **129 seconds after** its own `scan_date` of `20:33:07` -
-so elapsed time was taken at the moment each repository was fetched rather than
-once for the run.
+The consequence to be aware of: a repository whose description was edited last
+week but whose last commit was two years ago reports as fresh. `pushed_at` is
+collected alongside and costs nothing, so the narrower reading remains
+available if that trade ever needs revisiting.
 
-That makes rows within one file non-comparable: on a run that takes forty
-minutes, the last repository's elapsed times are measured against an instant
-forty minutes later than the first's. The distortion is systematic - later rows
-always look staler - and it means re-running the same inventory in a different
-order changes the numbers.
+**Both are anchored to `scan_date`**, the single instant recorded once per run.
 
-Anchoring both `last_update_hours` and `age_days` to `scan_date` fixes it, and
-has the additional property that a reader can check the arithmetic, because
-`scan_date` is already a column in the row.
+The implementation this replaces measured at fetch time. Its own reference row
+shows the cost: an `age_days` of 736.5466017006597 against a `created_at` of
+`2024-07-06T07:28:10Z` implies a "now" of `20:35:16`, **129 seconds after** the
+`scan_date` of `20:33:07` printed in the same row.
+
+That made rows within one file incomparable. On a forty-minute run the last
+repository's elapsed times were measured against an instant forty minutes later
+than the first's - a systematic bias, not noise, with later rows always looking
+older and staler - and re-running the same inventory in a different order
+changed its numbers.
+
+A fixed anchor removes both, and lets a reader recompute the arithmetic by
+hand, because `scan_date` is a column in the row.
+
+**Archived rows will not reproduce exactly.** The same repository scanned the
+same second now reports an `age_days` smaller by however long the run took to
+reach it - 129 seconds in the reference row's case. A test pins that difference
+so it is a recorded consequence rather than a later mystery.
 
 ---
 

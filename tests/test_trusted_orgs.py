@@ -190,7 +190,7 @@ def test_a_caller_supplied_registry_changes_who_is_paid() -> None:
 
 @pytest.mark.requirement("L3-TRU-006")
 def test_an_awarded_bonus_names_the_institution(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         score_trusted_org_bonus("hibernate")
 
     # The institution is why the bonus was paid, so it belongs in the record.

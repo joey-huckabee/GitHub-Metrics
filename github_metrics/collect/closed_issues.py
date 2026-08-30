@@ -115,9 +115,9 @@ def get_closed_issues(client: GitHubClient, owner: str, repoid: str) -> ClosedIs
             counts.closed,
         )
     elif counts.total == 0:
-        LOGGER.info("%s has an issue tracker enabled but no issues at all", slug)
+        LOGGER.debug("%s has an issue tracker enabled but no issues at all", slug)
 
-    LOGGER.info(
+    LOGGER.debug(
         "%s: %d closed issues, %d open, %d total (pull requests excluded)",
         slug,
         counts.closed,

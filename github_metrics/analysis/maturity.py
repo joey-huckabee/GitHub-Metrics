@@ -146,7 +146,7 @@ def score_maturity(age_days: float) -> float:
         12.0
     """
     score = MATURITY_POINTS * maturity_weight(age_days)
-    LOGGER.info(
+    LOGGER.debug(
         "Maturity score %s/%s from an age of %.2f days",
         score,
         MATURITY_POINTS,

@@ -204,6 +204,13 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   runs the CLI stops `caplog` from seeing records in tests that run
   *afterwards* — a latent flake that only appears once someone writes a log
   assertion.
+- **Per-repository narration is DEBUG; INFO is per run.** The unit of work is
+  the repository and an inventory holds hundreds, so one INFO line per
+  repository is hundreds of lines burying whatever the operator needed to see.
+  A value worth explaining is DEBUG; a value worth doubting is a WARNING.
+  `ingest.py`'s per-file summary is the one INFO line in the package, and it is
+  per run rather than per row. A test asserts that collecting an unremarkable
+  repository emits nothing at INFO or above.
 - **Logs go to stderr, always.** The CLI writes JSON to stdout, and an
   interleaved log line corrupts it for every downstream consumer. This is why
   `reset_logger()` defaults to stderr even though a general-purpose logging

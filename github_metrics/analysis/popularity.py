@@ -191,7 +191,7 @@ def score_stars(repository_stars_total_count: int) -> float:
         10.0
     """
     score = STARS_POINTS * stars_weight(repository_stars_total_count)
-    LOGGER.info(
+    LOGGER.debug(
         "Stars score %s/%s from %d stars",
         score,
         STARS_POINTS,
@@ -214,7 +214,7 @@ def score_forks(repository_forks_total_count: int) -> float:
         15.0
     """
     score = FORKS_POINTS * forks_weight(repository_forks_total_count)
-    LOGGER.info(
+    LOGGER.debug(
         "Forks score %s/%s from %d forks",
         score,
         FORKS_POINTS,

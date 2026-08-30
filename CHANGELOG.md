@@ -99,6 +99,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   whose tracker is disabled.
 - **A project with no evidence at all scores 0.0**, rather than collecting the
   lowest non-zero band for existing.
+- **Collection and scoring narrate at DEBUG rather than INFO.** Twenty log
+  lines moved. Every one of them fires once per repository, so on an inventory
+  of four hundred they were four hundred copies each — enough to bury the one
+  line an operator was looking for. The detail is unchanged and one level down;
+  warnings are untouched. The only INFO line left in the package is ingestion's
+  per-file summary, which is per run rather than per repository.
 
 ### Fixed
 

@@ -165,7 +165,7 @@ def test_the_counts_and_their_relationship_are_logged(
 
 @pytest.mark.requirement("L3-MET-007")
 def test_a_tags_only_project_is_called_out(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO, logger=COLLECT_LOGGER):
+    with caplog.at_level(logging.DEBUG, logger=COLLECT_LOGGER):
         collect(_StubClient(payload(releases=0, tags=943)), "torvalds", "linux")
 
     assert "publishes no GitHub Releases" in caplog.text
@@ -175,7 +175,7 @@ def test_a_tags_only_project_is_called_out(caplog: pytest.LogCaptureFixture) -> 
 def test_a_project_with_nothing_shipped_is_called_out(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    with caplog.at_level(logging.INFO, logger=COLLECT_LOGGER):
+    with caplog.at_level(logging.DEBUG, logger=COLLECT_LOGGER):
         collect(_StubClient(payload(releases=0, tags=0)))
 
     assert "no versioned artifact" in caplog.text

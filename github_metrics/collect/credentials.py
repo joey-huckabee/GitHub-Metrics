@@ -151,7 +151,7 @@ def verify_credentials(settings: Settings, client: GitHubClient | None = None) -
             "so this is expected for one of those."
         )
 
-    LOGGER.info(
+    LOGGER.debug(
         "GitHub credentials verified (%s); %d REST requests and %d GraphQL points available",
         check.token_kind,
         check.core_remaining,

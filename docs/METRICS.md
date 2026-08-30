@@ -75,9 +75,9 @@ All six components are `float`. See the rendering conflict below.
 | `stars_score` | `float` | `stars` | `64574` → `10.0` | **TBD** |
 | `forks_score` | `float` | `forks` | `6900` → `15.0` | **TBD** |
 | `maturity_score` | `float` | `age_days` | `736.5466017006597` → `12.0` | **TBD** |
-| `last_update_score` | `float` | `last_update_hours` | `8.10177526` → `15` | **TBD** |
+| `last_update_score` | `float` | `last_update_hours` | `15 × weight`. See [Last update](#last-update). Scoring settled; the input is not. | **Partial** |
 | `trusted_org_bonus` | `float` | `is_trusted_org` | `10.0` when trusted, `0.0` otherwise. See [Trusted organisations](#trusted-organisations). | **Settled** |
-| `total_score` | `float` | the six above | Arithmetic sum. | **Settled** |
+| `total_score` | `float` | the six above | Arithmetic sum. See [Total score](#total-score). | **Settled** |
 | `is_trusted_org` | `bool` | policy | Owner is on the trusted list, matched case-insensitively. See [Trusted organisations](#trusted-organisations). | **Settled** |
 
 ### Resolved: all six components are floats
@@ -725,6 +725,122 @@ band boundaries rather than the weights.
    for an unlisted org, and equally consistent with the column simply echoing
    the owner. Note that the API reports `organization` as **null** for a
    user-owned repository, which the owner never is.
+
+---
+
+## Last update
+
+**Status: the scoring is settled. What the input measures is not.**
+
+`last_update_score` is `15 x weight`, where the weight comes from how many
+hours have passed since the repository was last updated. Smaller is better
+here, unlike every other table.
+
+### Scoring bands
+
+| Hours since update | In years | Weight | Points |
+|---|---|---|---|
+| 0 - 876 | <= 0.1 | 1.0 | 15.0 |
+| 877 - 2,190 | <= 0.25 | 0.8 | 12.0 |
+| 2,191 - 4,380 | <= 0.5 | 0.6 | 9.0 |
+| 4,381 - 8,760 | <= 1 | 0.4 | 6.0 |
+| 8,761 - 26,280 | <= 3 | 0.2 | 3.0 |
+| more than 26,280 | > 3 | 0.0 | 0.0 |
+
+Roughly: touched in the last five weeks earns full marks, untouched for three
+years earns nothing.
+
+The reference row carries `last_update_hours` of 8.10177526 and
+`last_update_score` of 15, which the top band reproduces.
+
+### What changed, and what did not
+
+**The bands are unchanged.** A test sweeps every whole hour from zero to five
+years against a transcription of the original chain and asserts the weights
+match. Three things around them are fixed:
+
+1. **A boundary that decided nothing.** The chain ended `> 0.05 year -> 1`
+   followed by `<= 0.05 year -> 1`. Both sides produced 1.0, so the edge could
+   not change an answer - sweeping 0 to 40,000 hours found no input where
+   removing it mattered. It is dropped, because a boundary that decides nothing
+   still reads as though it does.
+2. **A negative input scored full marks.** Hours since an update cannot be
+   negative from a correct measurement, but clock skew between GitHub and the
+   local machine can produce one, and `<= 0.05 year` accepted it silently as
+   "just updated". It is now reported and scored as zero hours.
+3. **The bounds are exact integers.** `0.1 * 8760` is not exactly 876 in
+   binary floating point.
+
+### Open: what the input measures
+
+Two questions, and they apply to `age_days` as well.
+
+**Which timestamp?** GitHub reports two, and they are not close together:
+
+| Repository | `pushed_at` | `updated_at` | Difference |
+|---|---|---|---|
+| `urllib3/urllib3` | 99.67 h | 28.43 h | **71.2 h** |
+| `pypa/virtualenv` | 48.06 h | 7.63 h | **40.4 h** |
+| `torvalds/linux` | 1.64 h | 0.11 h | 1.5 h |
+| `cline/cline` | 0.65 h | 0.69 h | 0.05 h |
+
+`pushed_at` moves when code is pushed to any branch. `updated_at` moves when
+repository metadata changes - a description edit, a topic, a settings change -
+so it can report a project as fresh when no code has been written for months.
+For a metric asking whether a project is maintained, `pushed_at` is the
+defensible reading. Both are free fields in the query already being made.
+
+**Measured from when?** The reference row's `age_days` implies a "now" of
+`20:35:16`, which is **129 seconds after** its own `scan_date` of `20:33:07` -
+so elapsed time was taken at the moment each repository was fetched rather than
+once for the run.
+
+That makes rows within one file non-comparable: on a run that takes forty
+minutes, the last repository's elapsed times are measured against an instant
+forty minutes later than the first's. The distortion is systematic - later rows
+always look staler - and it means re-running the same inventory in a different
+order changes the numbers.
+
+Anchoring both `last_update_hours` and `age_days` to `scan_date` fixes it, and
+has the additional property that a reader can check the arithmetic, because
+`scan_date` is already a column in the row.
+
+---
+
+## Total score
+
+```
+total_score = prevalence_score
+            + stars_score
+            + forks_score
+            + maturity_score
+            + last_update_score
+            + trusted_org_bonus
+```
+
+A plain sum of six components, confirmed against the reference row:
+
+```
+20.0 + 10.0 + 15.0 + 12.0 + 15.0 + 0.0 = 72.0
+```
+
+Each component is a points budget scaled by a 0.0-1.0 weight, except
+`trusted_org_bonus`, which is a flat award because trust is a yes-or-no
+judgement with nothing to interpolate between.
+
+| Component | Budget | Settled? |
+|---|---|---|
+| `prevalence_score` | 20 | yes |
+| `stars_score` | ? | no |
+| `forks_score` | ? | no |
+| `maturity_score` | ? | no |
+| `last_update_score` | 15 | yes |
+| `trusted_org_bonus` | 10 | yes |
+
+The reference row shows `stars_score` 10.0, `forks_score` 15.0 and
+`maturity_score` 12.0, but those are observed values rather than budgets - none
+of the three is known to be at its maximum, so the largest possible
+`total_score` cannot yet be stated.
 
 ## Related documents
 

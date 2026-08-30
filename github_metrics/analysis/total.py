@@ -84,15 +84,20 @@ def score_total(
     if total > MAX_TOTAL_SCORE:
         # Not clamped. A total above the ceiling means a component exceeded its
         # own share, and returning 85.0 would hide which one.
+        # The share each component was allowed is compared but not logged.
+        # `points` carries the trusted-organisation weight, and CodeQL treats
+        # any value named for it as a secret; the offending name and value are
+        # what a reader needs, and the shares are in COMPONENT_POINTS.
+        over = [
+            f"{name}={value:.1f}"
+            for (name, allowed), value in zip(COMPONENT_POINTS, components, strict=True)
+            if value > allowed
+        ]
         LOGGER.warning(
-            "Total score %.1f exceeds the maximum of %.1f; a component is over its "
-            "share. Components: %s",
+            "Total score %.1f exceeds the maximum of %.1f; over their share: %s",
             total,
             MAX_TOTAL_SCORE,
-            ", ".join(
-                f"{name}={value:.1f}/{points:.1f}"
-                for (name, points), value in zip(COMPONENT_POINTS, components, strict=True)
-            ),
+            ", ".join(over) or "none individually, so the weights no longer sum to the maximum",
         )
 
     LOGGER.debug(

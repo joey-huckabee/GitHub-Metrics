@@ -72,7 +72,9 @@ def test_exceeding_the_ceiling_is_reported_rather_than_clamped(
 
     assert total == 90.0
     assert "exceeds the maximum" in caplog.text
-    assert "prevalence_score=25.0/20.0" in caplog.text
+    assert "prevalence_score=25.0" in caplog.text
+    # Only the component that overshot is named.
+    assert "stars_score" not in caplog.text
 
 
 @pytest.mark.requirement("L3-SCR-021")

@@ -9,27 +9,30 @@ The bands
 ---------
 | Hours since update | In years | Weight |
 |--------------------|----------|--------|
-| 0 - 876            | <= 0.1   | 1.0    |
+| 0 - 438            | <= 0.05  | 1.0    |
+| 439 - 876          | <= 0.1   | 0.9    |
 | 877 - 2,190        | <= 0.25  | 0.8    |
 | 2,191 - 4,380      | <= 0.5   | 0.6    |
 | 4,381 - 8,760      | <= 1     | 0.4    |
 | 8,761 - 26,280     | <= 3     | 0.2    |
 | more than 26,280   | > 3      | 0.0    |
 
-Roughly: touched in the last five weeks earns full marks, untouched for three
+Roughly: touched in the last 18 days earns full marks, untouched for three
 years earns nothing.
 
 Corrections to the version this replaces
 ----------------------------------------
-The bands are unchanged - every input scores exactly what it scored before,
-which a test asserts by sweeping the whole range against a copy of the original
-chain. Three things around them are fixed:
+Every band except one scores exactly what it scored before, which a test
+asserts by sweeping the whole range against a copy of the original chain. Three
+things are fixed:
 
-1. **A boundary that did nothing.** The chain ended
+1. **A band that had lost its weight.** The chain ended
    `> 0.05 year -> 1` followed by `<= 0.05 year -> 1`, so both sides of that
-   edge produced the same weight. Sweeping 0 to 40,000 hours found **no input**
-   where removing the branch changed the answer. It is dropped rather than
-   preserved, because a boundary that decides nothing reads as though it does.
+   edge produced the same result and the boundary could not change an answer.
+   The intended weight for the `0.05` band was **0.9**, and it is restored
+   here. This is the one change that alters output: a repository last updated
+   between 18 days and five weeks ago now scores 0.9 rather than 1.0, and
+   13.5 points rather than 15.
 2. **A negative input scored full marks.** Hours since the last update cannot
    be negative, but a clock skew between GitHub and the local machine can
    produce one, and `<= 0.05 year` accepted it silently as "just updated". It
@@ -49,7 +52,8 @@ HOURS_PER_YEAR: Final = 24 * 365
 """8,760. A calendar year is ignored here; the bands are far coarser than a day."""
 
 LAST_UPDATE_BANDS: Final[tuple[tuple[int, float], ...]] = (
-    (876, 1.0),  # 0.1 year, about five weeks
+    (438, 1.0),  # 0.05 year, about 18 days
+    (876, 0.9),  # 0.1 year, about five weeks
     (2_190, 0.8),  # 0.25 year
     (4_380, 0.6),  # 0.5 year
     (8_760, 0.4),  # 1 year

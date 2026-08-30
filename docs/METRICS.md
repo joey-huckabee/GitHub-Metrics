@@ -46,8 +46,8 @@ result set groupable later.
 |---|---|---|---|---|
 | `stars` | `int` | API | Presumed `stargazers_count`. Not yet confirmed. | **TBD** |
 | `forks` | `int` | API | Presumed `forks_count`. Not yet confirmed. Whether this counts direct forks only or the whole network is undecided. | **TBD** |
-| `age_days` | `float` | derived | Elapsed days since repository creation. The anchor (`scan_date` vs. wall clock) and the end point are undecided. Reference value `736.5466017006597` is full float precision. | **TBD** |
-| `last_update_hours` | `float` | derived | Elapsed hours since the repository was last updated. Undecided whether "updated" means `pushed_at` (last commit) or `updated_at` (any metadata change, including a star). These differ materially. | **TBD** |
+| `age_days` | `float` | derived | `created_at` to `scan_date`, in days, at full precision. See [Last update](#last-update) for the anchor. | **Settled** |
+| `last_update_hours` | `float` | derived | `updated_at` to `scan_date`, in hours. See [Last update](#last-update). | **Settled** |
 | `closed_issues` | `int` | API | Closed issues, all time, **excluding pull requests**. See [Closed issues](#closed-issues) below. | **Settled** |
 | `releases` | `int` | API | Distinct versions, which is the tag count. See [Releases](#releases). Counting settled; bands pending. | **Partial** |
 
@@ -72,10 +72,10 @@ All six components are `float`. See the rendering conflict below.
 | Column | Type | Driven by | Bands | Status |
 |---|---|---|---|---|
 | `prevalence_score` | `float` | closed issues, releases | `20 × max(issue weight, release weight)`. See [Prevalence score](#prevalence-score). | **Settled** |
-| `stars_score` | `float` | `stars` | `64574` → `10.0` | **TBD** |
-| `forks_score` | `float` | `forks` | `6900` → `15.0` | **TBD** |
-| `maturity_score` | `float` | `age_days` | `736.5466017006597` → `12.0` | **TBD** |
-| `last_update_score` | `float` | `last_update_hours` | `15 × weight`. See [Last update](#last-update). Scoring settled; the input is not. | **Partial** |
+| `stars_score` | `float` | `stars` | `10 × weight`. See [Stars and forks](#stars-and-forks). | **Settled** |
+| `forks_score` | `float` | `forks` | `15 × weight`. See [Stars and forks](#stars-and-forks). | **Settled** |
+| `maturity_score` | `float` | `age_days` | `15 × weight`. See [Maturity](#maturity). | **Settled** |
+| `last_update_score` | `float` | `last_update_hours` | `15 × weight`. See [Last update](#last-update). | **Settled** |
 | `trusted_org_bonus` | `float` | `is_trusted_org` | `10.0` when trusted, `0.0` otherwise. See [Trusted organisations](#trusted-organisations). | **Settled** |
 | `total_score` | `float` | the six above | Arithmetic sum. See [Total score](#total-score). | **Settled** |
 | `is_trusted_org` | `bool` | policy | Owner is on the trusted list, matched case-insensitively. See [Trusted organisations](#trusted-organisations). | **Settled** |
@@ -740,14 +740,15 @@ here, unlike every other table.
 
 | Hours since update | In years | Weight | Points |
 |---|---|---|---|
-| 0 - 876 | <= 0.1 | 1.0 | 15.0 |
+| 0 - 438 | <= 0.05 | 1.0 | 15.0 |
+| 439 - 876 | <= 0.1 | 0.9 | 13.5 |
 | 877 - 2,190 | <= 0.25 | 0.8 | 12.0 |
 | 2,191 - 4,380 | <= 0.5 | 0.6 | 9.0 |
 | 4,381 - 8,760 | <= 1 | 0.4 | 6.0 |
 | 8,761 - 26,280 | <= 3 | 0.2 | 3.0 |
 | more than 26,280 | > 3 | 0.0 | 0.0 |
 
-Roughly: touched in the last five weeks earns full marks, untouched for three
+Roughly: touched in the last 18 days earns full marks, untouched for three
 years earns nothing.
 
 The reference row carries `last_update_hours` of 8.10177526 and
@@ -759,11 +760,17 @@ The reference row carries `last_update_hours` of 8.10177526 and
 years against a transcription of the original chain and asserts the weights
 match. Three things around them are fixed:
 
-1. **A boundary that decided nothing.** The chain ended `> 0.05 year -> 1`
+1. **A band that had lost its weight.** The chain ended `> 0.05 year -> 1`
    followed by `<= 0.05 year -> 1`. Both sides produced 1.0, so the edge could
    not change an answer - sweeping 0 to 40,000 hours found no input where
-   removing it mattered. It is dropped, because a boundary that decides nothing
-   still reads as though it does.
+   removing it mattered. The intended weight for that band was **0.9**, and it
+   is restored.
+
+   This is the only change that alters output. A repository last updated
+   between 18 days and five weeks ago now scores 0.9 rather than 1.0, and 13.5
+   points rather than 15. A test sweeps five years of hourly inputs and asserts
+   that the differing hours are **exactly 439 to 876** - the change is surgical,
+   not merely intended.
 2. **A negative input scored full marks.** Hours since an update cannot be
    negative from a correct measurement, but clock skew between GitHub and the
    local machine can produce one, and `<= 0.05 year` accepted it silently as
@@ -771,9 +778,9 @@ match. Three things around them are fixed:
 3. **The bounds are exact integers.** `0.1 * 8760` is not exactly 876 in
    binary floating point.
 
-### Open: what the input measures
+### What the input measures
 
-Two questions, and they apply to `age_days` as well.
+Both settled, and both apply to `age_days` as well.
 
 **Which timestamp?** GitHub reports two, and they are not close together:
 
@@ -784,28 +791,163 @@ Two questions, and they apply to `age_days` as well.
 | `torvalds/linux` | 1.64 h | 0.11 h | 1.5 h |
 | `cline/cline` | 0.65 h | 0.69 h | 0.05 h |
 
-`pushed_at` moves when code is pushed to any branch. `updated_at` moves when
-repository metadata changes - a description edit, a topic, a settings change -
-so it can report a project as fresh when no code has been written for months.
-For a metric asking whether a project is maintained, `pushed_at` is the
-defensible reading. Both are free fields in the query already being made.
+**`updated_at` is the one used.** `pushed_at` moves only when code is pushed
+to a branch; `updated_at` also moves when repository metadata changes - a
+description edit, a topic, a settings change. `updated_at` is therefore the
+broader reading of "something happened here", which is what this metric takes
+activity to mean.
 
-**Measured from when?** The reference row's `age_days` implies a "now" of
-`20:35:16`, which is **129 seconds after** its own `scan_date` of `20:33:07` -
-so elapsed time was taken at the moment each repository was fetched rather than
-once for the run.
+The consequence to be aware of: a repository whose description was edited last
+week but whose last commit was two years ago reports as fresh. `pushed_at` is
+collected alongside and costs nothing, so the narrower reading remains
+available if that trade ever needs revisiting.
 
-That makes rows within one file non-comparable: on a run that takes forty
-minutes, the last repository's elapsed times are measured against an instant
-forty minutes later than the first's. The distortion is systematic - later rows
-always look staler - and it means re-running the same inventory in a different
-order changes the numbers.
+**Both are anchored to `scan_date`**, the single instant recorded once per run.
 
-Anchoring both `last_update_hours` and `age_days` to `scan_date` fixes it, and
-has the additional property that a reader can check the arithmetic, because
-`scan_date` is already a column in the row.
+The implementation this replaces measured at fetch time. Its own reference row
+shows the cost: an `age_days` of 736.5466017006597 against a `created_at` of
+`2024-07-06T07:28:10Z` implies a "now" of `20:35:16`, **129 seconds after** the
+`scan_date` of `20:33:07` printed in the same row.
+
+That made rows within one file incomparable. On a forty-minute run the last
+repository's elapsed times were measured against an instant forty minutes later
+than the first's - a systematic bias, not noise, with later rows always looking
+older and staler - and re-running the same inventory in a different order
+changed its numbers.
+
+A fixed anchor removes both, and lets a reader recompute the arithmetic by
+hand, because `scan_date` is a column in the row.
+
+**Archived rows will not reproduce exactly.** The same repository scanned the
+same second now reports an `age_days` smaller by however long the run took to
+reach it - 129 seconds in the reference row's case. A test pins that difference
+so it is a recorded consequence rather than a later mystery.
 
 ---
+
+---
+
+## Maturity
+
+`maturity_score` is `15 x weight`, from `age_days`. Older is better, to a
+ceiling of four years.
+
+| Age | Weight | Points |
+|---|---|---|
+| under 3 months | 0.0 | 0.0 |
+| 3 - 6 months | 0.2 | 3.0 |
+| 6 months - 1 year | 0.4 | 6.0 |
+| 1 - 2 years | 0.6 | 9.0 |
+| 2 - 3 years | 0.8 | 12.0 |
+| 3 - 4 years | 0.9 | 13.5 |
+| 4 years or more | 1.0 | 15.0 |
+
+The reference row's `age_days` of 736.5466017006597 is a little over two years
+and scores 12.0, which this reproduces.
+
+### A units defect, corrected
+
+The chain opened with `if age < 0.25`, comparing the age in **days** against a
+threshold the rest of the chain applied to **years**:
+
+```python
+age_in_years = age / 365
+if age < 0.25:              # days
+    age_weight = 0
+elif age_in_years < 0.5:    # years
+    age_weight = 0.2
+```
+
+So the "too young to score" band covered ages below 0.25 *days* - six hours -
+rather than below 0.25 *years*. Every repository between six hours and three
+months old scored 0.2 instead of 0.0, which credited a repository created
+yesterday with three points of maturity.
+
+A test sweeps six years of daily ages and asserts the weights that change are
+**exactly days 1 through 91**.
+
+The chain also ended `< 5 years -> 1.0` followed by `>= 5 years -> 1.0`. Both
+produce 1.0, so the five-year edge decided nothing. Unlike the equivalent case
+in [Last update](#last-update) no weight had gone missing - the progression had
+already reached its maximum at four years - so this is a plateau, and it is now
+written as one.
+
+---
+
+## Stars and forks
+
+Two counts, two budgets, and two tables that agree below 90 and diverge above
+it.
+
+| | Stars | Forks |
+|---|---|---|
+| Points | 10 | 15 |
+| Full marks at | 300 | 150 |
+
+| Count | Stars weight | Forks weight |
+|---|---|---|
+| under 5 | 0.0 | 0.0 |
+| 5 - 9 | 0.1 | 0.1 |
+| 10 - 19 | 0.2 | 0.2 |
+| 20 - 29 | 0.3 | 0.3 |
+| 30 - 39 | 0.4 | 0.4 |
+| 40 - 49 | 0.5 | 0.5 |
+| 50 - 69 | 0.6 | 0.6 |
+| 70 - 89 | 0.7 | 0.7 |
+| 90 - 109 | 0.8 | 0.8 |
+| 110 - 149 | 0.8 | **0.9** |
+| 150 - 299 | 0.9 | 1.0 |
+| 300 or more | 1.0 | 1.0 |
+
+The reference row's 64,574 stars score 10.0 and its 6,900 forks score 15.0.
+
+### Two defects in the fork function
+
+**It had no `return` statement.** It assigned a weight into a local and fell
+off the end, returning `None` for every input, so
+`15 * score_forks(forks)` raised
+`TypeError: unsupported operand type(s) for *: 'int' and 'NoneType'`. The fork
+score could never have been produced.
+
+**Its terminal branch assigned 0.1, not 1.0.** Supplying the missing return
+alone would have made a repository with 110 forks score **below** one with 109
+- 0.1 against 0.8 - so more forks would have meant a lower score. A test now
+asserts the weight never decreases as forks rise.
+
+`score_stars` needed neither fix. Its chain was complete, total and monotone;
+only the negative-count guard is new.
+
+### Where the 0.9 band went, and why
+
+The fork chain ran `< 110 -> 0.8` and then straight to its terminal branch,
+with no 0.9 anywhere. The band is restored at **150**, for three reasons:
+
+- It preserves every threshold the original had, adding one rather than moving
+  any.
+- 150 is already a boundary in the star table, so the two tables share one
+  vocabulary of thresholds - 5, 10, 20, 30, 40, 50, 70, 90, 110, 150, 300 -
+  rather than introducing a number that appears nowhere else.
+- It keeps the ceiling reachable by a genuinely well-used project.
+
+That last point is worth the measurement behind it. Across twelve well-known
+Python repositories the median fork-to-star ratio was **0.186**, ranging from
+0.05 to 0.47:
+
+| Repository | Stars | Forks | Ratio |
+|---|---|---|---|
+| `astral-sh/ruff` | 49,397 | 2,370 | 0.05 |
+| `tiangolo/fastapi` | 101,939 | 9,831 | 0.10 |
+| `bokeh/bokeh` | 20,436 | 4,261 | 0.21 |
+| `python/cpython` | 75,290 | 35,306 | 0.47 |
+
+At that median, the star ceiling of 300 corresponds to about **56 forks**. So a
+fork ceiling of 150 is roughly three times harder to reach than the star
+ceiling in equivalent terms, and the original's 110 would have been harder
+still. The asymmetry is deliberate: a fork takes more than a click, so it is
+the stronger signal and is scored on a stricter scale and a larger budget.
+
+**This is the one value chosen here rather than supplied.** It is a single
+entry in a table if it should be something else.
 
 ## Total score
 
@@ -831,16 +973,15 @@ judgement with nothing to interpolate between.
 | Component | Budget | Settled? |
 |---|---|---|
 | `prevalence_score` | 20 | yes |
-| `stars_score` | ? | no |
-| `forks_score` | ? | no |
-| `maturity_score` | ? | no |
+| `stars_score` | 10 | yes |
+| `forks_score` | 15 | yes |
+| `maturity_score` | 15 | yes |
 | `last_update_score` | 15 | yes |
 | `trusted_org_bonus` | 10 | yes |
 
-The reference row shows `stars_score` 10.0, `forks_score` 15.0 and
-`maturity_score` 12.0, but those are observed values rather than budgets - none
-of the three is known to be at its maximum, so the largest possible
-`total_score` cannot yet be stated.
+**Every budget is now known, and they sum to 85.** A repository at full marks
+on all six scores 85; the reference row's 72 is 85 less the 10-point trusted
+bonus it did not earn and the 3 points its maturity band left on the table.
 
 ## Related documents
 

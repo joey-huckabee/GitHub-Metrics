@@ -54,20 +54,25 @@ def original_chain(updates: float) -> float:
 
 
 @pytest.mark.requirement("L3-SCR-008")
-def test_every_non_negative_hour_scores_exactly_what_it_scored_before() -> None:
+def test_only_the_restored_band_differs_from_the_original() -> None:
     """Sweep the whole meaningful range against the original chain.
 
-    This is the guarantee that matters: the structure changed, the answers did
-    not. Zero to five years at hourly resolution covers every band and every
-    boundary between them.
+    Exactly one band was meant to change: the `0.05 year` band, whose weight
+    had been lost and is restored to 0.9. Everything else must score what it
+    scored before. Naming the differing inputs precisely - rather than
+    asserting "no mismatches" or not checking at all - is what makes the change
+    surgical rather than merely intended.
     """
-    mismatches = [
+    differing = [
         hours
         for hours in range(0, 5 * HOURS_PER_YEAR)
         if last_update_weight(float(hours)) != original_chain(float(hours))
     ]
 
-    assert mismatches == []
+    # 439 to 876 inclusive: more than 0.05 of a year, up to 0.1 of a year.
+    assert differing == list(range(439, 877))
+    assert all(last_update_weight(float(h)) == 0.9 for h in differing)
+    assert all(original_chain(float(h)) == 1.0 for h in differing)
 
 
 @pytest.mark.requirement("L3-SCR-008")
@@ -76,8 +81,11 @@ def test_every_non_negative_hour_scores_exactly_what_it_scored_before() -> None:
     [
         (0, 1.0),
         (8.10177526, 1.0),  # the reference row
-        (875, 1.0),
-        (876, 1.0),  # 0.1 year, inclusive
+        (437, 1.0),
+        (438, 1.0),  # 0.05 year, inclusive
+        (439, 0.9),  # the restored band
+        (875, 0.9),
+        (876, 0.9),  # 0.1 year, inclusive
         (877, 0.8),
         (2_190, 0.8),  # 0.25 year, inclusive
         (2_191, 0.6),
@@ -107,7 +115,7 @@ def test_the_score_never_rises_as_a_repository_goes_stale() -> None:
 def test_no_input_is_left_unmapped() -> None:
     produced = {last_update_weight(float(h)) for h in range(0, 30_000, 3)}
 
-    assert produced == {1.0, 0.8, 0.6, 0.4, 0.2, 0.0}
+    assert produced == {1.0, 0.9, 0.8, 0.6, 0.4, 0.2, 0.0}
 
 
 # ---------------------------------------------------------------------------
@@ -116,17 +124,20 @@ def test_no_input_is_left_unmapped() -> None:
 
 
 @pytest.mark.requirement("L3-SCR-009")
-def test_the_dropped_boundary_never_decided_anything() -> None:
-    """The removed `0.05 year` edge had the same weight on both sides.
+def test_the_restored_boundary_now_decides_something() -> None:
+    """The `0.05 year` edge had the same weight on both sides and now does not.
 
-    Both branches produced 1.0, so the edge could not change an answer. Pinning
-    that here records why dropping it was safe rather than leaving it to be
-    taken on trust.
+    In the version this replaces both branches produced 1.0, so the boundary
+    could not change an answer - it was a band that had lost its weight rather
+    than a deliberate plateau. With 0.9 restored the edge separates two
+    weights, which is what makes it a boundary.
     """
     edge = 0.05 * HOURS_PER_YEAR
 
-    assert last_update_weight(edge - 1) == last_update_weight(edge + 1) == 1.0
     assert original_chain(edge - 1) == original_chain(edge + 1) == 1.0
+
+    assert last_update_weight(edge - 1) == 1.0
+    assert last_update_weight(edge + 1) == 0.9
 
 
 @pytest.mark.requirement("L3-SCR-009")
@@ -140,10 +151,17 @@ def test_the_table_has_no_redundant_edges_left() -> None:
 
 @pytest.mark.requirement("L3-SCR-009")
 def test_the_bounds_are_exact_integers() -> None:
-    # 0.1 * 8760 is not exactly 876 in binary floating point. Writing the
-    # bounds as integers keeps a band edge from landing a fraction either side
-    # of where it reads.
-    assert [bound for bound, _ in LAST_UPDATE_BANDS] == [876, 2_190, 4_380, 8_760, 26_280]
+    # 0.05 * 8760 is not exactly 438 in binary floating point, nor 0.1 * 8760
+    # exactly 876. Writing the bounds as integers keeps a band edge from landing
+    # a fraction either side of where it reads.
+    assert [bound for bound, _ in LAST_UPDATE_BANDS] == [
+        438,
+        876,
+        2_190,
+        4_380,
+        8_760,
+        26_280,
+    ]
     assert all(isinstance(bound, int) for bound, _ in LAST_UPDATE_BANDS)
 
 

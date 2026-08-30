@@ -55,8 +55,8 @@ def test_the_institution_behind_an_owner_is_recoverable() -> None:
     # The values are the institution behind the organisation, which is not
     # what GitHub reports as the organisation's name: GitHub says "Spring"
     # for spring-projects and "Hibernate" for hibernate.
-    assert registry.institution_for("spring-projects") == "VMware:"
-    assert registry.institution_for("hibernate") == "Redhat"
+    assert registry.institution_for("spring-projects") == "VMware"
+    assert registry.institution_for("hibernate") == "Red Hat"
     assert registry.institution_for("google") == "Google"
 
 
@@ -66,15 +66,17 @@ def test_an_untrusted_owner_has_no_institution() -> None:
 
 
 @pytest.mark.requirement("L3-TRU-003")
-def test_the_values_are_preserved_exactly_as_supplied() -> None:
-    """The trailing colon and the unspaced Redhat are kept on purpose.
+def test_the_institutions_are_written_as_the_institutions_write_them() -> None:
+    """These names end up in a report, so their spelling is the product.
 
-    Both look like slips, but this is reference data rather than code.
-    Correcting it silently would change output someone may already be matching
-    on, so it is preserved until the change is asked for.
+    An earlier revision carried a trailing colon on `VMware:` and an unspaced
+    `Redhat`; both were transcription slips and are corrected here.
     """
-    assert DEFAULT_TRUSTED_ORGANIZATIONS["spring-projects"].endswith(":")
-    assert DEFAULT_TRUSTED_ORGANIZATIONS["hibernate"] == "Redhat"
+    assert DEFAULT_TRUSTED_ORGANIZATIONS["spring-projects"] == "VMware"
+    assert DEFAULT_TRUSTED_ORGANIZATIONS["hibernate"] == "Red Hat"
+    assert DEFAULT_TRUSTED_ORGANIZATIONS["google"] == "Google"
+
+    assert not any(value.endswith(":") for value in DEFAULT_TRUSTED_ORGANIZATIONS.values())
 
 
 @pytest.mark.requirement("L3-TRU-004")

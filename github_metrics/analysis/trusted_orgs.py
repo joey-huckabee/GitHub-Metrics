@@ -9,8 +9,8 @@ That is worth stating plainly, because the API looks like it should be able to
 answer it and cannot:
 
     owner              GitHub org name    trusted-list value
-    spring-projects    Spring             VMware:
-    hibernate          Hibernate          Redhat
+    spring-projects    Spring             VMware
+    hibernate          Hibernate          Red Hat
     google             Google             Google
 
 The values are the **institution behind** the organisation, not the
@@ -40,17 +40,15 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TRUSTED_ORGANIZATIONS: Final[Mapping[str, str]] = MappingProxyType(
     {
-        "spring-projects": "VMware:",
+        "spring-projects": "VMware",
         "google": "Google",
-        "hibernate": "Redhat",
+        "hibernate": "Red Hat",
     }
 )
 """Owner login mapped to the institution behind it.
 
-Reproduced exactly as supplied, including the trailing colon on `VMware:` and
-the unspaced `Redhat`. Both look like slips, but this is reference data rather
-than code: correcting it silently would change output that someone may already
-be matching on, so it is preserved and raised instead.
+These are institution names as those institutions write them, which is what
+makes them usable in a report: "Red Hat" rather than "Redhat".
 
 Read-only, so the default cannot be mutated by a caller and leak into another
 run in the same process.

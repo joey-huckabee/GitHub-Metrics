@@ -287,7 +287,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-TRU-001 | L2-TRU-001 | `tests/test_trusted_orgs.py::test_an_unlisted_owner_is_not_trusted`<br>`tests/test_trusted_orgs.py::test_the_default_list_holds_exactly_the_three_agreed_entries`<br>`tests/test_trusted_orgs.py::test_the_listed_owners_are_trusted` | Implemented |
 | L3-TRU-002 | L2-TRU-001 | `tests/test_trusted_orgs.py::test_a_registry_folds_the_case_of_keys_it_is_given`<br>`tests/test_trusted_orgs.py::test_matching_ignores_case_and_padding`<br>`tests/test_trusted_orgs.py::test_the_lookup_is_logged` | Implemented |
-| L3-TRU-003 | L2-TRU-002 | `tests/test_trusted_orgs.py::test_an_untrusted_owner_has_no_institution`<br>`tests/test_trusted_orgs.py::test_the_institution_behind_an_owner_is_recoverable`<br>`tests/test_trusted_orgs.py::test_the_values_are_preserved_exactly_as_supplied` | Implemented |
+| L3-TRU-003 | L2-TRU-002 | `tests/test_trusted_orgs.py::test_an_untrusted_owner_has_no_institution`<br>`tests/test_trusted_orgs.py::test_the_institution_behind_an_owner_is_recoverable`<br>`tests/test_trusted_orgs.py::test_the_institutions_are_written_as_the_institutions_write_them` | Implemented |
 | L3-TRU-004 | L2-TRU-003 | `tests/test_trusted_orgs.py::test_a_caller_can_supply_its_own_list`<br>`tests/test_trusted_orgs.py::test_an_empty_list_trusts_nobody`<br>`tests/test_trusted_orgs.py::test_the_default_list_cannot_be_mutated_by_a_caller`<br>`tests/test_trusted_orgs.py::test_the_loaded_list_is_logged` | Implemented |
 
 ### VAL: Name validation

@@ -655,9 +655,9 @@ points a trusted owner earns have not been supplied.
 
 | Owner | Institution |
 |---|---|
-| `spring-projects` | `VMware:` |
+| `spring-projects` | `VMware` |
 | `google` | `Google` |
-| `hibernate` | `Redhat` |
+| `hibernate` | `Red Hat` |
 
 Matching is case-insensitive, because GitHub account names are.
 
@@ -668,8 +668,8 @@ judgement, and the API cannot supply it:
 
 | Owner | GitHub org name | `company` field | Trusted-list value |
 |---|---|---|---|
-| `spring-projects` | Spring | null | **VMware:** |
-| `hibernate` | Hibernate | null | **Redhat** |
+| `spring-projects` | Spring | null | **VMware** |
+| `hibernate` | Hibernate | null | **Red Hat** |
 | `google` | Google | null | Google |
 
 The values are the **institution behind** the organisation. GitHub knows
@@ -683,13 +683,13 @@ institutions is a different analysis, not a different program. The registry
 accepts an explicit mapping today; a configuration source is the natural next
 step.
 
-### Two values look like slips
+### The institution names are the product
 
-`VMware:` carries a trailing colon, and `Redhat` is unspaced where the company
-writes itself "Red Hat". Both are **preserved exactly as supplied**. This is
-reference data rather than code, and correcting it silently would change output
-that something downstream may already match on. A test asserts both, so the
-decision is recorded rather than accidental.
+These strings end up in a report, so their spelling matters. They are written
+as the institutions write them - "Red Hat", not "Redhat". An earlier revision
+carried a trailing colon on `VMware:` and an unspaced `Redhat`; both were
+transcription slips and are corrected. A test asserts the spellings and that no
+value ends in punctuation.
 
 ### Open
 

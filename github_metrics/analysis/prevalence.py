@@ -27,6 +27,18 @@ If a future release wants prevalence to help rank mature projects, the change
 is to the band *boundaries* - the 500 and the 80 - not to the weights. See
 `docs/METRICS.md`.
 
+When a signal is absent
+-----------------------
+The issue signal is weighed only when there is issue evidence. Two situations
+produce none - a tracker that is switched off, and a tracker with nothing
+closed in it - and both are treated the same way: the signal is excluded and
+the release weight stands alone.
+
+This is what keeps a repository that has shipped nothing and closed nothing at
+**0.0**. The closed-issue band table floors at 0.1 for any count below 20,
+zero included, so weighing an empty tracker would score such a project 2.0 and
+put it above a project with no evidence at all - which is the wrong way round.
+
 Why the stronger signal rather than a fallback
 ----------------------------------------------
 The original rule selected on `closed_issues == 0`, which put a cliff at
@@ -66,9 +78,10 @@ def score_prevalence(
         closed_issues: Closed issues, excluding pull requests.
         distinct_versions: Distinct versions, which is the tag count.
         issues_enabled: Whether the repository's issue tracker is on. When it
-            is off the issue signal is **excluded** rather than scored as zero,
-            because the signal is absent rather than low - the project may
-            track its work somewhere this tool cannot see.
+            is off the issue signal is **excluded** rather than scored at the
+            closed-issue table's floor, because the signal is absent rather
+            than low - the project may track its work somewhere this tool
+            cannot see. A count of zero is excluded for the same reason.
 
     Returns:
         The score, from 0.0 to `MAX_PREVALENCE_SCORE`.
@@ -76,14 +89,32 @@ def score_prevalence(
     Examples:
         >>> score_prevalence(3770, 717)
         20.0
-        >>> score_prevalence(0, 0)          # the closed-issue floor of 0.1
-        2.0
-        >>> score_prevalence(0, 0, issues_enabled=False)
+        >>> score_prevalence(0, 0)          # nothing shipped, nothing closed
         0.0
+        >>> score_prevalence(1, 0)          # one closed issue is evidence
+        2.0
     """
     release_weight = score_releases(distinct_versions)
 
-    if issues_enabled:
+    # The issue signal counts only when there is issue evidence to weigh. Two
+    # situations produce none, and they are the same situation as far as this
+    # score is concerned: a tracker that is switched off, and a tracker with
+    # nothing closed in it. Treating them alike is what keeps a repository that
+    # has shipped and closed nothing at 0.0 rather than at the closed-issue
+    # table's floor of 0.1, which that table applies to any count below 20.
+    if not issues_enabled:
+        weight = release_weight
+        LOGGER.info(
+            "Prevalence: issue tracker disabled, only the release signal counts (weight %s)",
+            release_weight,
+        )
+    elif closed_issues <= 0:
+        weight = release_weight
+        LOGGER.info(
+            "Prevalence: no closed issues, so only the release signal counts (weight %s)",
+            release_weight,
+        )
+    else:
         issue_weight = score_closed_issues(closed_issues)
         weight = max(issue_weight, release_weight)
         stronger = "closed issues" if issue_weight >= release_weight else "versions"
@@ -92,14 +123,6 @@ def score_prevalence(
             issue_weight,
             release_weight,
             stronger,
-        )
-    else:
-        # Scoring a disabled tracker as 0.1 would let it beat a project that
-        # has genuinely shipped nothing, which is backwards.
-        weight = release_weight
-        LOGGER.info(
-            "Prevalence: issue tracker disabled, only the release signal counts (weight %s)",
-            release_weight,
         )
 
     score = PREVALENCE_POINTS * weight

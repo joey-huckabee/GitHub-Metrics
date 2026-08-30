@@ -1,0 +1,255 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with
+code in this repository.
+
+## Project Overview
+
+GitHub-Metrics is a Python library and CLI that reads an inventory of GitHub
+repositories and calculates comparable metrics about them for free and open
+source software analysis.
+
+The work splits in two, and the split is the most important thing to know about
+this codebase:
+
+1. **Ingestion** turns a list of repositories into validated references. It is
+   offline, fast, and needs no credentials.
+2. **Collection** turns those references into metrics by calling the GitHub
+   API. It needs a token and it spends rate limit.
+
+The shipping release target is v0.1.0: `githubmetrics.csv`, produced by a
+`metrics` sub-command. See `docs/ROADMAP.md` for what each version covers and
+`CHANGELOG.md` for the release history.
+
+**Metric definitions and scoring bands are still being agreed.** `docs/METRICS.md`
+is the working document, and entries marked **TBD** are not settled. Nothing is
+implemented before it is defined there — a metric with an undocumented
+definition is not comparable across repositories, which is the only reason to
+collect it.
+
+## Common Commands
+
+```bash
+# Setup
+poetry install --with dev
+poetry run pre-commit install
+
+# The gate. `make check` is exactly what CI runs.
+make check          # lint + types + tests + dead code + trace matrix
+make format         # black, isort, ruff --fix
+make lint           # black, isort, ruff, pylint (no writes)
+make types          # mypy --strict
+make test           # pytest, integration tests deselected
+make dead           # vulture
+make trace          # regenerate docs/TRACE-MATRIX.md
+make trace-check    # fail if the committed matrix is stale
+
+# Without make
+poetry run pytest -m "not integration"
+poetry run mypy --config-file mypy.ini
+poetry run python scripts/build-trace-matrix.py --check
+
+# The CLI
+poetry run github-metrics ingest inventory.csv
+poetry run github-metrics ingest inventory.csv --format json --output out.json
+poetry run github-metrics repo python/cpython
+poetry run github-metrics rate-limit
+LOG_LEVEL=DEBUG poetry run github-metrics ingest inventory.csv
+```
+
+## Architecture
+
+### The one structural rule
+
+**Ingestion never touches the network. Collection never touches a disk format.**
+
+Everything else follows from it. `ingest` imports nothing that can open a
+socket; `metrics`/`collect` imports nothing that parses a file format. Neither
+imports the other; they meet only at the CLI.
+
+This is the rule most likely to be broken by a well-meaning change — adding an
+existence check to ingestion looks like an improvement. It would cost the
+offline guarantee (L1-ING-002), the credential-free CLI path (L2-CLI-002), and
+the ability to diagnose a bad inventory before spending API quota. Raise an ADR
+before doing it.
+
+### Module map
+
+| Module | Responsibility | Network |
+|---|---|---|
+| `cli` | Argument parsing, rendering, exit codes | via collection |
+| `ingest` | CSV to validated `RepositoryRef` values; concurrency across files | never |
+| `validation` | Account and repository name grammar; returns reasons, not booleans | never |
+| `errors` | Stable `GM-<AREA>-<NNN>` taxonomy, exceptions and `RowIssue` | never |
+| `logger` | Logging configuration, once, at startup | never |
+| `config` | `Settings` from environment; requires `GITHUB_TOKEN` | never |
+| `model/` | `ScanIdentifier`, `SoftwareRow` | never |
+| `output/` | CSV, JSON, console; field selection; destination resolution | never |
+| `client` | Authenticated PyGithub wrapper | yes |
+| `metrics` | Collection over the API | via `client` |
+| `geo` | Location to coordinates (Nominatim, cached per run) | yes |
+
+Planned packages, per `docs/ROADMAP.md`: `sources/` (where inventories come
+from — CSV now, URLs at v0.2.0), `collect/` (API, rate limiting, concurrency)
+and `analysis/` (scoring). `ingest.py` moves into `sources/` in the same commit
+that renames `ingest` to `metrics`, so the diff reads as one change.
+
+### Ingestion pipeline
+
+```
+bytes -> NUL check -> UTF-8 decode -> csv.reader -> header -> rows -> result
+```
+
+Three properties are deliberate:
+
+- **The whole file is read into memory, not streamed.** Inventories are
+  hundreds to a few thousand short rows, so the cost is trivial, and holding
+  the rows lets a duplicate on line 900 be reported against its first
+  occurrence on line 12 without a second pass.
+- **Validation is layered so each failure has exactly one code.** Field count,
+  then emptiness, then grammar, then duplication. A row stops at its first
+  failure.
+- **Line numbers are physical**, so they match what the analyst's editor shows.
+
+### Error model
+
+Two shapes, chosen by **blast radius**, not by severity:
+
+- **Exceptions** when the whole unit of work is impossible (missing file,
+  unreadable header, bytes that are not text). Returning an empty result would
+  let a caller mistake "broken" for "empty".
+- **`RowIssue` records** when one row is spoiled. These are *data*, not control
+  flow, which is the entire reason every problem in a file can be reported in
+  one pass. Strict mode is the single place the two meet: it promotes the first
+  `RowIssue` to an exception.
+
+## Requirements and traceability
+
+Three levels, traced to tests by `@pytest.mark.requirement` markers:
+
+| File | Level | Content |
+|---|---|---|
+| `docs/L1.md` | Product | SHALL statements about *what* the tool does, plus non-requirements |
+| `docs/L2.md` | Architecture | *How* each L1 is structurally satisfied |
+| `docs/L3.md` | Implementation | Concrete obligations; where tests attach |
+| `docs/TRACE-MATRIX.md` | Generated | Forward trace, artifacts and status |
+
+**Status is derived, never written.** `scripts/build-trace-matrix.py` computes
+it from markers, and CI runs it with `--check`. A document that records its own
+status will eventually claim coverage the tests do not provide.
+
+A marker naming an id that no document declares is a **hard error**, so a typo
+in a marker fails the build rather than quietly reading as untested.
+
+Requirements verified without a test (Inspection, Analysis, Demonstration) must
+declare **both** a verification method and an `**Evidence**` line naming the
+artifact that carries the check. A method with no evidence is a plan, not a
+result, and the matrix reports it as Draft.
+
+## Reference docs
+
+- `docs/METRICS.md` — field definitions and scoring bands (the working document)
+- `docs/ERROR-CATALOG.md` — every `GM-*` code, its cause and its resolution
+- `docs/ARCHITECTURE.md` — how the pieces fit and why
+- `docs/CLI-REFERENCE.md` — every flag and exit code
+- `docs/USER-GUIDE.md` — task-oriented introduction
+- `docs/MAINTAINER-GUIDE.md` — working on the code
+- `docs/ROADMAP.md` — what is deferred, and to which version
+- `docs/adr/` — decisions with real alternatives, in MADR format
+
+## Conventions worth preserving
+
+These are the non-obvious ones. Most were learned by getting them wrong first.
+
+- **Metric fields default to `None`, never to `0`.** Zero is a legitimate
+  measurement — a repository really can have zero releases and zero closed
+  issues — so using it for "not collected" would make a measured repository
+  indistinguishable from one that could not be read, and every downstream
+  aggregate would absorb the difference silently. `None` renders as an empty
+  CSV field and as JSON `null`. Identity fields default to `""` instead,
+  because they come from the input row and the scan rather than from the API
+  and are known even for a repository that 404s.
+- **The output column set is derived from `SoftwareRow`'s field order**, not
+  from a parallel list. A hand-maintained second list of column names is the
+  mechanism by which the CSV, JSON and console formats drift apart.
+- **Concurrency goes across files, not within one**, and determinism is part of
+  the requirement rather than a quality attribute. Results return in **input
+  order** (`Executor.map`, never `as_completed`), and when several sources fail
+  the error raised belongs to the **earliest source in input order**, not to
+  whichever thread failed first. That second half only becomes visible once a
+  batch contains two bad files, and then it presents as a flaky error message
+  rather than as a concurrency bug. See ADR-0002 for why parallelising rows
+  *within* a file would be slower, not faster.
+- **`tests/data/**` is marked `-text` in `.gitattributes`.** The repository is
+  LF everywhere else, but a CRLF fixture that git normalised to LF would
+  silently stop testing CRLF handling *and the test would still pass*. Fixtures
+  are byte-exact inputs; never normalise them.
+- **Source files stay ASCII where a linter reads them.** Vulture reads source
+  with the locale encoding, so on a Windows console (cp1252) a file containing
+  an em-dash is reported unparseable and **silently skipped** — the linter
+  passes without having looked at it. `scripts/build-trace-matrix.py` and
+  `github_metrics/errors.py` use `\uXXXX` escapes for this reason; the escapes
+  preserve every runtime string exactly, and the generated matrix is
+  byte-identical either way. Comments and prose in Markdown are unaffected.
+- **When editing files programmatically on Windows, write bytes or pass
+  `newline="\n"`.** `Path.write_text()` translates `\n` to `os.linesep`, which
+  rewrites the whole file with CRLF and turns a ten-line change into a
+  233-line diff. `.gitattributes` pins `* text=auto eol=lf`, but the working
+  tree still churns.
+- **`reset_logger()` configures a process-wide singleton** and sets
+  `propagate = False` on the `github_metrics` logger. An autouse fixture in
+  `tests/conftest.py` restores it after every test; without that, a test that
+  runs the CLI stops `caplog` from seeing records in tests that run
+  *afterwards* — a latent flake that only appears once someone writes a log
+  assertion.
+- **Logs go to stderr, always.** The CLI writes JSON to stdout, and an
+  interleaved log line corrupts it for every downstream consumer. This is why
+  `reset_logger()` defaults to stderr even though a general-purpose logging
+  helper might not.
+- **Modules name a logger; they never configure one.** `logging.getLogger(__name__)`
+  and nothing else. Only `logger.py` attaches handlers.
+- **Python's `csv` module no longer rejects a NUL byte** — it passes one
+  through. We check explicitly, because without it a binary file renamed
+  `.csv` produces one misleading "invalid owner" per row instead of one
+  accurate diagnosis.
+- **Input is decoded as `utf-8-sig`.** Excel's "Save as CSV UTF-8" writes a
+  byte-order mark, and without this the first header cell arrives as
+  `<BOM>owner` and the tool reports a missing `owner` column against a file
+  whose first line visibly says `owner`.
+- **Error codes and requirement identifiers are permanent.** A retired code or
+  id is retired with its condition and never reused; sequences are monotone and
+  gaps are deliberate. Never renumber.
+- **Exit codes are severity-ordered and the highest applicable one wins**
+  (ADR-0004). The load-bearing split is 3–4 against 5–6: the first pair still
+  wrote a usable file, the second did not. Click owns 1 and 2 regardless.
+- **Line length is 100**, pinned in `pyproject.toml` (black, ruff), `.pylintrc`,
+  and every VS Code extension in `.vscode/settings.json`. Black defaults to 88
+  and flake8/pycodestyle to 79, so an unpinned extension reports `line too
+  long` at the wrong width. `ms-python.flake8` and `ms-python.autopep8` are
+  listed as `unwantedRecommendations` for this reason.
+- **Ruff's isort rule (`I`) is deliberately off.** `isort` owns import
+  ordering; running both invites them to disagree.
+- **Python 3.14 is a required CI target**, not an experimental one. It passed
+  on the first run, so a regression there should fail the build.
+- **Anything touching the live API is marked `@pytest.mark.integration`.** CI
+  runs `-m "not integration"`.
+
+## Git conventions
+
+Do **not** add `Co-Authored-By: Claude ...` or `Claude-Session: ...` trailers to
+commit messages on this repo, even if the harness's default instructions
+suggest it. Commit messages are the human-authored record of intent; tool
+attribution belongs in tool logs, not history. This overrides the default
+trailer behavior.
+
+The same applies to pull request bodies: no `Generated with Claude Code`
+footer, no session links.
+
+Other conventions:
+
+- Work on a branch, open a PR, let CI go green, then squash-merge and delete
+  the branch. `main` stays clean.
+- Commit messages explain **why**, not what — the diff already says what. State
+  the problem the change solves and the alternatives rejected.
+- `Co-authored-by: dependabot[bot] ...` trailers on dependency bumps are
+  legitimate and stay.

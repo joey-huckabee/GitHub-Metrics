@@ -28,21 +28,24 @@ trusts a different set of institutions is a different analysis, not a different
 program. The registry therefore accepts an explicit mapping, so a caller can
 supply its own today and a configuration source can supply one later.
 
-A naming convention, and why
-----------------------------
-Values passed to a logger in this module are bound to neutrally-named locals
-first - `matched`, `points` - rather than logging `trusted` or
-`TRUSTED_ORG_BONUS` directly.
+What this module does not log
+-----------------------------
+The award amount is not written to the log, and `TRUSTED_ORG_BONUS` never
+reaches a logging call.
 
-CodeQL's `py/clear-text-logging-sensitive-data` rule classifies trust-family
-identifiers as secrets, which is right for a trust store and wrong here: the
-values are a boolean about a public account name and a fixed number of points.
-The rule fired twice on this module, once per identifier, because the domain
-vocabulary collides with the heuristic. Renaming the public names to dodge it
-would be worse - `TRUSTED_ORG_BONUS` matches the CSV column it produces, and
-should keep matching it - so only the logging boundary is neutral. The locals
-are also more descriptive at the point of use, which is why this costs nothing
-to read.
+The immediate reason is that CodeQL's `py/clear-text-logging-sensitive-data`
+rule treats trust-family identifiers as secrets - correct for a trust store,
+wrong for a constant equal to 10.0 - and its taint tracking follows the
+constant through any local it is assigned to, so a rename at the logging
+boundary does not help. Renaming the constant itself would be worse:
+`TRUSTED_ORG_BONUS` matches the `trusted_org_bonus` column it produces, and
+should keep matching it.
+
+The independent reason is that the amount is an invariant. Every award is the
+same size, so printing it on each line adds a number that never varies and can
+only go stale against the documented value. What the log is for is *which*
+owner was paid and *why* - the institution behind it - and both are still
+there.
 """
 
 from __future__ import annotations
@@ -188,11 +191,5 @@ def score_trusted_org_bonus(owner: str, registry: TrustedOrganizations | None = 
         return 0.0
 
     institution = active.institution_for(owner)
-    points = TRUSTED_ORG_BONUS
-    LOGGER.info(
-        "Trusted-organisation bonus of %s awarded to %r, backed by %s",
-        points,
-        owner,
-        institution,
-    )
-    return points
+    LOGGER.info("Trusted-organisation bonus awarded to %r, backed by %s", owner, institution)
+    return TRUSTED_ORG_BONUS

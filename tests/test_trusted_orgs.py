@@ -195,7 +195,12 @@ def test_an_awarded_bonus_names_the_institution(caplog: pytest.LogCaptureFixture
 
     # The institution is why the bonus was paid, so it belongs in the record.
     assert "Red Hat" in caplog.text
-    assert "10.0" in caplog.text
+    assert "hibernate" in caplog.text
+
+    # The amount deliberately does not: it is an invariant, so logging it adds
+    # a number that never varies and can only go stale against the documented
+    # value. See the module docstring.
+    assert str(TRUSTED_ORG_BONUS) not in caplog.text
 
 
 @pytest.mark.requirement("L3-TRU-006")

@@ -1,4 +1,4 @@
-"""Tests for :mod:`github_metrics.ingest`."""
+"""Tests for :mod:`github_metrics.sources.csv_inventory`."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from github_metrics.errors import (
     SourceUnreadableError,
     StrictModeError,
 )
-from github_metrics.ingest import (
+from github_metrics.sources.csv_inventory import (
     IngestResult,
     RepositoryRef,
     read_repository_csv,
@@ -187,7 +187,7 @@ def test_issues_carry_the_line_number_and_render_like_a_compiler_diagnostic() ->
 
 @pytest.mark.requirement("L3-LOG-001")
 def test_row_issues_are_logged_at_debug(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.DEBUG, logger="github_metrics.ingest"):
+    with caplog.at_level(logging.DEBUG, logger="github_metrics.sources.csv_inventory"):
         read_repository_csv(DATA / "invalid-rows.csv")
 
     assert ISSUE_INVALID_REPOID in caplog.text

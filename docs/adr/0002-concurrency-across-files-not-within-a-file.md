@@ -119,6 +119,6 @@ Neutral:
 ## More Information
 
 Requirements L2-CON-001 through L2-CON-003 and their L3 derivations.
-Verified by `tests/test_ingest.py`, including a test that 1, 2 and 16 workers
+Verified by `tests/test_csv_inventory.py`, including a test that 1, 2 and 16 workers
 produce identical results, and one that the reported error is chosen by input
 order rather than by completion order.

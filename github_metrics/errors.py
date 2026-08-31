@@ -219,6 +219,12 @@ ISSUE_INVALID_REPOID = "GM-ING-014"
 ISSUE_DUPLICATE = "GM-ING-015"
 """The row repeats a repository already seen in this file."""
 
+ISSUE_MALFORMED_REFERENCE = "GM-ING-016"
+"""A reference is not `owner/repoid` and is not a URL naming a repository."""
+
+ISSUE_FOREIGN_HOST = "GM-ING-017"
+"""A reference is a URL, but its host is not GitHub."""
+
 
 @dataclass(frozen=True, slots=True)
 class RowIssue:
@@ -226,23 +232,31 @@ class RowIssue:
 
     Attributes:
         code: A stable `GM-ING-0NN` code from this module.
+        message: A human-readable description naming the offending value.
         line: The 1-based physical line number in the source file. Physical
             rather than logical, so it matches what an editor shows even when
-            a quoted field spans several lines.
-        message: A human-readable description naming the offending value.
+            a quoted field spans several lines. `None` for a reference given
+            on the command line, which has no line to point at.
         source: The file the row came from, for messages that aggregate
             several files.
     """
 
     code: str
-    line: int
     message: str
+    line: int | None = None
     source: str | None = None
 
     def __str__(self) -> str:
-        """Render as `path:line: [CODE] message`, the usual compiler shape."""
-        where = f"{self.source}:{self.line}" if self.source else f"line {self.line}"
-        return f"{where}: [{self.code}] {self.message}"
+        """Render as `path:line: [CODE] message`, the usual compiler shape.
+
+        Each part is dropped when there is nothing to say — a reference
+        typed as an argument has no line, and one read outside a file has no
+        source.
+        """
+        parts = [part for part in (self.source, self.line and str(self.line)) if part]
+        where = ":".join(parts)
+        body = f"[{self.code}] {self.message}"
+        return f"{where}: {body}" if where else body
 
 
 def truncate(value: str, limit: int = MAX_RAW_ECHO) -> str:

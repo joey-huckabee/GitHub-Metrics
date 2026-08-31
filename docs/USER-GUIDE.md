@@ -71,13 +71,35 @@ pypa,virtualenv
 Each row names the repository at `https://github.com/<owner>/<repoid>`. Read
 it:
 
-```bash
-$ github-metrics ingest inventory.csv
-inventory.csv: 3 repositories, 0 rejected
-  urllib3/urllib3
-  bokeh/bokeh
-  pypa/virtualenv
+```console
+$ github-metrics validate inventory.csv
+urllib3/urllib3
+bokeh/bokeh
+pypa/virtualenv
+3 repositories, 0 rejected, from 1 file(s)
 ```
+
+### You do not have to use a file
+
+A repository can be named directly, and the forms can be mixed:
+
+```console
+$ github-metrics validate pypa/virtualenv
+$ github-metrics validate https://github.com/pypa/virtualenv
+$ github-metrics validate inventory.csv cline/cline github.com/psf/requests
+```
+
+URLs are taken as they come — with or without a scheme, with `www.`, with a
+trailing slash, with `.git`, and with whatever path was left over from browsing
+the issues. The one thing that is not accepted is another host:
+`gitlab.com/foo/bar` would reduce perfectly well to `foo/bar`, which is exactly
+why it is refused rather than guessed at. On GitHub Enterprise, use the slug
+and point `GITHUB_API_URL` at your instance.
+
+**A repository named twice is collected once**, whether the repetition is
+within a file, across two files, or between a file and the command line. The
+first mention keeps its place and the second is reported. Collecting it twice
+would spend the rate limit twice and put two identical rows in the output.
 
 That is the whole contract. Two columns, one row per repository.
 
@@ -121,7 +143,7 @@ whitespace — ` RepoID , Owner ` is read the same as `owner,repoid`.
 Rejected rows do not stop the read. You get every problem at once:
 
 ```bash
-$ github-metrics ingest messy.csv
+$ github-metrics validate messy.csv
 messy.csv: 1 repositories, 5 rejected
   bokeh/bokeh
   ! messy.csv:3: [GM-ING-010] expected at least 2 fields but found 1: 'onlyonefield'
@@ -171,7 +193,7 @@ every aggregate you go on to compute.
 Pass as many as you like. They are read concurrently:
 
 ```bash
-$ github-metrics ingest teams/*.csv
+$ github-metrics validate teams/*.csv
 teams/data.csv: 12 repositories, 0 rejected
   ...
 teams/platform.csv: 31 repositories, 1 rejected
@@ -186,14 +208,14 @@ the thread count; it cannot change the answer.
 ## Handing the inventory to something else
 
 ```bash
-github-metrics ingest inventory.csv --format json --output inventory.json
+github-metrics validate inventory.csv --format json --output inventory.json
 ```
 
 Diagnostics go to stderr and data to stdout, so piping works even with logging
 turned all the way up:
 
 ```bash
-LOG_LEVEL=DEBUG github-metrics ingest inventory.csv --format json | jq '.[0].repositories[].owner'
+LOG_LEVEL=DEBUG github-metrics validate inventory.csv --format json | jq '.repositories[].owner'
 ```
 
 Each reference carries `source_line`, the physical line it came from, so a
@@ -333,7 +355,7 @@ Use `--strict` when any defect should stop the run before a later stage treats
 a partial inventory as complete:
 
 ```bash
-github-metrics ingest inventory.csv --strict || exit 1
+github-metrics validate inventory.csv --strict || exit 1
 ```
 
 Strict mode stops at the *first* problem and returns nothing. When it fires,
@@ -342,7 +364,7 @@ re-run without `--strict` to see the full list.
 ## Using it as a library
 
 ```python
-from github_metrics.ingest import read_repository_csv
+from github_metrics.sources import read_repository_csv
 
 result = read_repository_csv("inventory.csv")
 
@@ -358,10 +380,36 @@ print(f"{result.accepted} of {result.rows_read} rows accepted")
 Reading several files concurrently:
 
 ```python
-from github_metrics.ingest import read_repository_csvs
+from github_metrics.sources import read_repository_csvs
 
 for result in read_repository_csvs(["teams/data.csv", "teams/platform.csv"]):
     print(result.source, result.accepted, result.rejected)
+```
+
+Or take whatever the command line takes — slugs, URLs and files together,
+resolved in the order given, with repetitions removed across all of them:
+
+```python
+from github_metrics.sources import resolve_sources
+
+resolved = resolve_sources(
+    ["inventory.csv", "pypa/virtualenv", "https://github.com/psf/requests"]
+)
+
+for reference in resolved.repositories:
+    print(reference.full_name)
+
+print(f"{resolved.accepted} accepted, {resolved.rejected} rejected")
+```
+
+To read a single reference without touching the file system, `parse_reference`
+returns either a `RepositoryRef` or a `RowIssue` saying why not:
+
+```python
+from github_metrics.sources import parse_reference
+
+print(parse_reference("github.com/pypa/virtualenv/tree/main"))
+# RepositoryRef(owner='pypa', repoid='virtualenv', source_line=None)
 ```
 
 Catching failures — one base class covers every problem the tool reports, while

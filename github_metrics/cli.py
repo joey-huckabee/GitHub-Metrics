@@ -36,9 +36,9 @@ from github_metrics.errors import (
     MissingCredentialsError,
 )
 from github_metrics.geo import Geocoder
-from github_metrics.ingest import IngestResult, read_repository_csvs
 from github_metrics.logger import LogLevels, reset_logger
 from github_metrics.metrics import DEFAULT_CONTRIBUTOR_LIMIT, collect_repository_metrics
+from github_metrics.sources import ResolvedSources, resolve_sources
 
 # Exit statuses, severity-ordered; the highest applicable one wins. Codes 1 and
 # 2 belong to click (ClickException and UsageError) and are listed for
@@ -260,31 +260,39 @@ def rate_limit_command(context: CliContext) -> None:
         click.echo(f"{client.rate_limit_remaining()} core requests remaining")
 
 
-def _render_text(results: list[IngestResult]) -> str:
-    """Render ingest results as a short human-readable report."""
-    lines: list[str] = []
-    for result in results:
-        lines.append(f"{result.source}: {result.accepted} repositories, {result.rejected} rejected")
-        lines.extend(f"  {reference.full_name}" for reference in result.repositories)
-        lines.extend(f"  ! {issue}" for issue in result.issues)
-    total = sum(result.accepted for result in results)
-    if len(results) > 1:
-        lines.append(f"total: {total} repositories from {len(results)} files")
+def _render_text(resolved: ResolvedSources) -> str:
+    """Render a resolution as a short human-readable report."""
+    lines = [f"{reference.full_name}" for reference in resolved.repositories]
+    lines.extend(f"! {issue}" for issue in resolved.issues)
+    lines.append(
+        f"{resolved.accepted} repositories, {resolved.rejected} rejected, "
+        f"from {len(resolved.files)} file(s)"
+    )
     return "\n".join(lines)
 
 
-def _render_json(results: list[IngestResult]) -> str:
-    """Render ingest results as JSON."""
-    return json.dumps([result.to_dict() for result in results], indent=2, default=str)
+def _render_json(resolved: ResolvedSources) -> str:
+    """Render a resolution as JSON."""
+    payload = {
+        "repositories": [reference.to_dict() for reference in resolved.repositories],
+        "issues": [
+            {
+                "code": issue.code,
+                "message": issue.message,
+                "line": issue.line,
+                "source": issue.source,
+            }
+            for issue in resolved.issues
+        ],
+        "accepted": resolved.accepted,
+        "rejected": resolved.rejected,
+        "files": [str(path) for path in resolved.files],
+    }
+    return json.dumps(payload, indent=2, default=str)
 
 
-@main.command("ingest")
-@click.argument(
-    "sources",
-    nargs=-1,
-    required=True,
-    type=click.Path(dir_okay=False, path_type=Path),
-)
+@main.command("validate")
+@click.argument("sources", nargs=-1, required=True)
 @click.option(
     "--strict",
     is_flag=True,
@@ -310,28 +318,33 @@ def _render_json(results: list[IngestResult]) -> str:
     help="Write the report here instead of stdout.",
 )
 @click.pass_context
-def ingest_command(
+def validate_command(
     ctx: click.Context,
-    sources: tuple[Path, ...],
+    sources: tuple[str, ...],
     strict: bool,
     workers: int | None,
     output_format: str,
     output: Path | None,
 ) -> None:
-    """Read one or more OWNER,REPOID CSV files and report what they contain.
+    """Check what SOURCES name, without collecting anything.
 
-    This command validates and reports only. It performs no network access and
-    collects no metrics, so it needs no GITHUB_TOKEN.
+    Each SOURCE is a slug (pypa/virtualenv), a GitHub URL, or a CSV inventory,
+    and the three can be mixed in one command.
 
-    Exit status is 0 when every row was accepted, 3 when the files were read
-    but some rows were rejected, and 2 when a file could not be read at all.
+    This reports only. It performs no network access and collects no metrics,
+    so it needs no GITHUB_TOKEN - which is the point: a list can be checked
+    before any rate limit is spent on it, and by someone who has no token.
+
+    Exit status is 0 when every reference was accepted, 3 when the sources were
+    read but some references were rejected, and 2 when a file could not be read
+    at all.
     """
     try:
-        results = read_repository_csvs(sources, strict=strict, max_workers=workers)
+        resolved = resolve_sources(sources, strict=strict, max_workers=workers)
     except IngestError as exc:
         raise InputError(str(exc)) from exc
 
-    report = _render_json(results) if output_format == "json" else _render_text(results)
+    report = _render_json(resolved) if output_format == "json" else _render_text(resolved)
 
     if output is not None:
         output.write_text(report + "\n", encoding="utf-8")
@@ -339,7 +352,7 @@ def ingest_command(
     else:
         click.echo(report)
 
-    if any(result.issues for result in results):
+    if resolved.issues:
         # A distinct status lets a pipeline tell "nothing loaded" from "loaded,
         # but the inventory needs fixing" without parsing the report.
         ctx.exit(EXIT_ROWS_REJECTED)

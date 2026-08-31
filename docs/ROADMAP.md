@@ -12,6 +12,11 @@ about and deliberately scheduled; that is different from being promised.
 
 - Inventory ingestion from `owner,repoid` CSV, with full validation, a stable
   error taxonomy, lenient and strict modes, and concurrent multi-file reads
+- `github_metrics.sources`: slugs, GitHub URLs and CSV inventories, mixed
+  freely, resolved in input order with repetitions removed across all of them.
+  URL input was scheduled for v0.2.0 and arrived early, because it fell out of
+  giving every command the same inputs
+- `github-metrics validate`, the offline check — formerly `ingest`
 - Single-repository collection via `github-metrics repo`
 - A three-level requirements tree traced to tests, checked in CI
 
@@ -35,13 +40,15 @@ The current release target. Everything below is in scope now.
 
 ### The `metrics` sub-command
 
-Replaces `ingest`. Collects metrics for every repository named by the input and
+Replaces `repo`. Collects metrics for every repository named by the input and
 writes `githubmetrics.csv`.
 
-- **Input:** exactly one CSV file (multiple files are not accepted), or
-  `--owner` with `--repoid` for a single repository. The two forms are mutually
-  exclusive, the two flags must be given together, and only one repository can
-  be named this way. Directories are not walked.
+- **Input:** any number of sources, mixed — slugs, GitHub URLs and CSV
+  inventories, exactly as `validate` takes them. Directories are not walked.
+  The earlier plan restricted this to one CSV file, or `--owner` with
+  `--repoid`; both were dropped in favour of one input vocabulary shared by
+  every command, since the alternative makes the user remember which command
+  wants which form.
 - **Output:** one row per accepted input row, **in input order**.
 - **Destination:** a file named by `--output`. When only a directory is given,
   the file is written there as `githubmetrics.csv`. With no `--output` at all,
@@ -53,10 +60,10 @@ writes `githubmetrics.csv`.
   which is a rate-limit lever, not just a rendering filter.
 - **JSON:** an array of objects using the CSV column names, available both as a
   file and to the console.
-- **`--dry-run`:** validates the input and reports, with no network access and
-  no token required — the capability the `ingest` command provided, kept as a
-  flag rather than as a command of its own. Checking a 400-row inventory before
-  spending any quota is worth keeping.
+- **Checking first:** `validate` is a command of its own rather than a
+  `--dry-run` flag. Checking a 400-row inventory before spending any quota is
+  worth keeping, and a separate command is the form that can be handed to
+  someone who has no token at all.
 - **Duplicates:** dropped, with a warning naming them.
 - **Invalid rows:** rejected, as today.
 - **Unfetchable repositories:** identity columns filled, metrics and scores
@@ -71,7 +78,7 @@ headed rather than by what exists today:
 
 ```
 github_metrics/
-  sources/     where inventories come from - CSV now, URLs in v0.2.0
+  sources/     where a repository gets named - slugs, URLs, CSV inventories
   model/       ScanIdentifier, RepoMetaData, the output row
   collect/     API access, rate limiting, concurrency
   analysis/    the scoring calculations
@@ -79,9 +86,9 @@ github_metrics/
 ```
 
 `sources/` and `output/` are separate rather than one `csv_io` package because
-they diverge immediately: v0.2.0 adds a URL *source* and v0.3.0 adds a database
-*destination*, and neither belongs in a package named for CSV. Nothing named
-`csv_io` would still be honest by v0.3.0.
+they diverge immediately: `sources/` already reads URLs as well as CSV, and
+v0.3.0 adds a database *destination*. Nothing named `csv_io` would still be
+honest, and it stopped being honest sooner than expected.
 
 ### Rate limiting
 
@@ -119,27 +126,27 @@ the program embedding it.
 
 ---
 
-## v0.2.0 — URLs and rate-limit tuning
+## v0.2.0 — rate-limit tuning
 
-### GitHub URL input
+### Delivered early: GitHub URL input
 
-The CLI accepts a GitHub URL in place of `--owner` / `--repoid`. Anything after
-the parts needed to identify the repository is ignored, so a deep link into a
-file or a line range still resolves. A URL that cannot be parsed into an
-owner and repository returns a distinct error code rather than a generic
-failure.
+This was the headline of v0.2.0 and shipped in v0.1.0 instead. It was scheduled
+here on the assumption that URL handling was a feature of its own; it turned
+out to be a consequence of giving every command the same inputs, which is a
+smaller change than a separate URL mode would have been.
 
-This is why URL parsing was kept out of the CSV contract in
-[ADR-0001](adr/0001-two-column-csv-as-the-inventory-contract.md): the ambiguity
-is real, and it belongs in one clearly-marked place with its own error code
-rather than spread across every row of an inventory.
+What was planned is what was built: a deep link into a file or a line range
+still resolves, and a URL that cannot be read as a repository carries its own
+code — two of them, `GM-ING-016` for the shape and `GM-ING-017` for a host that
+is not GitHub.
 
-### Naming more than one repository on the command line
+The reasoning in
+[ADR-0001](adr/0001-two-column-csv-as-the-inventory-contract.md) held up: URL
+parsing is kept out of the CSV contract, in one clearly-marked place with its
+own codes, rather than spread across every row of an inventory.
 
-`--owner` / `--repoid` names exactly one repository in v0.1.0. Repeating the
-pair to name several without writing a CSV is a natural extension, deferred
-because the single-repository form covers the common case and the CSV covers
-the rest.
+Naming several repositories on the command line came with it, since a source
+list is a list.
 
 ### Rate-limit behaviour made configurable
 

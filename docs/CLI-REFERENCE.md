@@ -25,7 +25,7 @@ github-metrics [--env-file PATH] [--token TEXT | --token-file PATH]
 
 Configuration is resolved **lazily**: `--env-file` is recorded when the command
 group starts, but the file is only required by commands that reach the GitHub
-API. `ingest` therefore runs on a machine with no credentials at all.
+API. `validate` therefore runs on a machine with no credentials at all.
 
 ### Credentials
 
@@ -100,17 +100,17 @@ Read from the environment, or from a `.env` file. See
 | `LOG_LEVEL` | no | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
 Diagnostics go to **stderr** at `LOG_LEVEL`. Data goes to **stdout**. The two
-never mix, so `github-metrics ingest list.csv --format json | jq` works even at
+never mix, so `github-metrics validate list.csv --format json | jq` works even at
 `LOG_LEVEL=DEBUG`.
 
 ---
 
-## `ingest`
+## `validate`
 
-Read one or more `owner,repoid` CSV files and report what they contain.
+Report what SOURCES name, without collecting anything.
 
 ```
-github-metrics ingest [OPTIONS] SOURCES...
+github-metrics validate [OPTIONS] SOURCES...
 ```
 
 Validates and reports only. **No network access, no metric collection, no
@@ -120,14 +120,47 @@ Validates and reports only. **No network access, no metric collection, no
 
 | Argument | Description |
 |---|---|
-| `SOURCES...` | One or more CSV paths. At least one is required. Directories are not walked — expand a glob in your shell. |
+| `SOURCES...` | One or more sources, in any mix. At least one is required. Directories are not walked — expand a glob in your shell. |
+
+A **source** is one of three things, and every command that takes repositories
+takes all three:
+
+| Form | Example |
+|---|---|
+| slug | `pypa/virtualenv` |
+| GitHub URL | `https://github.com/pypa/virtualenv`, `github.com/pypa/virtualenv/tree/main`, `git@github.com:pypa/virtualenv.git` |
+| CSV inventory | `inventory.csv` |
+
+URLs are accepted with or without a scheme, with `www.`, with a trailing slash,
+with `.git`, and with a leftover path from browsing. A URL naming a host other
+than GitHub is **refused rather than reduced**: `gitlab.com/foo/bar` would
+reduce perfectly well to `foo/bar`, which is exactly the problem. On GitHub
+Enterprise, name the repository as a slug and point `GITHUB_API_URL` at the
+instance.
+
+Whether an argument is a path or a repository is decided by four rules, in
+order:
+
+1. It looks like a URL.
+2. It exists on disk as a file.
+3. It ends in `.csv`.
+4. Otherwise it is a slug.
+
+Rule 3 earns its place by diagnosis: without it a mistyped `inventroy.csv` is
+read as a slug and refused for having no `/`, which is true and useless. The
+cost is that a repository whose name ends in `.csv` has to be given as a URL.
+
+**A repository named twice is collected once.** The repetition is reported
+against the source that named it first, and the first mention is the one that
+keeps its position. Collecting it twice would spend the rate limit twice and
+produce two identical rows.
 
 ### Options
 
 | Option | Default | Description |
 |---|---|---|
 | `--strict` | off | Abort on the first bad row instead of reporting all of them. |
-| `--workers N` | `min(files, 8)` | Threads used to read multiple files. Has no effect on the result. |
+| `--workers N` | `min(files, 8)` | Threads used to read multiple CSV files. Has no effect on the result. |
 | `--format {text,json}` | `text` | Report format. |
 | `--output PATH` | stdout | Write the report here instead. |
 
@@ -135,8 +168,8 @@ Validates and reports only. **No network access, no metric collection, no
 
 | Code | Meaning |
 |---|---|
-| `0` | Every data row was accepted. |
-| `3` | The sources were read, but at least one row was rejected. |
+| `0` | Every reference was accepted. |
+| `3` | The sources were read, but at least one reference was rejected. |
 | `6` | A source could not be read, or `--strict` abandoned the read. |
 
 `3` is the one worth wiring into automation: it means the inventory loaded and
@@ -144,7 +177,7 @@ is usable, but is degraded. Collapsing it into `0` hides that; collapsing it
 into failure discards a result that is usually still worth having.
 
 ```bash
-github-metrics ingest inventory.csv
+github-metrics validate inventory.csv
 case $? in
   0) echo "clean" ;;
   3) echo "loaded, but rows need fixing" ;;
@@ -188,61 +221,74 @@ Each row denotes `https://github.com/<owner>/<repoid>`.
 
 ```bash
 # Read one inventory
-github-metrics ingest inventory.csv
+github-metrics validate inventory.csv
 
-# Several at once, read concurrently
-github-metrics ingest teams/*.csv
+# A repository named directly, in either form
+github-metrics validate pypa/virtualenv
+github-metrics validate https://github.com/pypa/virtualenv
+
+# Mixed, in one command
+github-metrics validate inventory.csv cline/cline github.com/psf/requests
+
+# Several files at once, read concurrently
+github-metrics validate teams/*.csv
 
 # Machine-readable, for the next stage
-github-metrics ingest inventory.csv --format json --output inventory.json
+github-metrics validate inventory.csv --format json --output inventory.json
 
 # Fail the pipeline on any defect
-github-metrics ingest inventory.csv --strict
+github-metrics validate inventory.csv --strict
 
 # Serialise the reads while diagnosing an I/O problem
-github-metrics ingest teams/*.csv --workers 1
+github-metrics validate teams/*.csv --workers 1
 
-# Per-row detail
-LOG_LEVEL=DEBUG github-metrics ingest inventory.csv
+# Per-reference detail
+LOG_LEVEL=DEBUG github-metrics validate inventory.csv
 ```
 
 ### Output
 
-Text (default) — one line per file, then its repositories, then its issues:
+Text (default) — the references, then the issues, then one summary line:
 
 ```
-inventory.csv: 3 repositories, 0 rejected
-  urllib3/urllib3
-  bokeh/bokeh
-  pypa/virtualenv
+$ github-metrics validate inventory.csv cline/cline
+urllib3/urllib3
+bokeh/bokeh
+pypa/virtualenv
+cline/cline
+4 repositories, 0 rejected, from 1 file(s)
 ```
 
-With several files, a combined total is appended.
+A refused reference names its source, and its line when it had one:
 
-JSON (`--format json`) — an array with one object per source:
+```
+$ github-metrics validate inventory.csv https://gitlab.com/a/b
+urllib3/urllib3
+! <argument>: [GM-ING-017] gitlab.com is not GitHub. On GitHub Enterprise, name the repository as owner/repoid and point GITHUB_API_URL at the instance
+! inventory.csv:5: [GM-ING-015] pypa/virtualenv already appears on line 4; keeping the first occurrence
+1 repositories, 2 rejected, from 1 file(s)
+```
+
+JSON (`--format json`) — **one document for the run**, not one per file. The
+sources are an input detail; a consumer wants the references in the order they
+were asked for:
 
 ```json
-[
-  {
-    "source": "inventory.csv",
-    "repositories": [
-      { "owner": "urllib3", "repoid": "urllib3", "source_line": 2 }
-    ],
-    "issues": [
-      {
-        "code": "GM-ING-015",
-        "line": 5,
-        "message": "pypa/virtualenv already appears on line 4; keeping the first occurrence",
-        "source": "inventory.csv"
-      }
-    ],
-    "rows_read": 2
-  }
-]
+{
+  "repositories": [
+    { "owner": "urllib3", "repoid": "urllib3", "source_line": 2 },
+    { "owner": "cline", "repoid": "cline", "source_line": null }
+  ],
+  "issues": [],
+  "accepted": 2,
+  "rejected": 0,
+  "files": ["inventory.csv"]
+}
 ```
 
 `source_line` is the 1-based physical line the row occupied, so a later failure
-can be traced back to the row that requested it.
+can be traced back to the row that requested it. It is `null` for a repository
+named on the command line, which has no line to point at.
 
 ---
 
@@ -537,10 +583,10 @@ click and are listed for completeness rather than chosen. See
 | `0` | Success | yes | all |
 | `1` | Configuration error, e.g. a missing token | no | all |
 | `2` | Usage error - malformed command line | no | all |
-| `3` | Degraded: some input rows were rejected | yes | `ingest` |
+| `3` | Degraded: some input rows were rejected | yes | `validate` |
 | `4` | Degraded: a repository could not be read, or has moved | yes | `closed-issues`, `releases` |
 | `5` | Aborted: API budget exhausted | partial | reserved |
-| `6` | Aborted: the input could not be read | no | `ingest` |
+| `6` | Aborted: the input could not be read | no | `validate` |
 | `7` | Aborted: no GitHub token supplied | no | API commands |
 | `8` | Aborted: GitHub rejected the token | no | API commands |
 

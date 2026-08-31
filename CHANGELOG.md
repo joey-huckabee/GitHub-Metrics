@@ -24,6 +24,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`github-metrics ingest`** command, with `--strict`, `--workers`,
   `--format {text,json}` and `--output`, and distinct exit statuses (0 clean,
   3 rows rejected, 2 unreadable).
+- **`github_metrics.sources`**, where a repository gets named. A source is a
+  slug, a GitHub URL, or a CSV inventory, and every command that takes
+  repositories takes all three, mixed freely in one invocation. URLs are
+  accepted with or without a scheme, with `www.`, with a trailing slash, with
+  `.git`, in the `git@` clone form, and with a leftover browsing path.
+- **A URL on another host is refused rather than reduced** (`GM-ING-017`).
+  `gitlab.com/foo/bar` reduces perfectly well to `foo/bar`, which is exactly
+  the problem: the result is a plausible reference to a different repository,
+  so a mistake would become a row instead of an error.
+- **A repository named twice is collected once** (`GM-ING-015`), whether the
+  repetition is within a file, across files, or between a file and the command
+  line. The first mention keeps its position and the second is reported against
+  the source that already had it. Collecting it twice would spend the rate
+  limit twice and produce two rows no consumer could tell apart.
 - **Documentation set** under `docs/`: user guide, CLI reference, error
   catalog, architecture, maintainer guide, roadmap, three levels of
   requirements (`L1.md`, `L2.md`, `L3.md`) and three ADRs.
@@ -83,6 +97,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **`ingest` is now `validate`, and `ingest.py` is now `sources/csv_inventory.py`.**
+  The old name described what the command did to the file rather than what it
+  did for the user, and it sat oddly beside `metrics` and `contributors`, which
+  are the commands that ingest anything. `validate` says what it is for:
+  checking a list before any rate limit is spent on it, on a machine with no
+  token at all.
+- **`validate --format json` emits one document per run**, not one per file.
+  The sources are an input detail; a consumer wants the references in the order
+  they were asked for. `source_line` is `null` for a repository named on the
+  command line, which has no line to point at.
+- **A `RowIssue` may carry no line number** — a reference typed as an argument
+  has no line to point at, and the rendered message drops the part it cannot
+  fill rather than printing `line None`.
 - The CLI resolves configuration lazily, so a command that needs no credentials
   no longer fails when none are configured.
 - Python 3.14 is now a required CI target rather than `continue-on-error`; it passed

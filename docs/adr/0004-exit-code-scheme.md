@@ -111,8 +111,8 @@ Good:
 
 Bad:
 
-- This changes the codes the shipped `ingest` command used, where `2` meant
-  "unreadable input" — now `6`. `ingest` is being replaced by `metrics` in the
+- This changes the codes the shipped `ingest` command (now `validate`) used, where `2` meant
+  "unreadable input" — now `6`. `repo` is being replaced by `metrics` in the
   same release, so the break happens once, in the release that renames the
   command, rather than silently later.
 

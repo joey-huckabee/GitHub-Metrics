@@ -139,7 +139,7 @@ and an embedded NUL.
 
 ## The offline/online boundary
 
-**`ingest` never touches the network. `metrics` never touches a disk format.**
+**`sources/` never touches the network. `collect/` never touches a disk format.**
 Neither imports the other; they meet only in `cli`.
 
 This is the rule most likely to be broken by a well-meaning change — adding an

@@ -36,13 +36,13 @@ Each row denotes `https://github.com/<owner>/<repoid>`.
 
 ```bash
 # Validate and report; no network access, no GITHUB_TOKEN required
-poetry run github-metrics ingest inventory.csv
+poetry run github-metrics validate inventory.csv
 
 # Several files at once, read concurrently
-poetry run github-metrics ingest teams/*.csv
+poetry run github-metrics validate teams/*.csv
 
 # Machine-readable, for the next stage
-poetry run github-metrics ingest inventory.csv --format json --output inventory.json
+poetry run github-metrics validate inventory.csv --format json --output inventory.json
 ```
 
 Rejected rows do not stop the read. Every problem is reported with a stable

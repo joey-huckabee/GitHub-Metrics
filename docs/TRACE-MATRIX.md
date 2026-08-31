@@ -20,10 +20,10 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 ## Coverage summary
 
-- L1 requirements: 17
-- L2 requirements: 64
-- L3 requirements: 88
-- Verified L2+L3: 152 of 152 (100.0%)
+- L1 requirements: 18
+- L2 requirements: 67
+- L3 requirements: 93
+- Verified L2+L3: 160 of 160 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -85,10 +85,10 @@ through their children, so counting them too would count the same work twice.
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-CLI-001 | L2-CLI-001 | `tests/test_cli_ingest.py::test_ingest_appears_in_the_command_list`<br>`tests/test_cli_ingest.py::test_ingest_lists_every_repository_it_read`<br>`tests/test_cli_ingest.py::test_ingest_requires_at_least_one_source`<br>`tests/test_cli_ingest.py::test_several_files_are_summarised_together` | Implemented |
-| L3-CLI-002 | L2-CLI-002 | `tests/test_cli_ingest.py::test_ingest_needs_no_github_token` | Implemented |
-| L3-CLI-003 | L2-CLI-003 | `tests/test_cli_ingest.py::test_json_output_is_machine_readable`<br>`tests/test_cli_ingest.py::test_output_can_be_written_to_a_file` | Implemented |
-| L3-CLI-004 | L2-CLI-004 | `tests/test_cli_ingest.py::test_a_clean_file_exits_zero`<br>`tests/test_cli_ingest.py::test_an_unreadable_file_produces_its_own_exit_status`<br>`tests/test_cli_ingest.py::test_rejected_rows_produce_a_distinct_exit_status`<br>`tests/test_cli_ingest.py::test_strict_mode_reports_the_first_bad_row_and_stops` | Implemented |
+| L3-CLI-001 | L2-CLI-001 | `tests/test_cli_validate.py::test_several_files_are_summarised_together`<br>`tests/test_cli_validate.py::test_validate_appears_in_the_command_list`<br>`tests/test_cli_validate.py::test_validate_lists_every_repository_it_read`<br>`tests/test_cli_validate.py::test_validate_requires_at_least_one_source` | Implemented |
+| L3-CLI-002 | L2-CLI-002 | `tests/test_cli_validate.py::test_validate_needs_no_github_token` | Implemented |
+| L3-CLI-003 | L2-CLI-003 | `tests/test_cli_validate.py::test_json_output_is_machine_readable`<br>`tests/test_cli_validate.py::test_output_can_be_written_to_a_file` | Implemented |
+| L3-CLI-004 | L2-CLI-004 | `tests/test_cli_validate.py::test_a_clean_file_exits_zero`<br>`tests/test_cli_validate.py::test_an_unreadable_file_produces_its_own_exit_status`<br>`tests/test_cli_validate.py::test_rejected_rows_produce_a_distinct_exit_status`<br>`tests/test_cli_validate.py::test_strict_mode_reports_the_first_bad_row_and_stops` | Implemented |
 | L3-CLI-005 | L2-CLI-005 | `tests/test_cli_closed_issues.py::test_a_disabled_tracker_is_called_out`<br>`tests/test_cli_closed_issues.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_cli_closed_issues.py::test_an_unreadable_repository_exits_four`<br>`tests/test_cli_closed_issues.py::test_explain_appends_the_bands`<br>`tests/test_cli_closed_issues.py::test_it_appears_in_the_command_list`<br>`tests/test_cli_closed_issues.py::test_it_reports_counts_the_tracker_state_and_the_weight`<br>`tests/test_cli_closed_issues.py::test_json_carries_the_same_values`<br>`tests/test_cli_closed_issues.py::test_json_includes_the_bands_only_when_explained` | Implemented |
 | L3-CLI-006 | L2-CLI-005 | `tests/test_releases.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_releases.py::test_an_unreadable_repository_exits_four`<br>`tests/test_releases.py::test_the_command_emits_json`<br>`tests/test_releases.py::test_the_command_explains_the_release_bands`<br>`tests/test_releases.py::test_the_command_flags_a_tags_only_project`<br>`tests/test_releases.py::test_the_command_reports_both_counts_and_the_distinct_total`<br>`tests/test_releases.py::test_the_command_shows_the_weight_and_warns_about_saturation` | Implemented |
 | L3-CLI-007 | L2-CLI-006 | `tests/test_cli_bands.py::test_an_unknown_metric_is_a_usage_error`<br>`tests/test_cli_bands.py::test_every_scoring_table_is_reachable`<br>`tests/test_cli_bands.py::test_it_needs_no_token`<br>`tests/test_cli_bands.py::test_no_argument_prints_every_table`<br>`tests/test_cli_bands.py::test_the_tables_carry_their_boundaries` | Implemented |
@@ -99,7 +99,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-CON-001 | L2-CON-001, L2-CON-002, L2-CON-003 | _(none)_ | Implemented |
+| L1-CON-001 | L2-CON-001, L2-CON-002, L2-CON-003, L2-SRC-003 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -113,9 +113,9 @@ through their children, so counting them too would count the same work twice.
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-CON-001 | L2-CON-001 | `tests/test_ingest.py::test_multiple_files_are_read_and_returned_in_input_order`<br>`tests/test_ingest.py::test_reading_no_files_starts_no_work`<br>`tests/test_ingest.py::test_strict_mode_propagates_through_the_pool` | Implemented |
-| L3-CON-002 | L2-CON-002 | `tests/test_ingest.py::test_results_are_stable_across_repeated_runs`<br>`tests/test_ingest.py::test_the_reported_error_is_the_earliest_source_not_the_fastest_thread` | Implemented |
-| L3-CON-003 | L2-CON-003 | `tests/test_ingest.py::test_more_workers_than_files_is_harmless`<br>`tests/test_ingest.py::test_the_worker_count_changes_nothing_about_the_answer` | Implemented |
+| L3-CON-001 | L2-CON-001 | `tests/test_csv_inventory.py::test_multiple_files_are_read_and_returned_in_input_order`<br>`tests/test_csv_inventory.py::test_reading_no_files_starts_no_work`<br>`tests/test_csv_inventory.py::test_strict_mode_propagates_through_the_pool` | Implemented |
+| L3-CON-002 | L2-CON-002 | `tests/test_csv_inventory.py::test_results_are_stable_across_repeated_runs`<br>`tests/test_csv_inventory.py::test_the_reported_error_is_the_earliest_source_not_the_fastest_thread` | Implemented |
+| L3-CON-003 | L2-CON-003 | `tests/test_csv_inventory.py::test_more_workers_than_files_is_harmless`<br>`tests/test_csv_inventory.py::test_the_worker_count_changes_nothing_about_the_answer` | Implemented |
 
 ### ERR: Error reporting and taxonomy
 
@@ -138,10 +138,10 @@ through their children, so counting them too would count the same work twice.
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-ERR-001 | L2-ERR-001 | `tests/test_ingest.py::test_a_directory_given_instead_of_a_file_raises`<br>`tests/test_ingest.py::test_a_file_containing_a_nul_byte_raises`<br>`tests/test_ingest.py::test_a_file_that_is_not_utf8_raises`<br>`tests/test_ingest.py::test_a_file_with_no_header_raises`<br>`tests/test_ingest.py::test_a_header_declaring_a_column_twice_raises`<br>`tests/test_ingest.py::test_a_header_missing_required_columns_raises`<br>`tests/test_ingest.py::test_missing_file_raises` | Implemented |
-| L3-ERR-002 | L2-ERR-002 | `tests/test_ingest.py::test_every_row_rejection_kind_is_reported_and_the_good_row_survives`<br>`tests/test_ingest.py::test_issues_carry_the_line_number_and_render_like_a_compiler_diagnostic` | Implemented |
-| L3-ERR-003 | L2-ERR-003 | `tests/test_ingest.py::test_a_duplicate_alone_is_enough_to_trip_strict_mode`<br>`tests/test_ingest.py::test_strict_mode_aborts_on_the_first_bad_row`<br>`tests/test_ingest.py::test_strict_mode_accepts_a_clean_file_unchanged` | Implemented |
-| L3-ERR-004 | L2-ERR-004 | `tests/test_ingest.py::test_error_codes_are_unique_across_the_taxonomy`<br>`tests/test_ingest.py::test_every_ingest_failure_shares_one_base_class` | Implemented |
+| L3-ERR-001 | L2-ERR-001 | `tests/test_csv_inventory.py::test_a_directory_given_instead_of_a_file_raises`<br>`tests/test_csv_inventory.py::test_a_file_containing_a_nul_byte_raises`<br>`tests/test_csv_inventory.py::test_a_file_that_is_not_utf8_raises`<br>`tests/test_csv_inventory.py::test_a_file_with_no_header_raises`<br>`tests/test_csv_inventory.py::test_a_header_declaring_a_column_twice_raises`<br>`tests/test_csv_inventory.py::test_a_header_missing_required_columns_raises`<br>`tests/test_csv_inventory.py::test_missing_file_raises` | Implemented |
+| L3-ERR-002 | L2-ERR-002 | `tests/test_csv_inventory.py::test_every_row_rejection_kind_is_reported_and_the_good_row_survives`<br>`tests/test_csv_inventory.py::test_issues_carry_the_line_number_and_render_like_a_compiler_diagnostic` | Implemented |
+| L3-ERR-003 | L2-ERR-003 | `tests/test_csv_inventory.py::test_a_duplicate_alone_is_enough_to_trip_strict_mode`<br>`tests/test_csv_inventory.py::test_strict_mode_aborts_on_the_first_bad_row`<br>`tests/test_csv_inventory.py::test_strict_mode_accepts_a_clean_file_unchanged` | Implemented |
+| L3-ERR-004 | L2-ERR-004 | `tests/test_csv_inventory.py::test_error_codes_are_unique_across_the_taxonomy`<br>`tests/test_csv_inventory.py::test_every_ingest_failure_shares_one_base_class` | Implemented |
 
 ### ING: Repository inventory ingestion
 
@@ -152,6 +152,7 @@ through their children, so counting them too would count the same work twice.
 | L1-ING-001 | L2-ING-001, L2-ING-002, L2-ING-003, L2-ING-004, L2-ING-005, L2-ING-007 | _(none)_ | Implemented |
 | L1-ING-002 | L2-ING-008 | _(none)_ | Implemented |
 | L1-ING-003 | L2-ERR-003, L2-ING-006 | _(none)_ | Implemented |
+| L1-ING-004 | L2-SRC-001, L2-SRC-002 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -164,19 +165,19 @@ through their children, so counting them too would count the same work twice.
 | L2-ING-005 | L1-ING-001 | L3-ING-005 | _(none)_ | Implemented |
 | L2-ING-006 | L1-ING-003 | L3-ING-006 | _(none)_ | Implemented |
 | L2-ING-007 | L1-ING-001 | L3-ING-007 | _(none)_ | Implemented |
-| L2-ING-008 | L1-ING-002 | _(none)_ | `github_metrics/ingest.py` | Implemented (I) |
+| L2-ING-008 | L1-ING-002 | _(none)_ | `github_metrics/sources/csv_inventory.py` | Implemented (I) |
 
 **L3 → Verification Artifacts**
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-ING-001 | L2-ING-001 | `tests/test_ingest.py::test_each_row_becomes_a_github_url`<br>`tests/test_ingest.py::test_reads_the_documented_example`<br>`tests/test_ingest.py::test_source_line_is_recorded_for_every_reference` | Implemented |
-| L3-ING-002 | L2-ING-002 | `tests/test_ingest.py::test_a_byte_order_mark_does_not_hide_the_header` | Implemented |
-| L3-ING-003 | L2-ING-003 | `tests/test_ingest.py::test_crlf_line_endings_are_accepted` | Implemented |
-| L3-ING-004 | L2-ING-004 | `tests/test_ingest.py::test_columns_may_be_reordered_recased_and_padded`<br>`tests/test_ingest.py::test_unrecognised_columns_are_ignored` | Implemented |
-| L3-ING-005 | L2-ING-005 | `tests/test_ingest.py::test_blank_lines_and_padding_are_tolerated` | Implemented |
-| L3-ING-006 | L2-ING-006 | `tests/test_ingest.py::test_duplicates_are_dropped_case_insensitively_keeping_the_first`<br>`tests/test_ingest.py::test_repository_ref_identity_folds_case` | Implemented |
-| L3-ING-007 | L2-ING-007 | `tests/test_ingest.py::test_a_large_inventory_reads_without_special_handling`<br>`tests/test_ingest.py::test_a_quoted_field_containing_a_separator_is_one_cell` | Implemented |
+| L3-ING-001 | L2-ING-001 | `tests/test_csv_inventory.py::test_each_row_becomes_a_github_url`<br>`tests/test_csv_inventory.py::test_reads_the_documented_example`<br>`tests/test_csv_inventory.py::test_source_line_is_recorded_for_every_reference` | Implemented |
+| L3-ING-002 | L2-ING-002 | `tests/test_csv_inventory.py::test_a_byte_order_mark_does_not_hide_the_header` | Implemented |
+| L3-ING-003 | L2-ING-003 | `tests/test_csv_inventory.py::test_crlf_line_endings_are_accepted` | Implemented |
+| L3-ING-004 | L2-ING-004 | `tests/test_csv_inventory.py::test_columns_may_be_reordered_recased_and_padded`<br>`tests/test_csv_inventory.py::test_unrecognised_columns_are_ignored` | Implemented |
+| L3-ING-005 | L2-ING-005 | `tests/test_csv_inventory.py::test_blank_lines_and_padding_are_tolerated` | Implemented |
+| L3-ING-006 | L2-ING-006 | `tests/test_csv_inventory.py::test_duplicates_are_dropped_case_insensitively_keeping_the_first`<br>`tests/test_csv_inventory.py::test_repository_ref_identity_folds_case` | Implemented |
+| L3-ING-007 | L2-ING-007 | `tests/test_csv_inventory.py::test_a_large_inventory_reads_without_special_handling`<br>`tests/test_csv_inventory.py::test_a_quoted_field_containing_a_separator_is_one_cell` | Implemented |
 
 ### LOG: Diagnostic logging
 
@@ -197,8 +198,8 @@ through their children, so counting them too would count the same work twice.
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-LOG-001 | L2-LOG-001 | `tests/test_ingest.py::test_row_issues_are_logged_at_debug` | Implemented |
-| L3-LOG-002 | L2-LOG-002 | `tests/test_repository.py::test_an_unremarkable_repository_is_collected_in_silence`<br>`tests/test_repository.py::test_something_worth_doubting_is_still_a_warning`<br>`tests/test_repository.py::test_the_detail_is_still_there_at_debug` | Implemented |
+| L3-LOG-001 | L2-LOG-001 | `tests/test_csv_inventory.py::test_row_issues_are_logged_at_debug` | Implemented |
+| L3-LOG-002 | L2-LOG-002 | `tests/test_repository.py::test_an_unremarkable_repository_is_collected_in_silence`<br>`tests/test_repository.py::test_something_worth_doubting_is_still_a_warning`<br>`tests/test_repository.py::test_the_detail_is_still_there_at_debug`<br>`tests/test_resolve.py::test_the_run_reports_its_outcome_once_at_info` | Implemented |
 
 ### MET: Metric collection
 
@@ -332,6 +333,26 @@ through their children, so counting them too would count the same work twice.
 | L3-SCR-019 | L2-SCR-002 | `tests/test_popularity.py::test_a_negative_count_is_reported_and_treated_as_zero` | Implemented |
 | L3-SCR-020 | L2-SCR-006 | `tests/test_popularity.py::test_the_band_tables_render_side_by_side`<br>`tests/test_popularity.py::test_the_budgets_are_ten_and_fifteen`<br>`tests/test_popularity.py::test_the_columns_are_the_budget_times_the_weight`<br>`tests/test_popularity.py::test_the_reference_row_is_reproduced` | Implemented |
 | L3-SCR-021 | L2-SCR-009 | `tests/test_total.py::test_a_normal_total_says_nothing_at_info`<br>`tests/test_total.py::test_a_perfect_repository_reaches_the_ceiling`<br>`tests/test_total.py::test_a_project_with_nothing_scores_nothing`<br>`tests/test_total.py::test_every_component_is_a_float`<br>`tests/test_total.py::test_exceeding_the_ceiling_is_reported_rather_than_clamped`<br>`tests/test_total.py::test_the_ceiling_is_derived_from_the_components_not_typed`<br>`tests/test_total.py::test_the_ceiling_is_eighty_five`<br>`tests/test_total.py::test_the_five_scored_components_sum_to_seventy_five_without_the_bonus`<br>`tests/test_total.py::test_the_reference_row_is_reproduced` | Implemented |
+
+### SRC: SRC
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-SRC-001 | L1-ING-004 | L3-SRC-001, L3-SRC-002 | _(none)_ | Implemented |
+| L2-SRC-002 | L1-ING-004 | L3-SRC-003, L3-SRC-004 | _(none)_ | Implemented |
+| L2-SRC-003 | L1-CON-001 | L3-SRC-005 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-SRC-001 | L2-SRC-001 | `tests/test_reference.py::test_a_url_is_recognised_before_it_is_parsed`<br>`tests/test_reference.py::test_browsing_debris_is_dropped`<br>`tests/test_reference.py::test_case_is_preserved_rather_than_normalised`<br>`tests/test_reference.py::test_every_usual_form_names_the_same_repository` | Implemented |
+| L3-SRC-002 | L2-SRC-001 | `tests/test_reference.py::test_a_malformed_reference_says_what_is_wrong_with_it`<br>`tests/test_reference.py::test_a_url_naming_no_repository_is_refused`<br>`tests/test_reference.py::test_an_issue_from_an_argument_carries_no_line_number`<br>`tests/test_reference.py::test_another_host_is_refused_rather_than_assumed`<br>`tests/test_reference.py::test_the_name_grammar_is_the_same_one_ingestion_uses` | Implemented |
+| L3-SRC-003 | L2-SRC-002 | `tests/test_resolve.py::test_a_mistyped_path_reports_a_missing_file_not_a_bad_name`<br>`tests/test_resolve.py::test_an_existing_file_is_read_even_without_a_csv_suffix`<br>`tests/test_resolve.py::test_the_rules_are_checked_in_order` | Implemented |
+| L3-SRC-004 | L2-SRC-002 | `tests/test_resolve.py::test_counts_cover_every_kind_of_source`<br>`tests/test_resolve.py::test_sources_of_different_kinds_mix_in_the_order_written`<br>`tests/test_resolve.py::test_the_same_arguments_always_resolve_the_same_way` | Implemented |
+| L3-SRC-005 | L2-SRC-003 | `tests/test_resolve.py::test_a_repetition_across_two_files_is_caught`<br>`tests/test_resolve.py::test_a_repository_named_twice_is_collected_once`<br>`tests/test_resolve.py::test_repetition_ignores_case_as_github_does`<br>`tests/test_resolve.py::test_the_first_mention_is_the_one_that_survives` | Implemented |
 
 ### TRU: Trust policy
 

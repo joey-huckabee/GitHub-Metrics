@@ -252,7 +252,7 @@ def test_ingest_needs_no_token_and_is_never_verified(
 
     monkeypatch.setattr("github_metrics.cli.verify_credentials", _explode)
 
-    result = run(["ingest", str(Path("tests") / "data" / "repositories.csv")])
+    result = run(["validate", str(Path("tests") / "data" / "repositories.csv")])
 
     assert result.exit_code == 0
 

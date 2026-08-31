@@ -50,11 +50,11 @@ poetry run mypy --config-file mypy.ini
 poetry run python scripts/build-trace-matrix.py --check
 
 # The CLI
-poetry run github-metrics ingest inventory.csv
-poetry run github-metrics ingest inventory.csv --format json --output out.json
+poetry run github-metrics validate inventory.csv
+poetry run github-metrics validate inventory.csv --format json --output out.json
 poetry run github-metrics repo python/cpython
 poetry run github-metrics rate-limit
-LOG_LEVEL=DEBUG poetry run github-metrics ingest inventory.csv
+LOG_LEVEL=DEBUG poetry run github-metrics validate inventory.csv
 ```
 
 ## Architecture
@@ -63,7 +63,7 @@ LOG_LEVEL=DEBUG poetry run github-metrics ingest inventory.csv
 
 **Ingestion never touches the network. Collection never touches a disk format.**
 
-Everything else follows from it. `ingest` imports nothing that can open a
+Everything else follows from it. `sources/` imports nothing that can open a
 socket; `metrics`/`collect` imports nothing that parses a file format. Neither
 imports the other; they meet only at the CLI.
 
@@ -78,7 +78,7 @@ before doing it.
 | Module | Responsibility | Network |
 |---|---|---|
 | `cli` | Argument parsing, rendering, exit codes | via collection |
-| `ingest` | CSV to validated `RepositoryRef` values; concurrency across files | never |
+| `sources/` | Slugs, URLs and CSV inventories to validated `RepositoryRef` values; concurrency across files | never |
 | `validation` | Account and repository name grammar; returns reasons, not booleans | never |
 | `errors` | Stable `GM-<AREA>-<NNN>` taxonomy, exceptions and `RowIssue` | never |
 | `logger` | Logging configuration, once, at startup | never |
@@ -91,10 +91,15 @@ before doing it.
 | `metrics` | Collection over the API | via `client` |
 | `geo` | Location to coordinates (Nominatim, cached per run) | yes |
 
-Planned packages, per `docs/ROADMAP.md`: `sources/` (where inventories come
-from — CSV now, URLs at v0.2.0). Rate limiting and collection concurrency join
-`collect/`. `ingest.py` moves into `sources/` in the same commit that renames
-`ingest` to `metrics`, so the diff reads as one change.
+`sources/` is where a repository gets named, in any of the three forms a
+command accepts: a slug, a GitHub URL, or a CSV inventory. `resolve_sources`
+decides which is which by rules applied in a fixed order — URL, existing file,
+`.csv` suffix, slug — and returns references in the order the arguments were
+written. Every command that takes repositories takes all three, so nobody has
+to remember which command wants which.
+
+Still planned, per `docs/ROADMAP.md`: rate limiting and collection concurrency
+join `collect/`, and `metrics` and `contributors` replace `repo`.
 
 ### Ingestion pipeline
 
@@ -208,7 +213,7 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   the repository and an inventory holds hundreds, so one INFO line per
   repository is hundreds of lines burying whatever the operator needed to see.
   A value worth explaining is DEBUG; a value worth doubting is a WARNING.
-  `ingest.py`'s per-file summary is the one INFO line in the package, and it is
+  `sources/csv_inventory.py`'s per-file summary is the one INFO line in the package, and it is
   per run rather than per row. A test asserts that collecting an unremarkable
   repository emits nothing at INFO or above.
 - **Logs go to stderr, always.** The CLI writes JSON to stdout, and an

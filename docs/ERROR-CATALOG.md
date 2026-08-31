@@ -52,7 +52,7 @@ into `GM-ING-020`. See
 **Meaning**: The named path does not exist.
 **Typical cause**: A typo, or a relative path resolved against a different
 working directory than expected.
-**Resolution**: Check the path. `github-metrics ingest ./inventory.csv` is
+**Resolution**: Check the path. `github-metrics validate ./inventory.csv` is
 resolved relative to where you ran it, not to the file's directory.
 
 ### `GM-ING-002` — Source unreadable
@@ -241,9 +241,30 @@ reference.
 
 ---
 
+### `GM-ING-016` - Malformed reference
+
+**Class**: `RowIssue`
+**Meaning**: A source is not `owner/repoid` and is not a URL naming a
+repository.
+**Typical cause**: A missing or extra `/`, or a URL that stops at the owner.
+**Resolution**: The message says what is wrong with the shape rather than only
+that it is wrong — `'a/b/c' is not owner/repoid: it has 2 '/' separators`.
+
+### `GM-ING-017` - Not a GitHub host
+
+**Class**: `RowIssue`
+**Meaning**: A source is a URL, but its host is not `github.com`.
+**Typical cause**: A URL copied from another forge.
+**Resolution**: `gitlab.com/foo/bar` reduces perfectly well to `foo/bar`, which
+is why it is refused rather than reduced: the result would be a plausible
+reference to a different repository. On GitHub Enterprise, name the repository
+as `owner/repoid` and point `GITHUB_API_URL` at the instance.
+
+---
+
 ## Credential errors
 
-Raised before any work starts. A command that needs no credentials - `ingest`,
+Raised before any work starts. A command that needs no credentials - `validate`,
 or any run with `--dry-run` - never reaches them.
 
 ### `GM-CFG-001` - No credentials

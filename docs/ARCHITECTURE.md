@@ -24,7 +24,7 @@ is testable without credentials.
              ┌─────────────┴─────────────┐
              ▼                           ▼
       ┌─────────────┐             ┌─────────────┐
-      │   ingest    │             │   metrics   │  collection over the API
+      │   sources   │             │   metrics   │  collection over the API
       │  (offline)  │             │  (online)   │
       └──────┬──────┘             └──────┬──────┘
              │                           │
@@ -46,7 +46,7 @@ is testable without credentials.
       └─────────────┘
 ```
 
-The two halves meet only at the CLI. `ingest` imports nothing that can open a
+The two halves meet only at the CLI. `sources/` imports nothing that can open a
 socket; `metrics` imports nothing that parses a file format. Neither imports
 the other.
 
@@ -65,7 +65,7 @@ ingestion suite runs offline with no fixtures for HTTP and no token. That is
 why it can afford to test fourteen input shapes.
 
 **An analyst can validate a list on a machine with no GitHub access at all.**
-This falls out of the above, and is the reason `github-metrics ingest` must run
+This falls out of the above, and is the reason `github-metrics validate` must run
 without a token — which in turn is why the CLI resolves configuration lazily
 rather than in its group callback (L2-CLI-002).
 
@@ -83,7 +83,7 @@ someone will look.
 | Module | Responsibility | Network | Notes |
 |---|---|---|---|
 | `cli` | Argument parsing, rendering, exit codes | via `metrics` | The only place the two halves meet |
-| `ingest` | CSV → validated `RepositoryRef` values | never | Also owns concurrency across files |
+| `sources/` | Slugs, URLs, CSV → validated `RepositoryRef` values | never | Also owns concurrency across files |
 | `validation` | Account and repository name grammar | never | Pure functions; returns reasons, not booleans |
 | `errors` | Code taxonomy, exceptions, `RowIssue` | never | Imported by both halves |
 | `logger` | Logging configuration | never | Configured once, at startup |

@@ -52,7 +52,10 @@ poetry run python scripts/build-trace-matrix.py --check
 # The CLI
 poetry run github-metrics validate inventory.csv
 poetry run github-metrics validate inventory.csv --format json --output out.json
-poetry run github-metrics repo python/cpython
+poetry run github-metrics metrics inventory.csv --output githubmetrics.csv
+poetry run github-metrics metrics pypa/virtualenv github.com/psf/requests
+poetry run github-metrics contributors inventory.csv
+poetry run github-metrics bands
 poetry run github-metrics rate-limit
 LOG_LEVEL=DEBUG poetry run github-metrics validate inventory.csv
 ```
@@ -88,7 +91,7 @@ before doing it.
 | `client` | Authenticated PyGithub wrapper | yes |
 | `collect/` | GraphQL collection: repository, counts, timestamps, credentials | via `client` |
 | `analysis/` | Scoring. Band tables and the weights they produce | never |
-| `metrics` | Collection over the API | via `client` |
+| `metrics` | Legacy single-repository snapshot, behind `contributors` | via `client` |
 | `geo` | Location to coordinates (Nominatim, cached per run) | yes |
 
 `sources/` is where a repository gets named, in any of the three forms a
@@ -98,8 +101,11 @@ decides which is which by rules applied in a fixed order — URL, existing file,
 written. Every command that takes repositories takes all three, so nobody has
 to remember which command wants which.
 
-Still planned, per `docs/ROADMAP.md`: rate limiting and collection concurrency
-join `collect/`, and `metrics` and `contributors` replace `repo`.
+`collect/` now owns the run as well as the queries: `budget.py` refuses a run
+the token cannot cover, and `runner.py` collects concurrently while returning
+results in input order. `analysis/row.py` is the single place a collected
+repository becomes an output row — the seam where the structural rule would
+otherwise be broken first.
 
 ### Ingestion pipeline
 

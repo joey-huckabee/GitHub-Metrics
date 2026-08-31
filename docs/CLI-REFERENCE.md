@@ -294,6 +294,144 @@ named on the command line, which has no line to point at.
 
 ---
 
+## `metrics`
+
+Collect metrics for every repository SOURCES names and write
+`githubmetrics.csv`. **Requires `GITHUB_TOKEN`.**
+
+```
+github-metrics metrics [OPTIONS] SOURCES...
+```
+
+This is the release deliverable. `SOURCES` are the same slugs, URLs and CSV
+inventories `validate` takes, mixed freely.
+
+| Option | Default | Description |
+|---|---|---|
+| `--output PATH` | console | Where to write. A directory receives `githubmetrics.csv`. |
+| `--format {csv,json}` | `csv` | Output format, for a file or the console. |
+| `--fields a,b,c` | all | Columns to emit, always rendered in canonical order. |
+| `--workers N` | `min(repositories, 8)` | Concurrent collections. |
+| `--strict` | off | Abort on the first bad input reference. |
+
+### What it costs, and when it refuses
+
+One GraphQL point per repository, checked **before anything is collected**:
+
+```console
+$ github-metrics metrics huge-inventory.csv
+Error: [GM-COL-004] 6000 repositories need 6010 GraphQL points (including a
+reserve of 10) but only 4983 remain. Short by 1027. Wait for the hourly reset,
+or collect fewer repositories per run
+```
+
+The check is the point. A run that discovers exhaustion halfway has already
+spent what it had and produced a file that is part measurement and part
+absence, with nothing to distinguish the two {EM} the repositories at the end of
+the inventory look exactly like ones that could not be read. Refusing costs one
+request that does not count against the limit.
+
+A reserve of ten points is held back so a run cannot leave the token at exactly
+zero, which would make the next command an operator tries look like a broken
+tool rather than a finished budget.
+
+### Rows
+
+One row per accepted reference, **in input order**. Results are collected
+concurrently but assembled in the order asked for, so two runs of one inventory
+produce byte-identical files and a diff shows changed data rather than
+reordered rows.
+
+A repository that could not be read still produces a row:
+
+```csv
+repo_name,owner,organization,scan_date,scan_id,stars,...
+virtualenv,pypa,pypa,2026-08-31 01:18:40+00:00,ae32d273-...,5041,...
+definitely-not-real,ghost,,2026-08-31 01:18:40+00:00,ae32d273-...,,...
+```
+
+Identity from the input, measurements empty. **Empty, not zero** {EM} zero is a
+legitimate score for a repository that was measured and found wanting.
+
+The failures are also named on stderr, because a file with empty rows says
+something went wrong and only this says what:
+
+```
+! ghost/definitely-not-real: [GM-COL-001] Could not resolve to a Repository
+! tiangolo/fastapi: [GM-COL-003] tiangolo/fastapi has been moved to fastapi/fastapi; update the inventory
+```
+
+### Exit status
+
+| Code | Meaning |
+|---|---|
+| `0` | Every reference was collected |
+| `3` | An input reference was rejected; the rest were collected |
+| `4` | A repository could not be collected, or has moved |
+| `5` | The remaining budget could not cover the run; nothing was collected |
+| `6` | A source could not be read |
+| `7`, `8` | No token, or a token GitHub rejected |
+
+Severity-ordered, highest applicable wins. `4` beats `3`: both still wrote a
+usable file, and an unreadable repository is the worse news.
+
+### Examples
+
+```bash
+# Console, vertical, one block per repository
+github-metrics metrics pypa/virtualenv
+
+# The deliverable
+github-metrics metrics inventory.csv --output githubmetrics.csv
+
+# A directory picks the filename
+github-metrics metrics inventory.csv --output ./results/
+
+# Mixed sources
+github-metrics metrics inventory.csv cline/cline github.com/psf/requests
+
+# Only the columns a dashboard needs
+github-metrics metrics inventory.csv --fields owner,repo_name,total_score
+
+# JSON, to a file or a pipe
+github-metrics metrics inventory.csv --format json | jq '.[].total_score'
+```
+
+---
+
+## `contributors`
+
+Collect contributor detail for every repository SOURCES names. **Requires
+`GITHUB_TOKEN`.**
+
+```
+github-metrics contributors [OPTIONS] SOURCES...
+```
+
+A **separate dataset** from `githubmetrics.csv`, and deliberately a separate
+command: `metrics` never pays for contributor pages, which are the expensive
+half of the request budget and produce columns `githubmetrics.csv` does not
+have.
+
+| Option | Default | Description |
+|---|---|---|
+| `--contributors N` | `25` | Maximum contributors to inspect per repository. |
+| `--geocode` | off | Resolve contributor locations to coordinates via Nominatim. |
+| `--output PATH` | stdout | Write JSON here instead. |
+
+> **Its columns are not settled.** The output is JSON until they are, and the
+> shape may change. `metrics` is the stable contract.
+
+Unlike `metrics`, this walks contributor pages, so its cost is **not** one
+point per repository and it is not covered by the pre-flight budget check.
+
+```bash
+github-metrics contributors pypa/virtualenv
+github-metrics contributors inventory.csv --geocode --output contributors.json
+```
+
+---
+
 ## `closed-issues`
 
 Report closed-issue counts and the score they produce, for one repository.
@@ -528,38 +666,6 @@ A blank cell means that bound belongs to only one of the two.
 | `0` | The tables were printed |
 | `2` | Usage error - an unrecognised metric name. The message lists the valid ones. |
 
-
-## `repo`
-
-Collect metrics for a single repository. **Requires `GITHUB_TOKEN`.**
-
-```
-github-metrics repo [OPTIONS] FULL_NAME
-```
-
-| Argument | Description |
-|---|---|
-| `FULL_NAME` | `owner/name`, e.g. `python/cpython`. |
-
-| Option | Default | Description |
-|---|---|---|
-| `--geocode` | off | Resolve contributor locations to coordinates via Nominatim. |
-| `--contributors N` | `25` | Maximum contributors to inspect. |
-| `--output PATH` | stdout | Write JSON here instead. |
-
-```bash
-github-metrics repo python/cpython
-github-metrics repo python/cpython --geocode --output cpython.json
-```
-
-Every snapshot carries a `tool_version` field recording which release produced
-it, so archived results stay attributable.
-
-> **Note.** `repo` takes one repository at a time and does not yet accept an
-> ingested inventory. Wiring ingestion to collection is the next milestone; see
-> [`ROADMAP.md`](ROADMAP.md).
-
----
 
 ## `rate-limit`
 

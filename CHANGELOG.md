@@ -38,6 +38,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   line. The first mention keeps its position and the second is reported against
   the source that already had it. Collecting it twice would spend the rate
   limit twice and produce two rows no consumer could tell apart.
+- **`github-metrics metrics`**, the release deliverable. Takes the same sources
+  as `validate`, collects concurrently, scores, and writes `githubmetrics.csv`
+  — one row per accepted reference, in input order. `--output` (a directory
+  gets the default filename), `--format csv|json`, `--fields`, `--workers`,
+  `--strict`. With no destination the rows render vertically on the console.
+- **A rate-limit pre-flight.** Collection costs one GraphQL point per
+  repository, so a run confirms the token can cover it before collecting
+  anything (`GM-COL-004`, exit 5). A run that discovers exhaustion halfway has
+  already spent what it had and leaves a file where the repositories at the end
+  are indistinguishable from ones that could not be read. A reserve of ten
+  points is held back so a run cannot leave the token at exactly zero.
+- **`github-metrics contributors`**, replacing the other half of `repo`. Same
+  sources, separate dataset. `metrics` never pays for contributor pages, which
+  are the expensive half of the request budget and produce columns
+  `githubmetrics.csv` does not have. Its own columns are not settled, so it
+  emits JSON.
 - **Documentation set** under `docs/`: user guide, CLI reference, error
   catalog, architecture, maintainer guide, roadmap, three levels of
   requirements (`L1.md`, `L2.md`, `L3.md`) and three ADRs.
@@ -110,6 +126,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **A `RowIssue` may carry no line number** — a reference typed as an argument
   has no line to point at, and the rendered message drops the part it cannot
   fill rather than printing `line None`.
+- **`repo` is gone**, replaced by `metrics` and `contributors` rather than
+  renamed to either: it was scaffolding, and it collected a different set of
+  fields from both.
 - The CLI resolves configuration lazily, so a command that needs no credentials
   no longer fails when none are configured.
 - Python 3.14 is now a required CI target rather than `continue-on-error`; it passed

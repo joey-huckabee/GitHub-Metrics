@@ -17,7 +17,11 @@ about and deliberately scheduled; that is different from being promised.
   URL input was scheduled for v0.2.0 and arrived early, because it fell out of
   giving every command the same inputs
 - `github-metrics validate`, the offline check — formerly `ingest`
-- Single-repository collection via `github-metrics repo`
+- `github-metrics metrics`, the release deliverable: collection over an
+  inventory, concurrently, with a rate-limit pre-flight, into
+  `githubmetrics.csv`
+- `github-metrics contributors`, the same sources into a separate dataset
+  — its columns are still to be agreed
 - A three-level requirements tree traced to tests, checked in CI
 
 **Merged, output half of v0.1.0:** the `SoftwareRow` column definition, the CSV,
@@ -40,7 +44,8 @@ The current release target. Everything below is in scope now.
 
 ### The `metrics` sub-command
 
-Replaces `repo`. Collects metrics for every repository named by the input and
+**Delivered.** Replaced `repo`, which was scaffolding collecting a different
+set of fields. Collects metrics for every repository named by the input and
 writes `githubmetrics.csv`.
 
 - **Input:** any number of sources, mixed — slugs, GitHub URLs and CSV

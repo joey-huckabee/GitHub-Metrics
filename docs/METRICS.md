@@ -140,7 +140,7 @@ attract. It is also the number the bands were calibrated against.
 | `age_days` | `float` | derived | `created_at` to `scan_date`, in days, at full precision. See [Last update](#last-update) for the anchor. | **Settled** |
 | `last_update_hours` | `float` | derived | `updated_at` to `scan_date`, in hours. See [Last update](#last-update). | **Settled** |
 | `closed_issues` | `int` | API | Closed issues, all time, **excluding pull requests**. See [Closed issues](#closed-issues) below. | **Settled** |
-| `releases` | `int` | API | Distinct versions, which is the tag count. See [Releases](#releases). Counting settled; bands pending. | **Partial** |
+| `releases` | `int` | API | Distinct versions, which is the tag count. See [Releases](#releases). | **Settled** |
 
 ## Scores
 

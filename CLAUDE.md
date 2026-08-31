@@ -52,7 +52,10 @@ poetry run python scripts/build-trace-matrix.py --check
 # The CLI
 poetry run github-metrics validate inventory.csv
 poetry run github-metrics validate inventory.csv --format json --output out.json
-poetry run github-metrics repo python/cpython
+poetry run github-metrics metrics inventory.csv --output githubmetrics.csv
+poetry run github-metrics metrics pypa/virtualenv github.com/psf/requests
+poetry run github-metrics contributors inventory.csv
+poetry run github-metrics bands
 poetry run github-metrics rate-limit
 LOG_LEVEL=DEBUG poetry run github-metrics validate inventory.csv
 ```
@@ -88,7 +91,7 @@ before doing it.
 | `client` | Authenticated PyGithub wrapper | yes |
 | `collect/` | GraphQL collection: repository, counts, timestamps, credentials | via `client` |
 | `analysis/` | Scoring. Band tables and the weights they produce | never |
-| `metrics` | Collection over the API | via `client` |
+| `metrics` | Legacy single-repository snapshot, behind `contributors` | via `client` |
 | `geo` | Location to coordinates (Nominatim, cached per run) | yes |
 
 `sources/` is where a repository gets named, in any of the three forms a
@@ -98,8 +101,11 @@ decides which is which by rules applied in a fixed order — URL, existing file,
 written. Every command that takes repositories takes all three, so nobody has
 to remember which command wants which.
 
-Still planned, per `docs/ROADMAP.md`: rate limiting and collection concurrency
-join `collect/`, and `metrics` and `contributors` replace `repo`.
+`collect/` now owns the run as well as the queries: `budget.py` refuses a run
+the token cannot cover, and `runner.py` collects concurrently while returning
+results in input order. `analysis/row.py` is the single place a collected
+repository becomes an output row — the seam where the structural rule would
+otherwise be broken first.
 
 ### Ingestion pipeline
 
@@ -191,13 +197,20 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   LF everywhere else, but a CRLF fixture that git normalised to LF would
   silently stop testing CRLF handling *and the test would still pass*. Fixtures
   are byte-exact inputs; never normalise them.
-- **Source files stay ASCII where a linter reads them.** Vulture reads source
-  with the locale encoding, so on a Windows console (cp1252) a file containing
-  an em-dash is reported unparseable and **silently skipped** — the linter
-  passes without having looked at it. `scripts/build-trace-matrix.py` and
-  `github_metrics/errors.py` use `\uXXXX` escapes for this reason; the escapes
-  preserve every runtime string exactly, and the generated matrix is
-  byte-identical either way. Comments and prose in Markdown are unaffected.
+- **Non-ASCII source is fine. This entry used to say the opposite.** The claim
+  was that vulture reads source with the locale encoding, so a file containing
+  an em-dash was silently skipped on a cp1252 console. That is not true of the
+  pinned version (>=2.13): `vulture.utils.read_file` uses `tokenize.open`,
+  which honours PEP 263 and defaults to UTF-8, and a file it genuinely cannot
+  read sets `ExitCode.InvalidInput` rather than passing quietly. Checked by
+  running vulture on a cp1252 console against two identical files, one with an
+  em-dash and one without: both reported the same unused function.
+
+  The `\uXXXX` escapes in `scripts/build-trace-matrix.py` and
+  `github_metrics/errors.py` are therefore unnecessary. They are also harmless
+  — they preserve every runtime string exactly — so they stay until there
+  is a reason to touch those lines. Do not add more, and do not reshape prose
+  to avoid a dash.
 - **When editing files programmatically on Windows, write bytes or pass
   `newline="\n"`.** `Path.write_text()` translates `\n` to `os.linesep`, which
   rewrites the whole file with CRLF and turns a ten-line change into a
@@ -298,6 +311,11 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   on the first run, so a regression there should fail the build.
 - **Anything touching the live API is marked `@pytest.mark.integration`.** CI
   runs `-m "not integration"`.
+- **black, isort and ruff run over the whole tree, not over `github_metrics
+  tests scripts`.** CI passes `.`, so scoping them to the package in the
+  Makefile lets a file outside it fail CI after `make check` has passed. That
+  happened once. `pylint` is the exception and takes the three names, because
+  pointing it at `.` makes it try to lint the virtualenv.
 
 ## Git conventions
 

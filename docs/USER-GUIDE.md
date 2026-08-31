@@ -349,6 +349,113 @@ drift from it. Reviewing the model here before starting a collection run is
 cheaper than discovering a disagreement about a boundary once the results are
 in a spreadsheet.
 
+## Collecting metrics
+
+This is what the tool is for.
+
+```console
+$ github-metrics metrics inventory.csv --output githubmetrics.csv
+Wrote 3 rows to githubmetrics.csv
+```
+
+The sources are the same ones `validate` takes, so a list you have checked is a
+list you can collect:
+
+```bash
+github-metrics metrics inventory.csv cline/cline github.com/psf/requests
+```
+
+With no `--output`, the rows go to the console as vertical blocks {EM} nineteen
+columns do not fit across a terminal, and a truncated metric is worse than no
+metric:
+
+```console
+$ github-metrics metrics pypa/virtualenv
+repo_name          virtualenv
+owner              pypa
+organization       pypa
+scan_date          2026-08-31 01:18:25.560138+00:00
+scan_id            0beab6d7-0b71-45e6-8826-841e05d0a3bd
+stars              5041
+forks              1114
+age_days           5656.447900001597
+last_update_hours  13.896266705
+closed_issues      1429
+releases           285
+prevalence_score   20.0
+stars_score        10.0
+forks_score        15.0
+maturity_score     15.0
+last_update_score  15.0
+trusted_org_bonus  0.0
+total_score        75.0
+is_trusted_org     false
+```
+
+### It checks the budget before it starts
+
+Collection costs one GraphQL point per repository, so a 400-row inventory
+spends 400 of the 5,000 available each hour. The run confirms that before
+collecting anything:
+
+```console
+$ github-metrics metrics huge-inventory.csv
+Error: [GM-COL-004] 6000 repositories need 6010 GraphQL points (including a
+reserve of 10) but only 4983 remain. Short by 1027. Wait for the hourly reset,
+or collect fewer repositories per run
+```
+
+Nothing was collected and nothing was spent. That is better than the
+alternative: a run that runs out halfway has already spent its quota and left
+you a file where the repositories at the end are indistinguishable from
+repositories that could not be read.
+
+### A repository that fails still gets a row
+
+The file has one row per accepted reference, always, so a failure cannot
+silently change what the file means:
+
+```csv
+definitely-not-real,ghost,,2026-08-31 01:18:40+00:00,ae32d273-...,,,,,,,,,,,,,,
+```
+
+Identity from your list, measurements empty. **Empty rather than zero**,
+because zero is a real score for a project that was measured and found wanting
+{EM} scoring an unreadable repository as zero would drag every average you
+compute.
+
+The run names them on stderr and exits **4**:
+
+```
+! ghost/definitely-not-real: [GM-COL-001] Could not resolve to a Repository
+! tiangolo/fastapi: [GM-COL-003] tiangolo/fastapi has been moved to fastapi/fastapi; update the inventory
+```
+
+That second one is worth knowing about. GitHub redirects a renamed or
+transferred repository, so the entry still works {EM} which is exactly why it is
+refused. Collecting it would give you a row of correct numbers about a
+repository your inventory does not name, and nothing in the file would say so.
+
+### Only the columns you want
+
+```bash
+github-metrics metrics inventory.csv --fields owner,repo_name,total_score
+```
+
+Columns come out in canonical order whatever order you ask for them, so two
+runs wanting the same columns produce identical headers.
+
+### Contributors are a separate command
+
+```bash
+github-metrics contributors inventory.csv --geocode --output contributors.json
+```
+
+Separate because contributor pages are the expensive half of the request
+budget, and none of what they return is in `githubmetrics.csv`. Making every
+metrics run pay for them would buy data the file has no columns for. Its own
+columns are not settled yet, so its output is JSON.
+
 ## In a pipeline
 
 Use `--strict` when any defect should stop the run before a later stage treats
@@ -434,14 +541,8 @@ credential-free, and safe to run before spending any API quota.
 Existence is established by the collection stage, and a well-formed reference
 to a repository that no longer exists will surface there as a 404.
 
-## Collecting metrics
+## What ingestion cannot tell you
 
-Today, one repository at a time, and this needs `GITHUB_TOKEN`:
-
-```bash
-github-metrics repo python/cpython
-github-metrics rate-limit
-```
-
-Feeding an ingested inventory into collection is the next milestone. See
-[`ROADMAP.md`](ROADMAP.md).
+That a repository exists. A well-formed reference to one that was deleted,
+renamed or made private is syntactically perfect, and only collection can find
+out. That is what exit status 4 from `metrics` is for.

@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import click
 from dotenv import load_dotenv
+from github import GithubException
 
 from github_metrics import __version__
 from github_metrics.analysis.closed_issues import (
@@ -24,21 +26,35 @@ from github_metrics.analysis.popularity import describe_bands as describe_popula
 from github_metrics.analysis.releases import RELEASE_BANDS, SATURATION_COUNT
 from github_metrics.analysis.releases import describe_bands as describe_release_bands
 from github_metrics.analysis.releases import score_releases
+from github_metrics.analysis.row import build_empty_row, build_row
 from github_metrics.client import GitHubClient
+from github_metrics.collect.budget import check_budget
 from github_metrics.collect.closed_issues import ClosedIssueCounts, get_closed_issues
 from github_metrics.collect.credentials import verify_credentials
 from github_metrics.collect.releases import ReleaseCounts, get_release_counts
+from github_metrics.collect.runner import Outcome, collect_all
 from github_metrics.config import Settings
 from github_metrics.errors import (
     CollectionError,
     IngestError,
     InvalidCredentialsError,
     MissingCredentialsError,
+    OutputDestinationError,
 )
 from github_metrics.geo import Geocoder
 from github_metrics.logger import LogLevels, reset_logger
 from github_metrics.metrics import DEFAULT_CONTRIBUTOR_LIMIT, collect_repository_metrics
-from github_metrics.sources import ResolvedSources, resolve_sources
+from github_metrics.model.scan import ScanIdentifier
+from github_metrics.model.software import SoftwareRow
+from github_metrics.output import (
+    render_console,
+    resolve_destination,
+    resolve_fields,
+    write_csv,
+    write_json,
+)
+from github_metrics.output.fields import split_selection
+from github_metrics.sources import RepositoryRef, ResolvedSources, resolve_sources
 
 # Exit statuses, severity-ordered; the highest applicable one wins. Codes 1 and
 # 2 belong to click (ClickException and UsageError) and are listed for
@@ -209,47 +225,233 @@ def main(
     )
 
 
-@main.command("repo")
-@click.argument("full_name")
+@main.command("metrics")
+@click.argument("sources", nargs=-1, required=True)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write here. A directory gets githubmetrics.csv. Omit for the console.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["csv", "json"]),
+    default="csv",
+    show_default=True,
+    help="Output format.",
+)
+@click.option(
+    "--fields",
+    default=None,
+    help="Comma-separated columns to emit. Defaults to all of them.",
+)
+@click.option(
+    "--workers",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Concurrent collections. Defaults to min(repositories, 8).",
+)
+@click.option(
+    "--strict",
+    is_flag=True,
+    help="Abort on the first bad input row instead of reporting all of them.",
+)
+@click.pass_context
+def metrics_command(
+    ctx: click.Context,
+    sources: tuple[str, ...],
+    output: Path | None,
+    output_format: str,
+    fields: str | None,
+    workers: int | None,
+    strict: bool,
+) -> None:
+    """Collect metrics for every repository SOURCES names.
+
+    Each SOURCE is a slug (pypa/virtualenv), a GitHub URL, or a CSV inventory,
+    and the three can be mixed. Check a list first with `validate`, which needs
+    no token.
+
+    One row per accepted reference, in input order. A repository that cannot be
+    read still produces a row, carrying its identity and no measurements.
+
+    Costs one GraphQL point per repository, confirmed against the token's
+    remaining budget before anything is collected.
+    """
+    context: CliContext = ctx.obj
+    destination = _destination(output, json_format=output_format == "json")
+    columns = resolve_fields(split_selection(fields) if fields else None)
+
+    try:
+        resolved = resolve_sources(sources, strict=strict)
+    except IngestError as exc:
+        raise InputError(str(exc)) from exc
+
+    scan = ScanIdentifier()
+    LOGGER.info("Scan %s started at %s", scan.scan_id, scan.scan_date)
+
+    outcomes = _collect(context, resolved.repositories, workers=workers)
+    rows = [
+        (
+            build_row(outcome.reference, outcome.metadata, scan)
+            if outcome.metadata is not None
+            else build_empty_row(outcome.reference, scan)
+        )
+        for outcome in outcomes
+    ]
+
+    _emit(rows, destination, output_format=output_format, columns=columns)
+    _report_failures(outcomes)
+
+    # Severity-ordered, highest applicable wins: an unreadable repository is
+    # worse news than a rejected input row, and both still produced a file.
+    if any(not outcome.ok for outcome in outcomes):
+        ctx.exit(EXIT_REPOSITORY_UNFETCHABLE)
+    if resolved.issues:
+        ctx.exit(EXIT_ROWS_REJECTED)
+
+
+def _destination(output: Path | None, *, json_format: bool) -> Path | None:
+    """Resolve where output goes, failing before any budget is spent."""
+    try:
+        return resolve_destination(output, json_format=json_format)
+    except OutputDestinationError as exc:
+        raise InputError(str(exc)) from exc
+
+
+def _collect(
+    context: CliContext,
+    references: Sequence[RepositoryRef],
+    *,
+    workers: int | None,
+) -> list[Outcome]:
+    """Check the budget, then collect. Nothing named means nothing to spend."""
+    if not references:
+        # Every source was refused. There is no quota to spend, and a
+        # header-only file is still the honest answer.
+        LOGGER.warning("No repositories to collect")
+        return []
+
+    with GitHubClient(context.settings()) as client:
+        budget = check_budget(client, len(references))
+        LOGGER.info(
+            "Budget: %d of %d GraphQL points for %d repositories",
+            budget.required,
+            budget.available,
+            budget.repositories,
+        )
+        return collect_all(client, references, max_workers=workers)
+
+
+def _emit(
+    rows: Sequence[SoftwareRow],
+    destination: Path | None,
+    *,
+    output_format: str,
+    columns: Sequence[str],
+) -> None:
+    """Write the rows where the caller asked for them."""
+    if destination is None:
+        if output_format == "json":
+            stream = io.StringIO()
+            write_json(rows, stream, columns=columns)
+            click.echo(stream.getvalue().rstrip())
+        else:
+            click.echo(render_console(rows, columns=columns))
+        return
+
+    # newline="" because the csv module writes its own line terminators.
+    with destination.open("w", encoding="utf-8", newline="") as handle:
+        if output_format == "json":
+            write_json(rows, handle, columns=columns)
+        else:
+            write_csv(rows, handle, columns=columns)
+    click.echo(f"Wrote {len(rows)} rows to {destination}")
+
+
+def _report_failures(outcomes: Sequence[Outcome]) -> None:
+    """Name the repositories that produced no measurements.
+
+    On stderr, and by name. A file with empty rows says something went wrong;
+    only this says which repositories, and why.
+    """
+    for outcome in outcomes:
+        if outcome.error is not None:
+            click.echo(f"! {outcome.reference.full_name}: {outcome.error}", err=True)
+
+
+@main.command("contributors")
+@click.argument("sources", nargs=-1, required=True)
 @click.option("--geocode", is_flag=True, help="Resolve contributor locations to coordinates.")
 @click.option(
     "--contributors",
     "contributor_limit",
     default=DEFAULT_CONTRIBUTOR_LIMIT,
     show_default=True,
-    help="Maximum number of contributors to inspect.",
+    help="Maximum number of contributors to inspect per repository.",
 )
 @click.option(
     "--output",
     type=click.Path(dir_okay=False, path_type=Path),
     help="Write JSON here instead of stdout.",
 )
-@click.pass_obj
-def repo_command(
-    context: CliContext,
-    full_name: str,
+@click.pass_context
+def contributors_command(
+    ctx: click.Context,
+    sources: tuple[str, ...],
     geocode: bool,
     contributor_limit: int,
     output: Path | None,
 ) -> None:
-    """Collect metrics for a single OWNER/NAME repository."""
+    """Collect contributor detail for every repository SOURCES names.
+
+    Takes the same sources as `metrics`: slugs, GitHub URLs and CSV
+    inventories, mixed freely.
+
+    This is a separate dataset from `githubmetrics.csv`, and separate from
+    `metrics`, which never pays for contributor pages. Its columns are not
+    settled, so the output is JSON until they are.
+    """
+    context: CliContext = ctx.obj
+    try:
+        resolved = resolve_sources(sources)
+    except IngestError as exc:
+        raise InputError(str(exc)) from exc
+
     settings = context.settings()
     geocoder = Geocoder(settings.geocoder_user_agent) if geocode else None
 
+    collected = []
+    failures = 0
     with GitHubClient(settings) as client:
-        metrics = collect_repository_metrics(
-            client,
-            full_name,
-            geocoder=geocoder,
-            contributor_limit=contributor_limit,
-        )
+        for reference in resolved.repositories:
+            try:
+                collected.append(
+                    collect_repository_metrics(
+                        client,
+                        reference.full_name,
+                        geocoder=geocoder,
+                        contributor_limit=contributor_limit,
+                    )
+                )
+            except GithubException as exc:
+                # One unreadable repository does not end the run; the ones
+                # before it were already paid for.
+                failures += 1
+                click.echo(f"! {reference.full_name}: {exc}", err=True)
 
-    payload = json.dumps(metrics.to_dict(), indent=2, default=str)
+    payload = json.dumps([entry.to_dict() for entry in collected], indent=2, default=str)
     if output is not None:
-        output.write_text(payload + "\n", encoding="utf-8")
+        output.write_text(payload + chr(10), encoding="utf-8")
         click.echo(f"Wrote {output}")
     else:
         click.echo(payload)
+
+    if failures:
+        ctx.exit(EXIT_REPOSITORY_UNFETCHABLE)
+    if resolved.issues:
+        ctx.exit(EXIT_ROWS_REJECTED)
 
 
 @main.command("rate-limit")

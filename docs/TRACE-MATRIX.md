@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 18
-- L2 requirements: 67
-- L3 requirements: 93
-- Verified L2+L3: 160 of 160 (100.0%)
+- L2 requirements: 73
+- L3 requirements: 101
+- Verified L2+L3: 174 of 174 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -68,7 +68,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-CLI-001 | L2-CLI-001, L2-CLI-002, L2-CLI-003, L2-CLI-004, L2-CLI-005 | _(none)_ | Implemented |
+| L1-CLI-001 | L2-CLI-001, L2-CLI-002, L2-CLI-003, L2-CLI-004, L2-CLI-005, L2-CLI-007 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -80,6 +80,7 @@ through their children, so counting them too would count the same work twice.
 | L2-CLI-004 | L1-CLI-001 | L3-CLI-004 | _(none)_ | Implemented |
 | L2-CLI-005 | L1-CLI-001 | L3-CLI-005, L3-CLI-006 | _(none)_ | Implemented |
 | L2-CLI-006 | L1-SCR-001 | L3-CLI-007 | _(none)_ | Implemented |
+| L2-CLI-007 | L1-CLI-001 | L3-CLI-008, L3-CLI-009 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -92,6 +93,26 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-005 | L2-CLI-005 | `tests/test_cli_closed_issues.py::test_a_disabled_tracker_is_called_out`<br>`tests/test_cli_closed_issues.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_cli_closed_issues.py::test_an_unreadable_repository_exits_four`<br>`tests/test_cli_closed_issues.py::test_explain_appends_the_bands`<br>`tests/test_cli_closed_issues.py::test_it_appears_in_the_command_list`<br>`tests/test_cli_closed_issues.py::test_it_reports_counts_the_tracker_state_and_the_weight`<br>`tests/test_cli_closed_issues.py::test_json_carries_the_same_values`<br>`tests/test_cli_closed_issues.py::test_json_includes_the_bands_only_when_explained` | Implemented |
 | L3-CLI-006 | L2-CLI-005 | `tests/test_releases.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_releases.py::test_an_unreadable_repository_exits_four`<br>`tests/test_releases.py::test_the_command_emits_json`<br>`tests/test_releases.py::test_the_command_explains_the_release_bands`<br>`tests/test_releases.py::test_the_command_flags_a_tags_only_project`<br>`tests/test_releases.py::test_the_command_reports_both_counts_and_the_distinct_total`<br>`tests/test_releases.py::test_the_command_shows_the_weight_and_warns_about_saturation` | Implemented |
 | L3-CLI-007 | L2-CLI-006 | `tests/test_cli_bands.py::test_an_unknown_metric_is_a_usage_error`<br>`tests/test_cli_bands.py::test_every_scoring_table_is_reachable`<br>`tests/test_cli_bands.py::test_it_needs_no_token`<br>`tests/test_cli_bands.py::test_no_argument_prints_every_table`<br>`tests/test_cli_bands.py::test_the_tables_carry_their_boundaries` | Implemented |
+| L3-CLI-008 | L2-CLI-007 | `tests/test_cli_metrics.py::test_a_csv_is_written_with_one_row_per_reference`<br>`tests/test_cli_metrics.py::test_a_directory_gets_the_default_filename`<br>`tests/test_cli_metrics.py::test_every_row_of_one_run_carries_the_same_scan`<br>`tests/test_cli_metrics.py::test_fields_selects_columns_in_canonical_order`<br>`tests/test_cli_metrics.py::test_json_is_available_as_a_file_and_to_the_console`<br>`tests/test_cli_metrics.py::test_no_output_renders_to_the_console`<br>`tests/test_cli_metrics.py::test_the_sources_are_the_same_ones_validate_takes`<br>`tests/test_cli_metrics.py::test_two_runs_are_told_apart` | Implemented |
+| L3-CLI-009 | L2-CLI-007 | `tests/test_cli_metrics.py::test_a_bad_destination_fails_before_any_quota_is_spent`<br>`tests/test_cli_metrics.py::test_a_rejected_reference_is_a_lesser_status_than_an_unreadable_one`<br>`tests/test_cli_metrics.py::test_a_run_that_names_nothing_still_produces_a_well_formed_file`<br>`tests/test_cli_metrics.py::test_an_unaffordable_run_spends_nothing`<br>`tests/test_cli_metrics.py::test_an_unreadable_repository_still_gets_a_row` | Implemented |
+
+### COL: COL
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-COL-001 | L1-OUT-001 | L3-COL-001 | _(none)_ | Implemented |
+| L2-COL-002 | L1-CON-001 | L3-COL-002 | _(none)_ | Implemented |
+| L2-COL-003 | L1-MET-001 | L3-COL-003 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-COL-001 | L2-COL-001 | `tests/test_runner.py::test_a_failure_does_not_take_the_rest_of_the_run_with_it`<br>`tests/test_runner.py::test_an_outcome_keeps_the_reference_that_produced_it`<br>`tests/test_runner.py::test_nothing_to_collect_is_not_an_error`<br>`tests/test_runner.py::test_the_failures_are_named_in_the_log` | Implemented |
+| L3-COL-002 | L2-COL-002 | `tests/test_runner.py::test_results_come_back_in_input_order_not_completion_order`<br>`tests/test_runner.py::test_the_pool_never_exceeds_the_work_available`<br>`tests/test_runner.py::test_the_same_inventory_collects_identically_every_time`<br>`tests/test_runner.py::test_the_worker_count_is_respected` | Implemented |
+| L3-COL-003 | L2-COL-003 | `tests/test_runner.py::test_a_run_that_does_not_fit_is_refused_before_it_starts`<br>`tests/test_runner.py::test_a_run_that_fits_reports_what_it_will_cost`<br>`tests/test_runner.py::test_the_cost_is_one_point_per_repository`<br>`tests/test_runner.py::test_the_reserve_keeps_a_token_from_reaching_exactly_zero` | Implemented |
 
 ### CON: Concurrency
 
@@ -99,7 +120,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-CON-001 | L2-CON-001, L2-CON-002, L2-CON-003, L2-SRC-003 | _(none)_ | Implemented |
+| L1-CON-001 | L2-COL-002, L2-CON-001, L2-CON-002, L2-CON-003, L2-SRC-003 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -207,8 +228,8 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-MET-001 | L2-MET-001, L2-MET-002, L2-MET-003, L2-MET-005, L2-MET-006, L2-MET-008, L2-MET-010 | _(none)_ | Implemented |
-| L1-MET-002 | L2-MET-004, L2-MET-007, L2-MET-009, L2-MET-011, L2-SCR-004 | _(none)_ | Implemented |
+| L1-MET-001 | L2-COL-003, L2-MET-001, L2-MET-002, L2-MET-003, L2-MET-005, L2-MET-006, L2-MET-008, L2-MET-010 | _(none)_ | Implemented |
+| L1-MET-002 | L2-MET-004, L2-MET-007, L2-MET-009, L2-MET-011, L2-ROW-002, L2-SCR-004 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -253,7 +274,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-OUT-001 | L2-OUT-001, L2-OUT-002, L2-OUT-003, L2-OUT-004, L2-OUT-008, L2-OUT-009 | _(none)_ | Implemented |
+| L1-OUT-001 | L2-COL-001, L2-OUT-001, L2-OUT-002, L2-OUT-003, L2-OUT-004, L2-OUT-008, L2-OUT-009, L2-ROW-001 | _(none)_ | Implemented |
 | L1-OUT-002 | L2-OUT-005, L2-OUT-006 | _(none)_ | Implemented |
 | L1-OUT-003 | L2-OUT-007 | _(none)_ | Implemented |
 
@@ -285,6 +306,23 @@ through their children, so counting them too would count the same work twice.
 | L3-OUT-008 | L2-OUT-004 | `tests/test_output.py::test_console_marks_an_unknown_value_rather_than_leaving_a_gap`<br>`tests/test_output.py::test_console_renders_vertically_one_label_per_line`<br>`tests/test_output.py::test_console_says_so_when_there_is_nothing_to_show`<br>`tests/test_output.py::test_console_separates_repositories` | Implemented |
 | L3-OUT-009 | L2-OUT-008 | `tests/test_output.py::test_a_directory_gets_the_default_filename`<br>`tests/test_output.py::test_a_missing_parent_directory_fails_early`<br>`tests/test_output.py::test_a_named_file_is_used_as_given`<br>`tests/test_output.py::test_a_trailing_separator_reads_as_a_directory_even_if_absent`<br>`tests/test_output.py::test_no_destination_means_the_console` | Implemented |
 | L3-OUT-010 | L2-OUT-009 | `tests/test_output.py::test_a_naive_scan_date_is_rejected`<br>`tests/test_output.py::test_a_scan_identifier_is_timezone_aware_and_unique`<br>`tests/test_output.py::test_one_identity_stamps_every_row_of_a_run` | Implemented |
+
+### ROW: ROW
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-ROW-001 | L1-OUT-001 | L3-ROW-001, L3-ROW-002 | _(none)_ | Implemented |
+| L2-ROW-002 | L1-MET-002 | L3-ROW-003 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-ROW-001 | L2-ROW-001 | `tests/test_row.py::test_every_score_is_a_float`<br>`tests/test_row.py::test_the_reference_row_is_reproduced`<br>`tests/test_row.py::test_the_run_stamps_every_row_it_produces`<br>`tests/test_row.py::test_the_scored_release_count_is_the_distinct_one`<br>`tests/test_row.py::test_the_total_is_the_sum_of_the_six_components` | Implemented |
+| L3-ROW-002 | L2-ROW-001 | `tests/test_row.py::test_a_personally_owned_repository_has_no_organisation`<br>`tests/test_row.py::test_the_bonus_and_the_column_agree_about_who_is_trusted`<br>`tests/test_row.py::test_the_name_comes_from_the_api_and_the_owner_from_the_input` | Implemented |
+| L3-ROW-003 | L2-ROW-002 | `tests/test_row.py::test_an_unreadable_repository_still_says_which_repository_it_was`<br>`tests/test_row.py::test_nothing_is_scored_as_zero_when_nothing_was_measured`<br>`tests/test_row.py::test_organization_is_empty_because_only_the_api_could_have_filled_it` | Implemented |
 
 ### SCR: Scoring
 
@@ -332,7 +370,7 @@ through their children, so counting them too would count the same work twice.
 | L3-SCR-018 | L2-SCR-001 | `tests/test_popularity.py::test_every_star_boundary_scores_as_documented`<br>`tests/test_popularity.py::test_no_fork_count_is_left_unmapped`<br>`tests/test_popularity.py::test_no_star_count_is_left_unmapped` | Implemented |
 | L3-SCR-019 | L2-SCR-002 | `tests/test_popularity.py::test_a_negative_count_is_reported_and_treated_as_zero` | Implemented |
 | L3-SCR-020 | L2-SCR-006 | `tests/test_popularity.py::test_the_band_tables_render_side_by_side`<br>`tests/test_popularity.py::test_the_budgets_are_ten_and_fifteen`<br>`tests/test_popularity.py::test_the_columns_are_the_budget_times_the_weight`<br>`tests/test_popularity.py::test_the_reference_row_is_reproduced` | Implemented |
-| L3-SCR-021 | L2-SCR-009 | `tests/test_total.py::test_a_normal_total_says_nothing_at_info`<br>`tests/test_total.py::test_a_perfect_repository_reaches_the_ceiling`<br>`tests/test_total.py::test_a_project_with_nothing_scores_nothing`<br>`tests/test_total.py::test_every_component_is_a_float`<br>`tests/test_total.py::test_exceeding_the_ceiling_is_reported_rather_than_clamped`<br>`tests/test_total.py::test_the_ceiling_is_derived_from_the_components_not_typed`<br>`tests/test_total.py::test_the_ceiling_is_eighty_five`<br>`tests/test_total.py::test_the_five_scored_components_sum_to_seventy_five_without_the_bonus`<br>`tests/test_total.py::test_the_reference_row_is_reproduced` | Implemented |
+| L3-SCR-021 | L2-SCR-009 | `tests/test_total.py::test_a_normal_total_says_nothing_at_info`<br>`tests/test_total.py::test_a_perfect_repository_reaches_the_ceiling`<br>`tests/test_total.py::test_a_project_with_nothing_scores_nothing`<br>`tests/test_total.py::test_every_component_is_a_float`<br>`tests/test_total.py::test_exceeding_the_ceiling_is_reported_rather_than_clamped`<br>`tests/test_total.py::test_the_bonus_is_described_rather_than_printed`<br>`tests/test_total.py::test_the_ceiling_is_derived_from_the_components_not_typed`<br>`tests/test_total.py::test_the_ceiling_is_eighty_five`<br>`tests/test_total.py::test_the_five_scored_components_sum_to_seventy_five_without_the_bonus`<br>`tests/test_total.py::test_the_other_five_components_keep_their_values`<br>`tests/test_total.py::test_the_reference_row_is_reproduced` | Implemented |
 
 ### SRC: SRC
 

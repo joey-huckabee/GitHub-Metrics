@@ -174,6 +174,17 @@ class GraphQLQueryError(CollectionError):
     code = "GM-COL-002"
 
 
+class RateLimitExhaustedError(CollectionError):
+    """The token has too few GraphQL points left to finish the run.
+
+    Raised before collection starts, never during it. A run that discovers
+    exhaustion halfway has already spent what it had and produced a file that
+    is part measurement and part absence, with nothing to tell the two apart.
+    """
+
+    code = "GM-COL-004"
+
+
 class OutputError(GitHubMetricsError):
     """Base class for failures producing output."""
 

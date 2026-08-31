@@ -35,8 +35,12 @@ def test_help_lists_commands() -> None:
     result = CliRunner().invoke(main, ["--help"])
 
     assert result.exit_code == 0
-    assert "repo" in result.output
-    assert "rate-limit" in result.output
+    for command in ("validate", "metrics", "contributors", "bands", "rate-limit"):
+        assert command in result.output, command
+    # `repo` is gone: it was a scaffolding command collecting a different set
+    # of fields, and it is replaced by `metrics` and `contributors` rather
+    # than renamed to either.
+    assert not any(line.strip().startswith("repo ") for line in result.output.splitlines())
 
 
 def test_missing_token_is_a_friendly_error(empty_env_file: Path) -> None:

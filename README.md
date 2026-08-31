@@ -58,11 +58,20 @@ a file could not be read at all.
 ### Collect metrics
 
 ```bash
-# Metrics for a single repository, as JSON on stdout
-poetry run github-metrics repo python/cpython
+# The deliverable: one row per repository, in input order
+poetry run github-metrics metrics inventory.csv --output githubmetrics.csv
 
-# Resolve contributor locations to coordinates and save the result
-poetry run github-metrics repo python/cpython --geocode --output cpython.json
+# Sources mix freely - slugs, URLs and inventories
+poetry run github-metrics metrics inventory.csv cline/cline github.com/psf/requests
+
+# Just the columns a dashboard needs
+poetry run github-metrics metrics inventory.csv --fields owner,repo_name,total_score
+
+# Contributor detail, a separate dataset
+poetry run github-metrics contributors inventory.csv --geocode --output contributors.json
+
+# Print the scoring bands - no token, no network
+poetry run github-metrics bands
 
 # How much API budget is left on the current token?
 poetry run github-metrics rate-limit
@@ -71,10 +80,14 @@ poetry run github-metrics rate-limit
 poetry run github-metrics --version
 ```
 
-Every snapshot carries a `tool_version` field recording which release produced it,
-so archived results stay attributable. Logs go to **stderr**, which keeps stdout a
-clean JSON stream — `github-metrics repo owner/name | jq .stars` works even at
-`LOG_LEVEL=DEBUG`.
+Collection costs **one GraphQL point per repository**, and the run confirms the
+token can cover it before collecting anything. A repository that cannot be read
+still produces a row, carrying its identity with every measurement empty, and
+the run exits 4 naming which ones failed.
+
+Logs go to **stderr**, which keeps stdout clean —
+`github-metrics metrics inventory.csv --format json | jq '.[].total_score'`
+works even at `LOG_LEVEL=DEBUG`.
 
 The same entry point is available as `python -m github_metrics`.
 

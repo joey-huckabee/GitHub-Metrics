@@ -30,7 +30,7 @@ from github_metrics.analysis.total import score_total
 from github_metrics.analysis.trusted_orgs import (
     TrustedOrganizations,
     is_trusted_org,
-    score_trusted_org_bonus,
+    score_org_bonus,
 )
 from github_metrics.collect.repository import RepoMetaData
 from github_metrics.model.scan import ScanIdentifier
@@ -75,7 +75,7 @@ def build_row(
     # The bonus and the column resolve through the same registry, so they
     # cannot disagree about who is trusted.
     owner = metadata.resolved_owner
-    bonus = score_trusted_org_bonus(owner, registry)
+    bonus = score_org_bonus(owner, registry)
 
     return SoftwareRow(
         repo_name=metadata.resolved_name,

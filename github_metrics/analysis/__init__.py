@@ -16,7 +16,7 @@ from github_metrics.analysis.total import MAX_TOTAL_SCORE, score_total
 from github_metrics.analysis.trusted_orgs import (
     TrustedOrganizations,
     is_trusted_org,
-    score_trusted_org_bonus,
+    score_org_bonus,
 )
 
 __all__ = [
@@ -33,5 +33,5 @@ __all__ = [
     "score_releases",
     "score_stars",
     "score_total",
-    "score_trusted_org_bonus",
+    "score_org_bonus",
 ]

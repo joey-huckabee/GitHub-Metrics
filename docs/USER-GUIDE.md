@@ -365,7 +365,7 @@ list you can collect:
 github-metrics metrics inventory.csv cline/cline github.com/psf/requests
 ```
 
-With no `--output`, the rows go to the console as vertical blocks {EM} nineteen
+With no `--output`, the rows go to the console as vertical blocks — nineteen
 columns do not fit across a terminal, and a truncated metric is worse than no
 metric:
 
@@ -400,9 +400,9 @@ collecting anything:
 
 ```console
 $ github-metrics metrics huge-inventory.csv
-Error: [GM-COL-004] 6000 repositories need 6010 GraphQL points (including a
-reserve of 10) but only 4983 remain. Short by 1027. Wait for the hourly reset,
-or collect fewer repositories per run
+Error: [GM-COL-004] 6000 repositories need 6000 GraphQL points but only 4983
+remain. Short by 1017. Wait for the hourly reset, or collect fewer repositories
+per run
 ```
 
 Nothing was collected and nothing was spent. That is better than the
@@ -421,7 +421,7 @@ definitely-not-real,ghost,,2026-08-31 01:18:40+00:00,ae32d273-...,,,,,,,,,,,,,,
 
 Identity from your list, measurements empty. **Empty rather than zero**,
 because zero is a real score for a project that was measured and found wanting
-{EM} scoring an unreadable repository as zero would drag every average you
+— scoring an unreadable repository as zero would drag every average you
 compute.
 
 The run names them on stderr and exits **4**:
@@ -432,7 +432,7 @@ The run names them on stderr and exits **4**:
 ```
 
 That second one is worth knowing about. GitHub redirects a renamed or
-transferred repository, so the entry still works {EM} which is exactly why it is
+transferred repository, so the entry still works — which is exactly why it is
 refused. Collecting it would give you a row of correct numbers about a
 repository your inventory does not name, and nothing in the file would say so.
 
@@ -469,6 +469,12 @@ Strict mode stops at the *first* problem and returns nothing. When it fires,
 re-run without `--strict` to see the full list.
 
 ## Using it as a library
+
+The package is usable as a dependency, so a larger project can collect metrics
+without shelling out to the CLI. There is no facade: you import the same
+functions the CLI imports.
+
+### Reading a list
 
 ```python
 from github_metrics.sources import read_repository_csv
@@ -531,6 +537,71 @@ except IngestError as exc:
     print(f"could not read the inventory: {exc}")
 ```
 
+### Collecting, as a library
+
+The CLI is one caller among others. Every capability it has is reachable
+without it, including the scan identity, the budget check, the worker count and
+the column selection.
+
+```python
+import io
+
+from github_metrics.analysis.row import build_empty_row, build_row
+from github_metrics.client import GitHubClient
+from github_metrics.collect.budget import check_budget
+from github_metrics.collect.runner import collect_all
+from github_metrics.config import Settings
+from github_metrics.model.scan import ScanIdentifier
+from github_metrics.output import write_csv
+from github_metrics.sources import resolve_sources
+
+resolved = resolve_sources(
+    ["pypa/virtualenv", "https://github.com/urllib3/urllib3", "ghost/nope"]
+)
+
+scan = ScanIdentifier()          # one identity for the whole run
+settings = Settings.from_env()   # GITHUB_TOKEN, GITHUB_API_URL
+
+with GitHubClient(settings) as client:
+    check_budget(client, len(resolved.repositories))     # refuses if it will not fit
+    outcomes = collect_all(client, resolved.repositories, max_workers=4)
+
+rows = [
+    build_row(o.reference, o.metadata, scan) if o.metadata else build_empty_row(o.reference, scan)
+    for o in outcomes
+]
+
+buffer = io.StringIO()
+write_csv(rows, buffer, columns=["owner", "repo_name", "stars", "total_score"])
+print(buffer.getvalue())
+
+failed = [o.reference.full_name for o in outcomes if not o.ok]
+```
+
+```csv
+repo_name,owner,stars,total_score
+virtualenv,pypa,5041,75.0
+urllib3,urllib3,4054,75.0
+nope,ghost,,
+```
+
+Four things that are the same as on the command line, because they are the same
+code:
+
+- **Columns come out in canonical order**, not the order you asked for. The
+  example asked for `owner` first and got `repo_name` first.
+- **A repository that could not be read still produces a row**, carrying its
+  identity with the measurements empty. `outcomes` tells you which, and why:
+  `o.error` is the exception rather than a string.
+- **`check_budget` refuses before anything is spent.** Call it or do not, but
+  the CLI's guarantee comes from this call and nothing else.
+- **`ScanIdentifier()` is created once.** Creating one per repository would
+  stamp each row with a different run and make the result set ungroupable.
+
+Collection is synchronous. To run it in the background, put it in your own
+thread or task — the package does not impose a concurrency model on the
+program embedding it.
+
 ## What ingestion does not tell you
 
 A reference that passes validation is **plausible**, not confirmed. Ingestion
@@ -538,11 +609,89 @@ performs no network access, so it cannot know whether a repository exists, is
 public, or was renamed. That is deliberate: it is what makes ingestion instant,
 credential-free, and safe to run before spending any API quota.
 
-Existence is established by the collection stage, and a well-formed reference
-to a repository that no longer exists will surface there as a 404.
+Existence is established by the collection stage: a well-formed reference to a
+repository that was deleted, renamed or made private surfaces there, and
+`metrics` exits 4 saying which ones.
 
-## What ingestion cannot tell you
+## Every command and flag
 
-That a repository exists. A well-formed reference to one that was deleted,
-renamed or made private is syntactically perfect, and only collection can find
-out. That is what exit status 4 from `metrics` is for.
+One line each, for when you know what you want and need the spelling. Full
+detail is in [`CLI-REFERENCE.md`](CLI-REFERENCE.md).
+
+### Global
+
+| Flag | Example |
+|---|---|
+| `--env-file` | `github-metrics --env-file ci.env metrics inventory.csv` |
+| `--token` | `github-metrics --token ghp_xxx rate-limit` |
+| `--token-file` | `github-metrics --token-file /run/secrets/github rate-limit` |
+| `--no-verify-token` | `github-metrics --no-verify-token metrics inventory.csv` |
+| `-V`, `--version` | `github-metrics -V` |
+| `-h`, `--help` | `github-metrics metrics --help` |
+
+`LOG_LEVEL=DEBUG` on any of them turns on per-repository detail. Diagnostics go
+to stderr, so a pipe stays clean.
+
+### `validate` — check a list, no token needed
+
+| Flag | Example |
+|---|---|
+| *(none)* | `github-metrics validate inventory.csv` |
+| *(sources mix)* | `github-metrics validate inventory.csv cline/cline github.com/psf/requests` |
+| `--strict` | `github-metrics validate inventory.csv --strict` |
+| `--workers` | `github-metrics validate teams/*.csv --workers 1` |
+| `--format` | `github-metrics validate inventory.csv --format json` |
+| `--output` | `github-metrics validate inventory.csv --format json --output report.json` |
+
+### `metrics` — the deliverable
+
+| Flag | Example |
+|---|---|
+| *(none)* | `github-metrics metrics pypa/virtualenv` |
+| `--output` (file) | `github-metrics metrics inventory.csv --output githubmetrics.csv` |
+| `--output` (directory) | `github-metrics metrics inventory.csv --output ./results/` |
+| `--format` | `github-metrics metrics inventory.csv --format json` |
+| `--fields` | `github-metrics metrics inventory.csv --fields owner,repo_name,total_score` |
+| `--workers` | `github-metrics metrics inventory.csv --workers 4` |
+| `--strict` | `github-metrics metrics inventory.csv --strict` |
+
+### `contributors` — a separate dataset
+
+| Flag | Example |
+|---|---|
+| *(none)* | `github-metrics contributors pypa/virtualenv` |
+| `--contributors` | `github-metrics contributors inventory.csv --contributors 50` |
+| `--geocode` | `github-metrics contributors inventory.csv --geocode` |
+| `--output` | `github-metrics contributors inventory.csv --output contributors.json` |
+
+### Probes and diagnostics
+
+| Command | Example |
+|---|---|
+| `closed-issues` | `github-metrics closed-issues pypa/virtualenv --explain` |
+| `closed-issues` | `github-metrics closed-issues cline/cline --format json` |
+| `releases` | `github-metrics releases pypa/virtualenv --explain` |
+| `releases` | `github-metrics releases cline/cline --format json` |
+| `bands` | `github-metrics bands` |
+| `bands METRIC` | `github-metrics bands maturity` |
+| `rate-limit` | `github-metrics rate-limit` |
+
+The probes cost one GraphQL point each. `bands` costs nothing and needs no
+token.
+
+## Exit codes at a glance
+
+| Code | Meaning | Was a file written? |
+|---|---|---|
+| `0` | Success | yes |
+| `1` | Configuration error | no |
+| `2` | Usage error | no |
+| `3` | Some input references were rejected | yes |
+| `4` | A repository could not be collected, or has moved | yes |
+| `5` | The budget could not cover the run | no |
+| `6` | A source could not be read | no |
+| `7` | No token supplied | no |
+| `8` | GitHub rejected the token | no |
+
+Test `$? -ge 3` for "something was wrong" and `$? -ge 5` for "nothing usable
+came out".

@@ -29,12 +29,18 @@ JSON and console renderers, field selection, destination resolution and the run
 identity. These do not depend on how a metric is calculated - only on which
 columns exist - so they were built while the definitions were being settled.
 
-**In progress — see [`METRICS.md`](METRICS.md):** the metric definitions and
-scoring bands. Nothing is implemented until it is defined there.
+**Settled:** every column in [`METRICS.md`](METRICS.md) now reads Settled, and
+the collection layer that was blocked on those definitions is built. The rule
+that got it there still holds — nothing is implemented before it is defined
+there.
 
-**Blocked on those definitions:** the collection layer, because which API calls
-a run makes is decided by what the metrics mean, and the rate-limit pre-flight
-budget is computed from that same request count.
+**Not being adjusted for this release:** `prevalence_score` saturates at 20.0
+for any mature repository, and `trusted_org_bonus` is 0 for nearly every row
+given a three-entry list. Two of the six components therefore do little to
+separate a portfolio of mature projects, and the ranking is carried by stars,
+forks, maturity and last update. This is a known and accepted property of
+v0.1.0, not an oversight; the levers are band boundaries and the length of the
+trusted list, and neither is being pulled now.
 
 ---
 
@@ -61,8 +67,17 @@ writes `githubmetrics.csv`.
 - **Console format:** a **vertical** table, one block per input row. Nineteen
   columns do not fit across a terminal, so the columns become rows.
 - **Field selection:** the caller selects which columns to emit; selecting none
-  emits all. Selection also **skips the API calls no selected column needs**,
-  which is a rate-limit lever, not just a rendering filter.
+  emits all. Columns come out in canonical order whatever order they are asked
+  for, so two runs wanting the same columns produce identical headers.
+
+  This was specified as a rate-limit lever as well — selection would skip the
+  API calls no selected column needed. It is a rendering filter only, and that
+  is now the right answer rather than a shortfall: every column a row needs
+  comes from **one** GraphQL query costing **one** point, so there is no call
+  left to skip and no quota to save. The lever was designed when collection was
+  assumed to be several REST calls per repository. Making selection cheaper
+  than one point is not possible, so the promise is withdrawn rather than
+  carried forward.
 - **JSON:** an array of objects using the CSV column names, available both as a
   file and to the console.
 - **Checking first:** `validate` is a command of its own rather than a
@@ -99,13 +114,17 @@ honest, and it stopped being honest sooner than expected.
 
 Integrated with the per-repository concurrency, not bolted beside it.
 
+**Delivered.**
+
 - **On exhaustion: fail the run.** Deliberately blunt for this release.
   Configurable behaviour is v0.2.0.
-- **Pre-flight budgeting is on by default**: estimate the requests a run needs
-  against the quota remaining, and refuse to start a run that cannot finish.
+- **Pre-flight budgeting is on by default.** One point per repository against
+  the quota remaining, refusing a run that cannot finish. It is a comparison
+  rather than an estimate, because the per-repository cost is exactly one.
   Making it optional is v0.2.0.
-- **No reserve buffer.** The budget runs to zero.
-- **Fixed concurrency.** Quota-adaptive worker counts are v0.2.0.
+- **No reserve buffer.** The budget runs to zero, so a full hourly quota
+  collects exactly 5,000 repositories.
+- **Fixed concurrency**, eight workers. Quota-adaptive counts are v0.2.0.
 
 ### Library use
 

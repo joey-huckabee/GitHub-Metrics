@@ -320,9 +320,9 @@ One GraphQL point per repository, checked **before anything is collected**:
 
 ```console
 $ github-metrics metrics huge-inventory.csv
-Error: [GM-COL-004] 6000 repositories need 6010 GraphQL points (including a
-reserve of 10) but only 4983 remain. Short by 1027. Wait for the hourly reset,
-or collect fewer repositories per run
+Error: [GM-COL-004] 6000 repositories need 6000 GraphQL points but only 4983
+remain. Short by 1017. Wait for the hourly reset, or collect fewer repositories
+per run
 ```
 
 The check is the point. A run that discovers exhaustion halfway has already
@@ -331,9 +331,10 @@ absence, with nothing to distinguish the two {EM} the repositories at the end of
 the inventory look exactly like ones that could not be read. Refusing costs one
 request that does not count against the limit.
 
-A reserve of ten points is held back so a run cannot leave the token at exactly
-zero, which would make the next command an operator tries look like a broken
-tool rather than a finished budget.
+No reserve is held back, so the budget runs to zero and a full hourly quota
+collects exactly 5,000 repositories — the largest run the tool can do. Keeping
+points back would buy a convenience by refusing a run the token could actually
+have finished.
 
 ### Rows
 

@@ -217,6 +217,30 @@ status code - which is why this code exists at all.
 
 ---
 
+### `GM-COL-003` - Repository has moved
+
+**Class**: `RepositoryMovedError`
+**Exit status**: 4
+**Meaning**: GitHub reports the repository under a different owner or a
+different name than the inventory asked for.
+**Typical cause**: The repository was renamed or transferred after the
+inventory was written. GitHub redirects both, so the reference still resolves.
+**Resolution**: The message and the warning both name the current
+`owner/name`; copy it into the inventory.
+
+This is the one collection failure where nothing went wrong at the API. The
+data comes back, and it is correct — about a repository the inventory does not
+name. Collecting it would produce a row in which every number is right and
+nothing says the reference was stale, which is an error that survives review
+because it looks like data. The row is emitted with its identity columns and
+no measurements, exactly as for a repository that could not be read.
+
+Case is not a difference. GitHub account and repository names are
+case-insensitive, so `PyPA/virtualenv` and `pypa/virtualenv` are the same
+reference.
+
+---
+
 ## Credential errors
 
 Raised before any work starts. A command that needs no credentials - `ingest`,

@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 17
 - L2 requirements: 64
-- L3 requirements: 87
-- Verified L2+L3: 151 of 151 (100.0%)
+- L3 requirements: 88
+- Verified L2+L3: 152 of 152 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -223,7 +223,7 @@ through their children, so counting them too would count the same work twice.
 | L2-MET-008 | L1-MET-001 | L3-MET-008, L3-MET-009, L3-MET-011 | _(none)_ | Implemented |
 | L2-MET-009 | L1-MET-002 | L3-MET-010 | _(none)_ | Implemented |
 | L2-MET-010 | L1-MET-001 | L3-MET-012 | _(none)_ | Implemented |
-| L2-MET-011 | L1-MET-002 | L3-MET-013, L3-MET-014, L3-MET-015 | _(none)_ | Implemented |
+| L2-MET-011 | L1-MET-002 | L3-MET-013, L3-MET-014, L3-MET-015, L3-MET-016 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -242,8 +242,9 @@ through their children, so counting them too would count the same work twice.
 | L3-MET-011 | L2-MET-008 | `tests/test_elapsed.py::test_a_null_repository_fails_rather_than_raising_a_key_error`<br>`tests/test_elapsed.py::test_a_repository_never_pushed_to_is_handled`<br>`tests/test_elapsed.py::test_all_three_timestamps_are_parsed`<br>`tests/test_elapsed.py::test_an_unparseable_timestamp_fails_loudly`<br>`tests/test_elapsed.py::test_one_query_asks_for_all_three`<br>`tests/test_elapsed.py::test_the_parsed_timestamps_are_timezone_aware` | Implemented |
 | L3-MET-012 | L2-MET-010 | `tests/test_repository.py::test_a_null_repository_fails_rather_than_raising_a_key_error`<br>`tests/test_repository.py::test_a_repository_never_pushed_to_is_handled`<br>`tests/test_repository.py::test_an_unparseable_timestamp_fails_loudly`<br>`tests/test_repository.py::test_distinct_versions_is_derived_the_same_way_as_elsewhere`<br>`tests/test_repository.py::test_every_scored_value_comes_from_one_query`<br>`tests/test_repository.py::test_the_query_asks_for_totals_only` | Implemented |
 | L3-MET-013 | L2-MET-011 | `tests/test_repository.py::test_a_disabled_tracker_is_still_reported_here`<br>`tests/test_repository.py::test_a_personally_owned_repository_is_noted`<br>`tests/test_repository.py::test_a_personally_owned_repository_reports_no_organisation`<br>`tests/test_repository.py::test_an_organisation_owned_repository_reports_its_organisation`<br>`tests/test_repository.py::test_an_unknown_owner_type_is_not_treated_as_an_organisation` | Implemented |
-| L3-MET-014 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_transfer`<br>`tests/test_repository.py::test_a_transfer_is_reported`<br>`tests/test_repository.py::test_a_transferred_repository_keeps_both_owners` | Implemented |
-| L3-MET-015 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_rename`<br>`tests/test_repository.py::test_a_missing_name_falls_back_to_the_inventory`<br>`tests/test_repository.py::test_a_rename_is_reported`<br>`tests/test_repository.py::test_a_renamed_repository_keeps_both_names`<br>`tests/test_repository.py::test_the_name_is_taken_from_the_api_not_from_the_inventory` | Implemented |
+| L3-MET-014 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_transfer`<br>`tests/test_repository.py::test_a_transfer_names_where_it_went`<br>`tests/test_repository.py::test_a_transferred_repository_is_refused` | Implemented |
+| L3-MET-015 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_rename`<br>`tests/test_repository.py::test_a_missing_name_falls_back_to_the_inventory`<br>`tests/test_repository.py::test_the_name_is_taken_from_the_api_not_from_the_inventory` | Implemented |
+| L3-MET-016 | L2-MET-011 | `tests/test_repository.py::test_a_renamed_repository_is_refused`<br>`tests/test_repository.py::test_the_new_location_is_reported_so_it_can_be_pasted_in` | Implemented |
 
 ### OUT: Result output and destinations
 

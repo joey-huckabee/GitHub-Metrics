@@ -146,6 +146,23 @@ class RepositoryNotFoundError(CollectionError):
     code = "GM-COL-001"
 
 
+class RepositoryMovedError(CollectionError):
+    """GitHub reports the repository under a different owner or name.
+
+    A rename or a transfer redirects, so the reference still resolves and the
+    data comes back looking correct. That is the problem: the row would be
+    collected against a repository the inventory no longer names, and nothing
+    in the output would say so.
+
+    The inventory is the record of what is being measured, so a reference that
+    no longer matches is treated as a defective reference rather than as a
+    successful read. The message names the current location, because the fix
+    is to copy it into the inventory.
+    """
+
+    code = "GM-COL-003"
+
+
 class GraphQLQueryError(CollectionError):
     """The GraphQL API returned errors for a query.
 

@@ -61,6 +61,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   length and scopes; the value itself is never logged, at any level.
 - **`github_metrics.analysis.trusted_orgs`** with a replaceable registry of
   trusted owners and a 10-point bonus.
+- **`stars` and `forks` are settled**: GraphQL `stargazerCount`, and
+  `forkCount` for **direct forks only** rather than the whole fork network.
+  A fork taken from another fork measures that fork's visibility, not the
+  original project's.
 - **`github_metrics.analysis.total`** sums the six components. The ceiling of
   **85.0** is computed from their weights rather than clamped, so a component
   that drifts past its own share shows up as a total that overshoots — and is
@@ -111,11 +115,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the repository's name, and together with `owner` it is what makes a row
   identifiable at all. Still nineteen columns.
 - **`repo_name` is verified against the API rather than echoed from the input.**
-  A rename redirects silently, exactly as a transfer does, so an inventory
-  entry can be stale and still resolve. The column carries the name GitHub
-  reports, falls back to the input value when the repository could not be read,
-  and a rename is logged at WARNING. The name comes from the query already
-  being sent, so verification costs nothing.
+  The name comes from the query already being sent, so verification costs
+  nothing.
+- **A repository that has been renamed or transferred is refused, not
+  collected** (`GM-COL-003`, exit 4). GitHub redirects both silently, so a
+  stale inventory entry still resolves and returns correct numbers — about a
+  repository the inventory does not name, with nothing in the output to say so.
+  The row is emitted with its identity columns and no measurements, and the
+  warning names the current `owner/name` so the list can be fixed by copying
+  it. Case is not a difference, since GitHub names are case-insensitive.
 - **`organization` is empty for an unfetchable repository**, alongside the
   metrics, rather than being treated as an always-known identity column. It
   reads like identity but only the API can report it, and a repository that

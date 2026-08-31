@@ -3,11 +3,11 @@
 The authoritative definition of every column in `githubmetrics.csv`: where the
 value comes from, how it is calculated, and how it is scored.
 
-**This document is under construction.** Rows marked **TBD** are not yet
-decided and are being worked through. Nothing marked TBD is implemented, and
-nothing is implemented that is not defined here first — a metric with an
-undocumented definition is not comparable across repositories, which is the
-whole point of collecting it.
+**Every column is now defined and every row reads Settled.** The rule that got
+it here still applies: nothing is implemented that is not defined here first
+— a metric with an undocumented definition is not comparable across
+repositories, which is the whole point of collecting it. A row marked **TBD**
+means the definition is still being argued about and no code depends on it.
 
 ## Output shape
 
@@ -88,29 +88,55 @@ and echoing the user's login into the column would make the two kinds of
 ownership indistinguishable downstream - every aggregate by organisation would
 silently acquire one bucket per individual maintainer.
 
-**A transferred repository reports two different owners, and both are kept.**
-GitHub follows a rename silently, so an inventory entry survives a move:
+**A repository that has moved is refused, not collected.** GitHub redirects a
+rename and a transfer silently, so a stale entry still resolves:
 
-| | |
-|---|---|
-| the inventory says | `tiangolo/fastapi` |
-| GitHub reports | `fastapi/fastapi` |
+| | inventory says | GitHub reports |
+|---|---|---|
+| transferred | `tiangolo/fastapi` | `fastapi/fastapi` |
+| renamed | `pypa/pep517` | `pypa/pyproject-hooks` |
 
-The row carries `owner = tiangolo` and `organization = fastapi`, which looks
-like a defect and is not. `owner` is the value someone has to edit to correct
-the inventory; the organisation is where the repository actually lives.
-Recording only one of them loses either the ability to fix the list or the
-knowledge that it is stale, so collection logs the move at WARNING.
+Nothing fails, and that is the danger. Collecting it would produce a row in
+which every number is correct, measured against a repository the inventory does
+not name, with nothing in the output to say the reference was stale — an error
+that survives review because it looks like data.
 
-Comparison is case-insensitive, because GitHub account names are: `PyPA` and
-`pypa` are the same owner and do not constitute a transfer.
+So the reference is treated as defective. The row is emitted with its identity
+columns and **no measurements**, exactly as for a repository that could not be
+read; the run warns with the current `owner/name` so correcting the list is a
+copy and paste; and it exits **4** rather than clean. The code is
+[`GM-COL-003`](ERROR-CATALOG.md).
+
+```
+WARNING  pypa/pep517 has been renamed to pypa/pyproject-hooks. GitHub still
+         redirects, so the reference resolves, but it no longer names the
+         repository the inventory asked for. No data collected; update the
+         inventory to pypa/pyproject-hooks
+```
+
+Comparison is case-insensitive, because GitHub names are: `PyPA/virtualenv` and
+`pypa/virtualenv` are the same reference, and refusing a row over its spelling
+would reject a working entry.
 
 ## Raw metrics
 
+### Direct forks, not the network
+
+`forkCount` counts the repositories forked **directly from this one**. GitHub
+also tracks a *network*: a fork of a fork of the original, and so on down, all
+grouped under the root repository. The network is the larger number, and for a
+popular project it can be much larger, because a fork made from someone else's
+fork counts there and not here.
+
+Direct forks is the right measurement for this tool. A fork taken from another
+fork says something about that fork's visibility rather than about the original
+project, so counting it would credit a repository for attention it did not
+attract. It is also the number the bands were calibrated against.
+
 | Column | Type | Source | Definition | Status |
 |---|---|---|---|---|
-| `stars` | `int` | API | Presumed `stargazers_count`. Not yet confirmed. | **TBD** |
-| `forks` | `int` | API | Presumed `forks_count`. Not yet confirmed. Whether this counts direct forks only or the whole network is undecided. | **TBD** |
+| `stars` | `int` | API | GraphQL `stargazerCount`. | **Settled** |
+| `forks` | `int` | API | GraphQL `forkCount` — **direct forks only**, not the whole fork network. | **Settled** |
 | `age_days` | `float` | derived | `created_at` to `scan_date`, in days, at full precision. See [Last update](#last-update) for the anchor. | **Settled** |
 | `last_update_hours` | `float` | derived | `updated_at` to `scan_date`, in hours. See [Last update](#last-update). | **Settled** |
 | `closed_issues` | `int` | API | Closed issues, all time, **excluding pull requests**. See [Closed issues](#closed-issues) below. | **Settled** |

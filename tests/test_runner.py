@@ -9,7 +9,7 @@ from typing import Any, cast
 import pytest
 
 from github_metrics.client import GitHubClient
-from github_metrics.collect.budget import RESERVE_POINTS, Budget, check_budget
+from github_metrics.collect.budget import Budget, check_budget
 from github_metrics.collect.runner import collect_all
 from github_metrics.errors import RateLimitExhaustedError, RepositoryNotFoundError
 from github_metrics.sources import RepositoryRef
@@ -192,7 +192,7 @@ def test_the_same_inventory_collects_identically_every_time() -> None:
 def test_a_run_that_fits_reports_what_it_will_cost() -> None:
     budget = check_budget(cast(GitHubClient, _StubClient(points=5000)), 400)
 
-    assert budget == Budget(repositories=400, required=400 + RESERVE_POINTS, available=5000)
+    assert budget == Budget(repositories=400, required=400, available=5000)
     assert budget.affordable is True
     assert budget.shortfall == 0
 
@@ -208,25 +208,28 @@ def test_a_run_that_does_not_fit_is_refused_before_it_starts() -> None:
         check_budget(cast(GitHubClient, _StubClient(points=50)), 400)
 
     message = str(caught.value)
-    assert "400 repositories need 410" in message
+    assert "400 repositories need 400" in message
     assert "only 50 remain" in message
-    assert "Short by 360" in message
+    assert "Short by 350" in message
 
 
 @pytest.mark.requirement("L3-COL-003")
-def test_the_reserve_keeps_a_token_from_reaching_exactly_zero() -> None:
-    # A spent token makes the next command an operator tries look like a
-    # broken tool rather than a finished budget.
+def test_the_budget_runs_to_zero() -> None:
+    """No reserve is held back.
+
+    A full hourly quota therefore collects exactly 5,000 repositories, which is
+    the largest run the tool can do. Holding points back would refuse a run the
+    token could actually have finished.
+    """
     exact = _StubClient(points=100)
 
-    check_budget(cast(GitHubClient, exact), 100 - RESERVE_POINTS)
+    assert check_budget(cast(GitHubClient, exact), 100).shortfall == 0
     with pytest.raises(RateLimitExhaustedError):
-        check_budget(cast(GitHubClient, exact), 100)
+        check_budget(cast(GitHubClient, exact), 101)
 
 
 @pytest.mark.requirement("L3-COL-003")
 def test_the_cost_is_one_point_per_repository() -> None:
     # Measured against the live API, and the reason a 400-row inventory fits.
-    budget = check_budget(cast(GitHubClient, _StubClient()), 1)
-
-    assert budget.required - RESERVE_POINTS == 1
+    assert check_budget(cast(GitHubClient, _StubClient()), 1).required == 1
+    assert check_budget(cast(GitHubClient, _StubClient()), 400).required == 400

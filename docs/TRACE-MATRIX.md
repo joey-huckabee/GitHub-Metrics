@@ -112,7 +112,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-COL-001 | L2-COL-001 | `tests/test_runner.py::test_a_failure_does_not_take_the_rest_of_the_run_with_it`<br>`tests/test_runner.py::test_an_outcome_keeps_the_reference_that_produced_it`<br>`tests/test_runner.py::test_nothing_to_collect_is_not_an_error`<br>`tests/test_runner.py::test_the_failures_are_named_in_the_log` | Implemented |
 | L3-COL-002 | L2-COL-002 | `tests/test_runner.py::test_results_come_back_in_input_order_not_completion_order`<br>`tests/test_runner.py::test_the_pool_never_exceeds_the_work_available`<br>`tests/test_runner.py::test_the_same_inventory_collects_identically_every_time`<br>`tests/test_runner.py::test_the_worker_count_is_respected` | Implemented |
-| L3-COL-003 | L2-COL-003 | `tests/test_runner.py::test_a_run_that_does_not_fit_is_refused_before_it_starts`<br>`tests/test_runner.py::test_a_run_that_fits_reports_what_it_will_cost`<br>`tests/test_runner.py::test_the_cost_is_one_point_per_repository`<br>`tests/test_runner.py::test_the_reserve_keeps_a_token_from_reaching_exactly_zero` | Implemented |
+| L3-COL-003 | L2-COL-003 | `tests/test_runner.py::test_a_run_that_does_not_fit_is_refused_before_it_starts`<br>`tests/test_runner.py::test_a_run_that_fits_reports_what_it_will_cost`<br>`tests/test_runner.py::test_the_budget_runs_to_zero`<br>`tests/test_runner.py::test_the_cost_is_one_point_per_repository` | Implemented |
 
 ### CON: Concurrency
 

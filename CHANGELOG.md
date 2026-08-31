@@ -6,9 +6,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0] - 2026-08-30
+
+First release. Reads a list of GitHub repositories, collects comparable
+metrics for each, scores them, and writes `githubmetrics.csv`.
+
+Two components are known not to separate a mature portfolio:
+`prevalence_score` saturates at 20.0 for any established repository, and
+`trusted_org_bonus` is 0.0 for nearly every row given a three-entry list. The
+ranking is carried by stars, forks, maturity and last update. That is accepted
+for this release; the levers are the band boundaries and the length of the
+trusted list.
+
 ### Added
 
-- **Repository inventory ingestion.** `github_metrics.ingest` reads an
+- **Repository inventory ingestion.** `github_metrics.sources` reads an
   `owner,repoid` CSV into validated `RepositoryRef` values. It performs no
   network access and collects no metrics, so it needs no `GITHUB_TOKEN`.
   Tolerates a UTF-8 BOM, CRLF or LF endings, reordered/recased/padded headers,
@@ -47,8 +61,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   repository, so a run confirms the token can cover it before collecting
   anything (`GM-COL-004`, exit 5). A run that discovers exhaustion halfway has
   already spent what it had and leaves a file where the repositories at the end
-  are indistinguishable from ones that could not be read. A reserve of ten
-  points is held back so a run cannot leave the token at exactly zero.
+  are indistinguishable from ones that could not be read. No reserve is held
+  back, so a full hourly quota collects exactly 5,000 repositories.
 - **`github-metrics contributors`**, replacing the other half of `repo`. Same
   sources, separate dataset. `metrics` never pays for contributor pages, which
   are the expensive half of the request budget and produce columns
@@ -215,9 +229,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sees success and then reads a null repository. `NOT_FOUND` is classified
   separately: a deleted or renamed repository is an expected outcome of a valid
   reference, not a defect.
-- **`scripts/build-trace-matrix.py` and `github_metrics/errors.py` are pure
-  ASCII.** Vulture reads source with the locale encoding, so on a Windows
-  console an em-dash made a file unparseable and it was **silently skipped** -
-  the linter passed without having looked at it.
+- **Withdrawn: the claim that vulture silently skips non-ASCII source.** It was
+  recorded here as a fix, and it is not one. The pinned version reads source
+  with `tokenize.open`, which honours PEP 263 and defaults to UTF-8, and a file
+  it genuinely cannot read sets `ExitCode.InvalidInput` rather than passing
+  quietly — checked on a cp1252 console against two otherwise identical
+  files, one containing an em-dash. The `\uXXXX` escapes in
+  `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
+  and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/8feb637...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/8feb637...v0.1.0

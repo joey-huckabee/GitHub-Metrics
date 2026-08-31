@@ -12,6 +12,12 @@ repositories that could not be read. Refusing to start costs one free request
 and leaves the quota intact for a smaller run or a later one.
 
 The endpoint used for the check does not count against either budget.
+
+No reserve is held back, so the budget runs to zero and a 5,000-repository
+inventory is exactly the largest run a full hourly quota can do. Keeping a few
+points back so a later command still works would buy a convenience by refusing
+a run the token could actually have finished, which is the wrong trade for a
+tool whose job is the batch.
 """
 
 from __future__ import annotations
@@ -28,14 +34,6 @@ LOGGER = logging.getLogger(__name__)
 POINTS_PER_REPOSITORY: Final = 1
 """What `collect.repository` costs. Measured against the live API, not assumed."""
 
-RESERVE_POINTS: Final = 10
-"""Points left unspent, so a run cannot leave the token at exactly zero.
-
-A token with nothing left is not just a finished run: the next command an
-operator tries - a probe, a rate-limit check, a retry of one bad row - fails
-too, and looks like a broken tool rather than a spent budget.
-"""
-
 
 @dataclass(frozen=True, slots=True)
 class Budget:
@@ -43,7 +41,7 @@ class Budget:
 
     Attributes:
         repositories: How many repositories the run would collect.
-        required: Points the run needs, including the reserve.
+        required: Points the run needs.
         available: Points the token has left this hour.
     """
 
@@ -78,16 +76,15 @@ def check_budget(client: GitHubClient, repositories: int) -> Budget:
     available = client.graphql_points_remaining()
     budget = Budget(
         repositories=repositories,
-        required=repositories * POINTS_PER_REPOSITORY + RESERVE_POINTS,
+        required=repositories * POINTS_PER_REPOSITORY,
         available=available,
     )
 
     if not budget.affordable:
         raise RateLimitExhaustedError(
             f"{repositories} repositories need {budget.required} GraphQL points "
-            f"(including a reserve of {RESERVE_POINTS}) but only {available} remain. "
-            f"Short by {budget.shortfall}. Wait for the hourly reset, or collect fewer "
-            "repositories per run"
+            f"but only {available} remain. Short by {budget.shortfall}. Wait for the "
+            "hourly reset, or collect fewer repositories per run"
         )
 
     LOGGER.debug(

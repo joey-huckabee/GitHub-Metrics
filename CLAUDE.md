@@ -304,6 +304,11 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   on the first run, so a regression there should fail the build.
 - **Anything touching the live API is marked `@pytest.mark.integration`.** CI
   runs `-m "not integration"`.
+- **black, isort and ruff run over the whole tree, not over `github_metrics
+  tests scripts`.** CI passes `.`, so scoping them to the package in the
+  Makefile lets a file outside it fail CI after `make check` has passed. That
+  happened once. `pylint` is the exception and takes the three names, because
+  pointing it at `.` makes it try to lint the virtualenv.
 
 ## Git conventions
 

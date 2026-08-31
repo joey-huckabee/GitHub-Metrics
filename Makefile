@@ -17,14 +17,14 @@ hooks: ## Install the pre-commit git hooks
 	$(RUN) pre-commit install
 
 format: ## Auto-format the codebase
-	$(RUN) black $(PKG) $(TESTS) $(SCRIPTS)
-	$(RUN) isort $(PKG) $(TESTS) $(SCRIPTS)
-	$(RUN) ruff check --fix $(PKG) $(TESTS) $(SCRIPTS)
+	$(RUN) black .
+	$(RUN) isort .
+	$(RUN) ruff check --fix .
 
 lint: ## Run the linters without modifying files
-	$(RUN) black --check --diff $(PKG) $(TESTS) $(SCRIPTS)
-	$(RUN) isort --check-only --diff $(PKG) $(TESTS) $(SCRIPTS)
-	$(RUN) ruff check $(PKG) $(TESTS) $(SCRIPTS)
+	$(RUN) black --check --diff .
+	$(RUN) isort --check-only --diff .
+	$(RUN) ruff check .
 	$(RUN) pylint $(PKG) $(TESTS) $(SCRIPTS)
 
 types: ## Run mypy

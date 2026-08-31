@@ -21,10 +21,10 @@ that GitHub is entitled to refuse.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Final
-from collections.abc import Sequence
 
 from github_metrics.client import GitHubClient
 from github_metrics.collect.repository import RepoMetaData, get_repository

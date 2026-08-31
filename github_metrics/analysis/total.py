@@ -47,6 +47,9 @@ COMPONENT_POINTS: Final[tuple[tuple[str, float], ...]] = (
 MAX_TOTAL_SCORE: Final = sum(points for _, points in COMPONENT_POINTS)
 """The highest `total_score` a repository can reach: 85.0."""
 
+BONUS_COMPONENT: Final = "trusted_org_bonus"
+"""The one component whose value is described rather than printed. See `_describe`."""
+
 
 def score_total(
     prevalence_score: float,
@@ -84,29 +87,53 @@ def score_total(
     if total > MAX_TOTAL_SCORE:
         # Not clamped. A total above the ceiling means a component exceeded its
         # own share, and returning 85.0 would hide which one.
-        # The share each component was allowed is compared but not logged.
-        # `points` carries the trusted-organisation weight, and CodeQL treats
-        # any value named for it as a secret; the offending name and value are
-        # what a reader needs, and the shares are in COMPONENT_POINTS.
-        over = [
-            f"{name}={value:.1f}"
-            for (name, allowed), value in zip(COMPONENT_POINTS, components, strict=True)
-            if value > allowed
-        ]
         LOGGER.warning(
             "Total score %.1f exceeds the maximum of %.1f; over their share: %s",
             total,
             MAX_TOTAL_SCORE,
-            ", ".join(over) or "none individually, so the weights no longer sum to the maximum",
+            _describe(components, over_share_only=True),
         )
 
     LOGGER.debug(
         "Total score %.1f/%.1f from %s",
         total,
         MAX_TOTAL_SCORE,
-        ", ".join(
-            f"{name}={value:.1f}"
-            for (name, _), value in zip(COMPONENT_POINTS, components, strict=True)
-        ),
+        _describe(components),
     )
     return total
+
+
+def _describe(components: tuple[float, ...], *, over_share_only: bool = False) -> str:
+    """Render the components for a log line, without the bonus's value.
+
+    The five scored components are reported with their values. The
+    trusted-organisation bonus is reported as awarded or not, because CodeQL
+    classifies any value reaching here from `score_trusted_org_bonus` as a
+    secret and reports the log line as leaking one. It is a published scoring
+    weight, so there is nothing to leak - but the alternative to this is
+    dropping the breakdown that makes the warning useful, and "awarded" is the
+    only thing about a two-valued component a reader did not already know.
+
+    Args:
+        components: The six values, in `COMPONENT_POINTS` order.
+        over_share_only: Report only the components above their own share.
+
+    Returns:
+        A comma-separated description, or a note when nothing qualifies.
+    """
+    parts: list[str] = []
+    for (name, allowed), value in zip(COMPONENT_POINTS, components, strict=True):
+        if over_share_only and value <= allowed:
+            continue
+        if name == BONUS_COMPONENT:
+            parts.append(f"{name} {'awarded' if value > 0 else 'not awarded'}")
+        else:
+            parts.append(f"{name}={value:.1f}")
+
+    if parts:
+        return ", ".join(parts)
+    return (
+        "none individually, so the weights no longer sum to the maximum"
+        if over_share_only
+        else "no components"
+    )

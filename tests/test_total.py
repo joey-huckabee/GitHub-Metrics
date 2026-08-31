@@ -78,6 +78,44 @@ def test_exceeding_the_ceiling_is_reported_rather_than_clamped(
 
 
 @pytest.mark.requirement("L3-SCR-021")
+def test_the_bonus_is_described_rather_than_printed(caplog: pytest.LogCaptureFixture) -> None:
+    """CodeQL classifies the bonus as a secret; it is a published weight.
+
+    Describing it keeps the breakdown, which is the part a reader needs, and
+    "awarded" is the only thing about a two-valued component they did not
+    already know.
+    """
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
+        score_total(*PERFECT)
+
+    assert "trusted_org_bonus awarded" in caplog.text
+    assert "trusted_org_bonus=10.0" not in caplog.text
+
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
+        score_total(*REFERENCE)
+
+    assert "trusted_org_bonus not awarded" in caplog.text
+
+
+@pytest.mark.requirement("L3-SCR-021")
+def test_the_other_five_components_keep_their_values(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
+        score_total(*REFERENCE)
+
+    for fragment in (
+        "prevalence_score=20.0",
+        "stars_score=10.0",
+        "forks_score=15.0",
+        "maturity_score=12.0",
+        "last_update_score=15.0",
+    ):
+        assert fragment in caplog.text, fragment
+
+
+@pytest.mark.requirement("L3-SCR-021")
 def test_a_normal_total_says_nothing_at_info(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.INFO, logger="github_metrics"):
         score_total(*REFERENCE)

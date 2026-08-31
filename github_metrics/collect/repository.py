@@ -18,15 +18,29 @@ organisation, and **empty** when it is a person. Empty is not a gap; it is how
 a row records that the repository is personally owned, and there is no other
 column in which that fact could live.
 
-The owner GitHub reports is not always the owner the inventory asked for.
-Repositories move, and the API follows the redirect silently:
+A moved repository is a defective reference
+------------------------------------------
+The owner and name GitHub reports are not always the ones the inventory asked
+for. Repositories are renamed and transferred, and the API follows the redirect
+silently:
 
-    inventory says   tiangolo/fastapi
-    GitHub says      fastapi/fastapi
+    inventory says   tiangolo/fastapi        pypa/pep517
+    GitHub says      fastapi/fastapi         pypa/pyproject-hooks
 
-Both are kept. `owner` stays as the inventory wrote it, because that is the
-value someone has to edit to fix the list; `resolved_owner` records where the
-repository actually lives now.
+Nothing fails, which is exactly the danger: the row would be collected against
+a repository the inventory no longer names, every number in it would be right,
+and nothing in the output would say the reference was stale.
+
+So a mismatch raises `RepositoryMovedError` rather than returning data. The
+inventory is the record of what is being measured; a reference that no longer
+matches it is a defect in the list, not a successful read. The row still
+appears in the output — identity columns filled, measurements empty — the run
+warns with the current location so the fix is a copy and paste, and it exits
+degraded rather than clean.
+
+Case is not a mismatch. GitHub account and repository names are
+case-insensitive, so `PyPA/virtualenv` and `pypa/virtualenv` are the same
+reference and only the spelling differs.
 """
 
 from __future__ import annotations
@@ -39,7 +53,11 @@ from typing import Any, Final
 from github_metrics.client import GitHubClient
 from github_metrics.collect.graphql import execute
 from github_metrics.collect.timestamps import RepositoryTimestamps
-from github_metrics.errors import GraphQLQueryError, RepositoryNotFoundError
+from github_metrics.errors import (
+    GraphQLQueryError,
+    RepositoryMovedError,
+    RepositoryNotFoundError,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +67,7 @@ ORGANIZATION_TYPE: Final = "Organization"
 REPOSITORY_QUERY = """
 query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
+    name
     owner { login __typename }
     stargazerCount
     forkCount
@@ -75,6 +94,8 @@ class RepoMetaData:
         repoid: The repository name as the inventory wrote it.
         resolved_owner: The owner GitHub reports, which differs when a
             repository has been transferred.
+        resolved_name: The name GitHub reports, which differs when a repository
+            has been renamed.
         owner_type: `Organization` or `User`.
         stars: Stargazers.
         forks: Forks.
@@ -89,6 +110,7 @@ class RepoMetaData:
     owner: str
     repoid: str
     resolved_owner: str
+    resolved_name: str
     owner_type: str
     stars: int
     forks: int
@@ -120,6 +142,11 @@ class RepoMetaData:
         return self.resolved_owner.casefold() != self.owner.casefold()
 
     @property
+    def was_renamed(self) -> bool:
+        """Whether GitHub reports a different name than the inventory asked for."""
+        return self.resolved_name.casefold() != self.repoid.casefold()
+
+    @property
     def distinct_versions(self) -> int:
         """Version markers, counting each once. See `collect.releases`."""
         return max(self.releases, self.tags)
@@ -147,6 +174,8 @@ def get_repository(client: GitHubClient, owner: str, repoid: str) -> RepoMetaDat
     Raises:
         RepositoryNotFoundError: The repository does not exist, is private to
             this token, or was renamed beyond GitHub's own redirect.
+        RepositoryMovedError: GitHub reports a different owner or name, so the
+            reference resolves but no longer matches the inventory.
         GraphQLQueryError: The API reported an error, or returned a value that
             could not be parsed.
     """
@@ -165,8 +194,40 @@ def get_repository(client: GitHubClient, owner: str, repoid: str) -> RepoMetaDat
         raise RepositoryNotFoundError(f"{slug}: the API returned no repository and no error")
 
     metadata = _build(owner, repoid, slug, repository)
+    _check_still_matches(slug, metadata)
     _log_shape(slug, metadata)
     return metadata
+
+
+def _check_still_matches(slug: str, metadata: RepoMetaData) -> None:
+    """Refuse a repository GitHub reports under a different name or owner.
+
+    Args:
+        slug: The reference as the inventory wrote it.
+        metadata: What GitHub reported.
+
+    Raises:
+        RepositoryMovedError: If the two disagree by more than case.
+    """
+    if not (metadata.was_renamed or metadata.was_transferred):
+        return
+
+    current = f"{metadata.resolved_owner}/{metadata.resolved_name}"
+    kind = "renamed" if metadata.was_renamed and not metadata.was_transferred else "moved"
+
+    # A warning as well as the exception: the exception ends this row, while
+    # the log is where someone reading a batch run finds the replacement to
+    # paste into the inventory.
+    LOGGER.warning(
+        "%s has been %s to %s. GitHub still redirects, so the reference resolves, but it "
+        "no longer names the repository the inventory asked for. No data collected; "
+        "update the inventory to %s",
+        slug,
+        kind,
+        current,
+        current,
+    )
+    raise RepositoryMovedError(f"{slug} has been {kind} to {current}; update the inventory")
 
 
 def _build(owner: str, repoid: str, slug: str, repository: dict[str, Any]) -> RepoMetaData:
@@ -178,6 +239,7 @@ def _build(owner: str, repoid: str, slug: str, repository: dict[str, Any]) -> Re
         owner=owner,
         repoid=repoid,
         resolved_owner=str(owner_node.get("login", owner)),
+        resolved_name=str(repository.get("name") or repoid),
         owner_type=str(owner_node.get("__typename", "")),
         stars=int(repository["stargazerCount"]),
         forks=int(repository["forkCount"]),
@@ -206,18 +268,6 @@ def _log_shape(slug: str, metadata: RepoMetaData) -> None:
         metadata.resolved_owner,
         metadata.owner_type or "unknown",
     )
-
-    if metadata.was_transferred:
-        # The inventory is out of date but still resolves, because GitHub
-        # redirects. Worth saying so: the row will carry one owner and a
-        # different organisation, and that is not a bug.
-        LOGGER.warning(
-            "%s now lives at %s/%s; GitHub followed the redirect, so the inventory "
-            "entry still works but no longer matches",
-            slug,
-            metadata.resolved_owner,
-            metadata.repoid,
-        )
 
     if not metadata.is_organization:
         LOGGER.debug(

@@ -10,7 +10,11 @@ import pytest
 
 from github_metrics.client import GitHubClient
 from github_metrics.collect.repository import RepoMetaData, get_repository
-from github_metrics.errors import GraphQLQueryError, RepositoryNotFoundError
+from github_metrics.errors import (
+    GraphQLQueryError,
+    RepositoryMovedError,
+    RepositoryNotFoundError,
+)
 
 LOGGER_NAME = "github_metrics.collect.repository"
 
@@ -31,6 +35,7 @@ class _StubClient:
 
 
 OVERRIDABLE: dict[str, tuple[str, ...]] = {
+    "name": ("name",),
     "owner_login": ("owner", "login"),
     "owner_type": ("owner", "__typename"),
     "stars": ("stargazerCount",),
@@ -52,6 +57,7 @@ def payload(**overrides: Any) -> dict[str, Any]:
     the code that limit is meant to police.
     """
     repository: dict[str, Any] = {
+        "name": "cline",
         "owner": {"login": "cline", "__typename": "Organization"},
         "stargazerCount": 64_574,
         "forkCount": 6_900,
@@ -115,6 +121,8 @@ def test_the_query_asks_for_totals_only() -> None:
     # instead of staying at one point.
     assert "nodes" not in query
     assert query.count("totalCount") == 4
+    # The name is verified from the same query, so verification is free.
+    assert any(line.strip() == "name" for line in query.splitlines())
     assert variables == {"owner": "cline", "name": "cline"}
 
 
@@ -131,7 +139,11 @@ def test_distinct_versions_is_derived_the_same_way_as_elsewhere() -> None:
 
 @pytest.mark.requirement("L3-MET-013")
 def test_an_organisation_owned_repository_reports_its_organisation() -> None:
-    metadata = collect(_StubClient(payload(owner_login="urllib3", owner_type="Organization")))
+    metadata = collect(
+        _StubClient(payload(owner_login="urllib3", owner_type="Organization", name="urllib3")),
+        "urllib3",
+        "urllib3",
+    )
 
     assert metadata.is_organization is True
     assert metadata.organization == "urllib3"
@@ -142,7 +154,9 @@ def test_a_personally_owned_repository_reports_no_organisation() -> None:
     # Empty is the answer, not a gap: it is the only place a row records that
     # the repository belongs to a person.
     metadata = collect(
-        _StubClient(payload(owner_login="torvalds", owner_type="User")), "torvalds", "linux"
+        _StubClient(payload(owner_login="torvalds", owner_type="User", name="linux")),
+        "torvalds",
+        "linux",
     )
 
     assert metadata.is_organization is False
@@ -166,47 +180,99 @@ def test_an_unknown_owner_type_is_not_treated_as_an_organisation() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Transferred repositories
+# Renamed and transferred repositories
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.requirement("L3-MET-014")
-def test_a_transferred_repository_keeps_both_owners() -> None:
-    """The inventory said `tiangolo/fastapi`; GitHub says `fastapi/fastapi`.
+@pytest.mark.requirement("L3-MET-015")
+def test_the_name_is_taken_from_the_api_not_from_the_inventory() -> None:
+    """The column is verified rather than echoed.
 
-    GitHub follows the redirect silently, so the entry still resolves. Both
-    values are kept: `owner` is what someone has to edit to fix the list,
-    `resolved_owner` is where the repository actually lives.
+    A repository name can be stale in the inventory and still work, because
+    GitHub redirects a rename exactly as it redirects a transfer.
     """
     metadata = collect(
-        _StubClient(payload(owner_login="fastapi", owner_type="Organization")),
-        "tiangolo",
-        "fastapi",
+        _StubClient(payload(name="virtualenv", owner_login="pypa")), "pypa", "virtualenv"
     )
 
-    assert metadata.owner == "tiangolo"
-    assert metadata.resolved_owner == "fastapi"
-    assert metadata.organization == "fastapi"
-    assert metadata.was_transferred is True
+    assert metadata.resolved_name == "virtualenv"
+    assert metadata.was_renamed is False
+
+
+@pytest.mark.requirement("L3-MET-016")
+def test_a_renamed_repository_is_refused() -> None:
+    """The reference resolves and is still wrong.
+
+    Every number would have been correct, collected against a repository the
+    inventory no longer names, with nothing in the output to say so.
+    """
+    with pytest.raises(RepositoryMovedError, match="renamed to pypa/pyproject-hooks"):
+        collect(_StubClient(payload(name="pyproject-hooks", owner_login="pypa")), "pypa", "pep517")
+
+
+@pytest.mark.requirement("L3-MET-016")
+def test_the_new_location_is_reported_so_it_can_be_pasted_in(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with (
+        caplog.at_level(logging.WARNING, logger=LOGGER_NAME),
+        pytest.raises(RepositoryMovedError),
+    ):
+        collect(_StubClient(payload(name="pyproject-hooks", owner_login="pypa")), "pypa", "pep517")
+
+    assert "update the inventory to pypa/pyproject-hooks" in caplog.text
+    assert "No data collected" in caplog.text
+
+
+@pytest.mark.requirement("L3-MET-015")
+def test_a_case_difference_is_not_a_rename() -> None:
+    metadata = collect(
+        _StubClient(payload(name="CPython", owner_login="python")), "python", "cpython"
+    )
+
+    assert metadata.was_renamed is False
+    assert metadata.resolved_name == "CPython"
+
+
+@pytest.mark.requirement("L3-MET-015")
+def test_a_missing_name_falls_back_to_the_inventory() -> None:
+    # Defensive: the column has to have an answer either way, since it is what
+    # says which repository the row is about.
+    broken = payload()
+    broken["data"]["repository"]["name"] = None
+
+    assert collect(_StubClient(broken), "cline", "cline").resolved_name == "cline"
 
 
 @pytest.mark.requirement("L3-MET-014")
-def test_a_transfer_is_reported(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.WARNING, logger=LOGGER_NAME):
+def test_a_transferred_repository_is_refused() -> None:
+    """The inventory said `tiangolo/fastapi`; GitHub says `fastapi/fastapi`."""
+    with pytest.raises(RepositoryMovedError, match="moved to fastapi/fastapi"):
         collect(
-            _StubClient(payload(owner_login="fastapi")),
+            _StubClient(payload(owner_login="fastapi", owner_type="Organization", name="fastapi")),
             "tiangolo",
             "fastapi",
         )
 
-    assert "now lives at fastapi/fastapi" in caplog.text
+
+@pytest.mark.requirement("L3-MET-014")
+def test_a_transfer_names_where_it_went(caplog: pytest.LogCaptureFixture) -> None:
+    with (
+        caplog.at_level(logging.WARNING, logger=LOGGER_NAME),
+        pytest.raises(RepositoryMovedError),
+    ):
+        collect(_StubClient(payload(owner_login="fastapi", name="fastapi")), "tiangolo", "fastapi")
+
+    assert "update the inventory to fastapi/fastapi" in caplog.text
 
 
 @pytest.mark.requirement("L3-MET-014")
 def test_a_case_difference_is_not_a_transfer() -> None:
     # GitHub account names are case-insensitive, so PyPA and pypa are the same
-    # owner and the row should not claim the repository moved.
-    metadata = collect(_StubClient(payload(owner_login="PyPA")), "pypa", "virtualenv")
+    # owner. Refusing the row over a spelling would reject a working reference.
+    metadata = collect(
+        _StubClient(payload(owner_login="PyPA", name="virtualenv")), "pypa", "virtualenv"
+    )
 
     assert metadata.was_transferred is False
 
@@ -273,7 +339,7 @@ def test_something_worth_doubting_is_still_a_warning(
 ) -> None:
     # The rule quietens narration, not diagnosis.
     with caplog.at_level(logging.WARNING, logger=LOGGER_NAME):
-        collect(_StubClient(payload(owner_login="fastapi")), "tiangolo", "fastapi")
+        collect(_StubClient(payload(issues_enabled=False, closed=0)))
 
     assert caplog.records
 

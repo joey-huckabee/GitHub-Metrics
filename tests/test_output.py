@@ -24,7 +24,7 @@ from github_metrics.output.destination import DEFAULT_FILENAME, DEFAULT_JSON_FIL
 from github_metrics.output.fields import split_selection
 
 EXPECTED_HEADER = (
-    "client_name,owner,organization,scan_date,scan_id,stars,forks,age_days,"
+    "repo_name,owner,organization,scan_date,scan_id,stars,forks,age_days,"
     "last_update_hours,closed_issues,releases,prevalence_score,stars_score,"
     "forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,"
     "is_trusted_org"
@@ -38,7 +38,7 @@ SCAN_ID = UUID("ca219015-79a4-4bd6-b37e-272fa74bd8c2")
 def reference_row() -> SoftwareRow:
     """The worked example from docs/METRICS.md."""
     return SoftwareRow(
-        client_name="cline",
+        repo_name="cline",
         owner="cline",
         organization="cline",
         scan_date=SCAN_DATE,
@@ -64,9 +64,8 @@ def reference_row() -> SoftwareRow:
 def unfetchable_row() -> SoftwareRow:
     """A repository that could not be read: identity known, nothing measured."""
     return SoftwareRow(
-        client_name="ghost",
+        repo_name="ghost-repo",
         owner="ghost",
-        organization="ghost",
         scan_date=SCAN_DATE,
         scan_id=SCAN_ID,
     )
@@ -196,7 +195,9 @@ def test_an_unfetchable_row_keeps_its_identity_and_empties_the_rest(
 ) -> None:
     cells = csv_text([unfetchable_row]).splitlines()[1].split(",")
 
-    assert cells[:3] == ["ghost", "ghost", "ghost"]
+    # `organization` is reported by the API, so an unreadable repository has
+    # none. The columns that say which repository this was still survive.
+    assert cells[:3] == ["ghost-repo", "ghost", ""]
     assert cells[3] == str(SCAN_DATE)
     assert cells[4] == str(SCAN_ID)
     assert all(cell == "" for cell in cells[5:])

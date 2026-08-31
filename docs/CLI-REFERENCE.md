@@ -538,7 +538,7 @@ click and are listed for completeness rather than chosen. See
 | `1` | Configuration error, e.g. a missing token | no | all |
 | `2` | Usage error - malformed command line | no | all |
 | `3` | Degraded: some input rows were rejected | yes | `ingest` |
-| `4` | Degraded: a repository could not be read | yes | `closed-issues`, `releases` |
+| `4` | Degraded: a repository could not be read, or has moved | yes | `closed-issues`, `releases` |
 | `5` | Aborted: API budget exhausted | partial | reserved |
 | `6` | Aborted: the input could not be read | no | `ingest` |
 | `7` | Aborted: no GitHub token supplied | no | API commands |

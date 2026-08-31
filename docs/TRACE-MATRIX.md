@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 17
-- L2 requirements: 63
-- L3 requirements: 85
-- Verified L2+L3: 148 of 148 (100.0%)
+- L2 requirements: 64
+- L3 requirements: 88
+- Verified L2+L3: 152 of 152 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -223,7 +223,7 @@ through their children, so counting them too would count the same work twice.
 | L2-MET-008 | L1-MET-001 | L3-MET-008, L3-MET-009, L3-MET-011 | _(none)_ | Implemented |
 | L2-MET-009 | L1-MET-002 | L3-MET-010 | _(none)_ | Implemented |
 | L2-MET-010 | L1-MET-001 | L3-MET-012 | _(none)_ | Implemented |
-| L2-MET-011 | L1-MET-002 | L3-MET-013, L3-MET-014 | _(none)_ | Implemented |
+| L2-MET-011 | L1-MET-002 | L3-MET-013, L3-MET-014, L3-MET-015, L3-MET-016 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -242,7 +242,9 @@ through their children, so counting them too would count the same work twice.
 | L3-MET-011 | L2-MET-008 | `tests/test_elapsed.py::test_a_null_repository_fails_rather_than_raising_a_key_error`<br>`tests/test_elapsed.py::test_a_repository_never_pushed_to_is_handled`<br>`tests/test_elapsed.py::test_all_three_timestamps_are_parsed`<br>`tests/test_elapsed.py::test_an_unparseable_timestamp_fails_loudly`<br>`tests/test_elapsed.py::test_one_query_asks_for_all_three`<br>`tests/test_elapsed.py::test_the_parsed_timestamps_are_timezone_aware` | Implemented |
 | L3-MET-012 | L2-MET-010 | `tests/test_repository.py::test_a_null_repository_fails_rather_than_raising_a_key_error`<br>`tests/test_repository.py::test_a_repository_never_pushed_to_is_handled`<br>`tests/test_repository.py::test_an_unparseable_timestamp_fails_loudly`<br>`tests/test_repository.py::test_distinct_versions_is_derived_the_same_way_as_elsewhere`<br>`tests/test_repository.py::test_every_scored_value_comes_from_one_query`<br>`tests/test_repository.py::test_the_query_asks_for_totals_only` | Implemented |
 | L3-MET-013 | L2-MET-011 | `tests/test_repository.py::test_a_disabled_tracker_is_still_reported_here`<br>`tests/test_repository.py::test_a_personally_owned_repository_is_noted`<br>`tests/test_repository.py::test_a_personally_owned_repository_reports_no_organisation`<br>`tests/test_repository.py::test_an_organisation_owned_repository_reports_its_organisation`<br>`tests/test_repository.py::test_an_unknown_owner_type_is_not_treated_as_an_organisation` | Implemented |
-| L3-MET-014 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_transfer`<br>`tests/test_repository.py::test_a_transfer_is_reported`<br>`tests/test_repository.py::test_a_transferred_repository_keeps_both_owners` | Implemented |
+| L3-MET-014 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_transfer`<br>`tests/test_repository.py::test_a_transfer_names_where_it_went`<br>`tests/test_repository.py::test_a_transferred_repository_is_refused` | Implemented |
+| L3-MET-015 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_rename`<br>`tests/test_repository.py::test_a_missing_name_falls_back_to_the_inventory`<br>`tests/test_repository.py::test_the_name_is_taken_from_the_api_not_from_the_inventory` | Implemented |
+| L3-MET-016 | L2-MET-011 | `tests/test_repository.py::test_a_renamed_repository_is_refused`<br>`tests/test_repository.py::test_the_new_location_is_reported_so_it_can_be_pasted_in` | Implemented |
 
 ### OUT: Result output and destinations
 
@@ -289,7 +291,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-SCR-001 | L2-CLI-006, L2-SCR-001, L2-SCR-002, L2-SCR-003, L2-SCR-005, L2-SCR-006, L2-SCR-007, L2-SCR-008 | _(none)_ | Implemented |
+| L1-SCR-001 | L2-CLI-006, L2-SCR-001, L2-SCR-002, L2-SCR-003, L2-SCR-005, L2-SCR-006, L2-SCR-007, L2-SCR-008, L2-SCR-009 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -303,6 +305,7 @@ through their children, so counting them too would count the same work twice.
 | L2-SCR-006 | L1-SCR-001 | L3-SCR-011, L3-SCR-015, L3-SCR-020 | _(none)_ | Implemented |
 | L2-SCR-007 | L1-SCR-001 | L3-SCR-012 | _(none)_ | Implemented |
 | L2-SCR-008 | L1-SCR-001 | L3-SCR-016 | _(none)_ | Implemented |
+| L2-SCR-009 | L1-SCR-001 | L3-SCR-021 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -328,6 +331,7 @@ through their children, so counting them too would count the same work twice.
 | L3-SCR-018 | L2-SCR-001 | `tests/test_popularity.py::test_every_star_boundary_scores_as_documented`<br>`tests/test_popularity.py::test_no_fork_count_is_left_unmapped`<br>`tests/test_popularity.py::test_no_star_count_is_left_unmapped` | Implemented |
 | L3-SCR-019 | L2-SCR-002 | `tests/test_popularity.py::test_a_negative_count_is_reported_and_treated_as_zero` | Implemented |
 | L3-SCR-020 | L2-SCR-006 | `tests/test_popularity.py::test_the_band_tables_render_side_by_side`<br>`tests/test_popularity.py::test_the_budgets_are_ten_and_fifteen`<br>`tests/test_popularity.py::test_the_columns_are_the_budget_times_the_weight`<br>`tests/test_popularity.py::test_the_reference_row_is_reproduced` | Implemented |
+| L3-SCR-021 | L2-SCR-009 | `tests/test_total.py::test_a_normal_total_says_nothing_at_info`<br>`tests/test_total.py::test_a_perfect_repository_reaches_the_ceiling`<br>`tests/test_total.py::test_a_project_with_nothing_scores_nothing`<br>`tests/test_total.py::test_every_component_is_a_float`<br>`tests/test_total.py::test_exceeding_the_ceiling_is_reported_rather_than_clamped`<br>`tests/test_total.py::test_the_ceiling_is_derived_from_the_components_not_typed`<br>`tests/test_total.py::test_the_ceiling_is_eighty_five`<br>`tests/test_total.py::test_the_five_scored_components_sum_to_seventy_five_without_the_bonus`<br>`tests/test_total.py::test_the_reference_row_is_reproduced` | Implemented |
 
 ### TRU: Trust policy
 

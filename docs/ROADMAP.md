@@ -163,8 +163,12 @@ rate-limit knobs were already scheduled here and keep their place.
 ### Contributor collection
 
 The shape is [`example.json`](example.json): the twenty `SoftwareRow` columns,
-then a contributor block. One JSON file per repository, written to a folder
-named `githubmetrics` unless `--output` says otherwise.
+then a contributor block. One JSON file per repository, at
+`githubmetrics/<owner>/<repoid>.json` unless `--output` says otherwise,
+lower-cased throughout, and written only for a repository that was actually
+read. See
+[ADR-0005](adr/0005-one-scan-command-and-per-repository-json.md) for why each
+of those three is what it is.
 
 **Merged so far:**
 
@@ -177,14 +181,22 @@ named `githubmetrics` unless `--output` says otherwise.
   replaced by the `is_trusted_org` boolean the CSV already carries, and the
   0/0 coordinates for an ungeocoded contributor replaced by `null`
 
+**Settled since:**
+
+- The output layout is `githubmetrics/<owner>/<repoid>.json`. The flat
+  `<owner>-<repoid>.json` was rejected because hyphens are legal in both an
+  account name and a repository name, so it maps `foo-bar/baz` and
+  `foo/bar-baz` to one file - two different repositories rather than a
+  duplicate pair, so duplicate detection correctly says nothing while one
+  overwrites the other
+- Paths are always lower case, because GitHub names are case-insensitive and
+  `RepositoryRef.key` already folds case to say so
+- A repository that could not be read gets **no file**. The run warns,
+  continues and exits 4, and the CSV still carries its identity-only row
+
 **Still to do:**
 
 - Collecting the contributor block and writing the per-repository files
-- The filename layout. `githubmetrics/<owner>-<repoid>.json` and
-  `githubmetrics/<owner>/<repoid>.json` are not equivalent: hyphens are legal
-  in both account and repository names, so the flat form maps `foo-bar/baz`
-  and `foo/bar-baz` to one file. They are different repositories rather than
-  duplicates, so duplicate detection cannot catch it
 - Folding `contributors` into `scan` behind a flag, per
   [ADR-0005](adr/0005-one-scan-command-and-per-repository-json.md), so the
   cheap path stays the default

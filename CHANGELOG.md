@@ -20,7 +20,18 @@ collected.
   spells it as GitHub does, `RepositoryRef.url` as the inventory does, and a
   row uses whichever it has. Twenty columns now, not nineteen.
 - **[ADR-0005](docs/adr/0005-one-scan-command-and-per-repository-json.md)**,
-  recording why one command produces both artifacts. Two invocations produce
+  recording why one command produces both artifacts, and settling the on-disk
+  layout: `githubmetrics/<owner>/<repoid>.json`, always lower case, and no file
+  at all for a repository that could not be read. The flat
+  `<owner>-<repoid>.json` was rejected because hyphens are legal in both an
+  account and a repository name, so it maps `foo-bar/baz` and `foo/bar-baz` to
+  one file — two different repositories rather than a duplicate pair, so
+  duplicate detection correctly reports nothing while one overwrites the other.
+  Lower case because GitHub names are case-insensitive and `RepositoryRef.key`
+  already folds case to say so. No file because a JSON document holding an
+  empty contributor array and a zero total reads exactly like a repository with
+  no contributors, and the CSV's empty *fields* have no equivalent in a
+  directory listing — where an absent file is unambiguous on its own. Two invocations produce
   two `scan_id` values and two `scan_date` values, so a `githubmetrics.csv` and
   a folder of per-repository JSON collected minutes apart cannot be joined or
   grouped by run — which is the whole reason those columns exist. Still

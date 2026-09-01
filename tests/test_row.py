@@ -85,7 +85,7 @@ def test_the_reference_row_is_reproduced() -> None:
     """
     row = build_row(REFERENCE, metadata(), SCAN)
 
-    assert row.repo_name == "cline"
+    assert row.name == "cline"
     assert row.owner == "cline"
     assert row.organization == "cline"
     assert row.stars == 64_574
@@ -174,10 +174,10 @@ def test_a_personally_owned_repository_has_no_organisation() -> None:
 
 @pytest.mark.requirement("L3-ROW-002")
 def test_the_name_comes_from_the_api_and_the_owner_from_the_input() -> None:
-    # `owner` is what someone edits to fix the list; `repo_name` is verified.
+    # `owner` is what someone edits to fix the list; `name` is verified.
     row = build_row(REFERENCE, metadata(name="cline"), SCAN)
 
-    assert row.repo_name == "cline"
+    assert row.name == "cline"
     assert row.owner == REFERENCE.owner
 
 
@@ -190,8 +190,9 @@ def test_the_name_comes_from_the_api_and_the_owner_from_the_input() -> None:
 def test_an_unreadable_repository_still_says_which_repository_it_was() -> None:
     row = build_empty_row(RepositoryRef(owner="ghost", repoid="missing"), SCAN)
 
-    assert row.repo_name == "missing"
+    assert row.name == "missing"
     assert row.owner == "ghost"
+    assert row.url == "https://github.com/ghost/missing"
     assert row.scan_id == SCAN.scan_id
     assert row.scan_date == SCAN.scan_date
 
@@ -206,7 +207,7 @@ def test_nothing_is_scored_as_zero_when_nothing_was_measured() -> None:
     """
     row = build_empty_row(RepositoryRef(owner="ghost", repoid="missing"), SCAN)
 
-    measured = set(ALL_FIELDS) - {"repo_name", "owner", "scan_date", "scan_id"}
+    measured = set(ALL_FIELDS) - {"name", "owner", "url", "scan_date", "scan_id"}
     for name in measured:
         assert getattr(row, name) in ("", None), name
 

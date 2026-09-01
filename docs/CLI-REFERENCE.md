@@ -294,13 +294,13 @@ named on the command line, which has no line to point at.
 
 ---
 
-## `metrics`
+## `scan`
 
 Collect metrics for every repository SOURCES names and write
 `githubmetrics.csv`. **Requires `GITHUB_TOKEN`.**
 
 ```
-github-metrics metrics [OPTIONS] SOURCES...
+github-metrics scan [OPTIONS] SOURCES...
 ```
 
 This is the release deliverable. `SOURCES` are the same slugs, URLs and CSV
@@ -319,7 +319,7 @@ inventories `validate` takes, mixed freely.
 One GraphQL point per repository, checked **before anything is collected**:
 
 ```console
-$ github-metrics metrics huge-inventory.csv
+$ github-metrics scan huge-inventory.csv
 Error: [GM-COL-004] 6000 repositories need 6000 GraphQL points but only 4983
 remain. Short by 1017. Wait for the hourly reset, or collect fewer repositories
 per run
@@ -327,7 +327,7 @@ per run
 
 The check is the point. A run that discovers exhaustion halfway has already
 spent what it had and produced a file that is part measurement and part
-absence, with nothing to distinguish the two {EM} the repositories at the end of
+absence, with nothing to distinguish the two — the repositories at the end of
 the inventory look exactly like ones that could not be read. Refusing costs one
 request that does not count against the limit.
 
@@ -346,12 +346,12 @@ reordered rows.
 A repository that could not be read still produces a row:
 
 ```csv
-repo_name,owner,organization,scan_date,scan_id,stars,...
-virtualenv,pypa,pypa,2026-08-31 01:18:40+00:00,ae32d273-...,5041,...
-definitely-not-real,ghost,,2026-08-31 01:18:40+00:00,ae32d273-...,,...
+name,owner,organization,url,scan_date,scan_id,stars,...
+virtualenv,pypa,pypa,https://github.com/pypa/virtualenv,2026-08-31 01:18:40+00:00,ae32d273-...,5041,...
+definitely-not-real,ghost,,https://github.com/ghost/definitely-not-real,2026-08-31 01:18:40+00:00,ae32d273-...,,...
 ```
 
-Identity from the input, measurements empty. **Empty, not zero** {EM} zero is a
+Identity from the input, measurements empty. **Empty, not zero** — zero is a
 legitimate score for a repository that was measured and found wanting.
 
 The failures are also named on stderr, because a file with empty rows says
@@ -380,22 +380,22 @@ usable file, and an unreadable repository is the worse news.
 
 ```bash
 # Console, vertical, one block per repository
-github-metrics metrics pypa/virtualenv
+github-metrics scan pypa/virtualenv
 
 # The deliverable
-github-metrics metrics inventory.csv --output githubmetrics.csv
+github-metrics scan inventory.csv --output githubmetrics.csv
 
 # A directory picks the filename
-github-metrics metrics inventory.csv --output ./results/
+github-metrics scan inventory.csv --output ./results/
 
 # Mixed sources
-github-metrics metrics inventory.csv cline/cline github.com/psf/requests
+github-metrics scan inventory.csv cline/cline github.com/psf/requests
 
 # Only the columns a dashboard needs
-github-metrics metrics inventory.csv --fields owner,repo_name,total_score
+github-metrics scan inventory.csv --fields owner,name,total_score
 
 # JSON, to a file or a pipe
-github-metrics metrics inventory.csv --format json | jq '.[].total_score'
+github-metrics scan inventory.csv --format json | jq '.[].total_score'
 ```
 
 ---
@@ -410,7 +410,7 @@ github-metrics contributors [OPTIONS] SOURCES...
 ```
 
 A **separate dataset** from `githubmetrics.csv`, and deliberately a separate
-command: `metrics` never pays for contributor pages, which are the expensive
+command: `scan` never pays for contributor pages, which are the expensive
 half of the request budget and produce columns `githubmetrics.csv` does not
 have.
 
@@ -421,9 +421,9 @@ have.
 | `--output PATH` | stdout | Write JSON here instead. |
 
 > **Its columns are not settled.** The output is JSON until they are, and the
-> shape may change. `metrics` is the stable contract.
+> shape may change. `scan` is the stable contract.
 
-Unlike `metrics`, this walks contributor pages, so its cost is **not** one
+Unlike `scan`, this walks contributor pages, so its cost is **not** one
 point per repository and it is not covered by the pre-flight budget check.
 
 ```bash

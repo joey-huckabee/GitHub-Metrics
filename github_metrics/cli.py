@@ -225,7 +225,7 @@ def main(
     )
 
 
-@main.command("metrics")
+@main.command("scan")
 @click.argument("sources", nargs=-1, required=True)
 @click.option(
     "--output",
@@ -258,7 +258,7 @@ def main(
     help="Abort on the first bad input row instead of reporting all of them.",
 )
 @click.pass_context
-def metrics_command(
+def scan_command(
     ctx: click.Context,
     sources: tuple[str, ...],
     output: Path | None,
@@ -267,7 +267,7 @@ def metrics_command(
     workers: int | None,
     strict: bool,
 ) -> None:
-    """Collect metrics for every repository SOURCES names.
+    """Scan every repository SOURCES names and report its metrics.
 
     Each SOURCE is a slug (pypa/virtualenv), a GitHub URL, or a CSV inventory,
     and the three can be mixed. Check a list first with `validate`, which needs

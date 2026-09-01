@@ -78,9 +78,10 @@ def build_row(
     bonus = score_org_bonus(owner, registry)
 
     return SoftwareRow(
-        repo_name=metadata.resolved_name,
+        name=metadata.resolved_name,
         owner=reference.owner,
         organization=metadata.organization,
+        url=metadata.url,
         scan_date=scan.scan_date,
         scan_id=scan.scan_id,
         stars=metadata.stars,
@@ -117,9 +118,12 @@ def build_empty_row(reference: RepositoryRef, scan: ScanIdentifier) -> SoftwareR
     return SoftwareRow(
         # The name comes from the input here. GitHub reported nothing, and the
         # column that says which repository a row is about has to have an
-        # answer even - especially - when nothing else does.
-        repo_name=reference.repoid,
+        # answer even - especially - when nothing else does. The same goes for
+        # the address: it is where someone would go to find out why the read
+        # failed, so it is exactly the row that must not omit it.
+        name=reference.repoid,
         owner=reference.owner,
+        url=reference.url,
         scan_date=scan.scan_date,
         scan_id=scan.scan_id,
     )

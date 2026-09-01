@@ -59,13 +59,13 @@ a file could not be read at all.
 
 ```bash
 # The deliverable: one row per repository, in input order
-poetry run github-metrics metrics inventory.csv --output githubmetrics.csv
+poetry run github-metrics scan inventory.csv --output githubmetrics.csv
 
 # Sources mix freely - slugs, URLs and inventories
-poetry run github-metrics metrics inventory.csv cline/cline github.com/psf/requests
+poetry run github-metrics scan inventory.csv cline/cline github.com/psf/requests
 
 # Just the columns a dashboard needs
-poetry run github-metrics metrics inventory.csv --fields owner,repo_name,total_score
+poetry run github-metrics scan inventory.csv --fields owner,name,total_score
 
 # Contributor detail, a separate dataset
 poetry run github-metrics contributors inventory.csv --geocode --output contributors.json
@@ -86,7 +86,7 @@ still produces a row, carrying its identity with every measurement empty, and
 the run exits 4 naming which ones failed.
 
 Logs go to **stderr**, which keeps stdout clean —
-`github-metrics metrics inventory.csv --format json | jq '.[].total_score'`
+`github-metrics scan inventory.csv --format json | jq '.[].total_score'`
 works even at `LOG_LEVEL=DEBUG`.
 
 The same entry point is available as `python -m github_metrics`.

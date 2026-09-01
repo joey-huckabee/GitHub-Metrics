@@ -18,7 +18,7 @@ this codebase:
    API. It needs a token and it spends rate limit.
 
 The shipping release target is v0.1.0: `githubmetrics.csv`, produced by a
-`metrics` sub-command. See `docs/ROADMAP.md` for what each version covers and
+`scan` sub-command. See `docs/ROADMAP.md` for what each version covers and
 `CHANGELOG.md` for the release history.
 
 **Metric definitions and scoring bands are still being agreed.** `docs/METRICS.md`
@@ -52,8 +52,8 @@ poetry run python scripts/build-trace-matrix.py --check
 # The CLI
 poetry run github-metrics validate inventory.csv
 poetry run github-metrics validate inventory.csv --format json --output out.json
-poetry run github-metrics metrics inventory.csv --output githubmetrics.csv
-poetry run github-metrics metrics pypa/virtualenv github.com/psf/requests
+poetry run github-metrics scan inventory.csv --output githubmetrics.csv
+poetry run github-metrics scan pypa/virtualenv github.com/psf/requests
 poetry run github-metrics contributors inventory.csv
 poetry run github-metrics bands
 poetry run github-metrics rate-limit

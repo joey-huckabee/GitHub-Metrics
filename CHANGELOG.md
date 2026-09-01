@@ -6,7 +6,55 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+Groundwork for v0.2.0's contributor dataset. The per-repository JSON in
+`docs/example.json` turned out to be the metrics row plus a contributor block,
+not a second dataset, so this release aligns the two before any of it is
+collected.
+
+### Added
+
+- **`url` as an output column**, after `name`, `owner` and `organization`. It
+  is derived from the owner and the name rather than reported separately, which
+  makes it an identity column: a repository that could not be read still
+  carries the address someone would visit to find out why. `RepoMetaData.url`
+  spells it as GitHub does, `RepositoryRef.url` as the inventory does, and a
+  row uses whichever it has. Twenty columns now, not nineteen.
+- **[ADR-0005](docs/adr/0005-one-scan-command-and-per-repository-json.md)**,
+  recording why one command produces both artifacts. Two invocations produce
+  two `scan_id` values and two `scan_date` values, so a `githubmetrics.csv` and
+  a folder of per-repository JSON collected minutes apart cannot be joined or
+  grouped by run — which is the whole reason those columns exist. Still
+  `proposed`: the contributor block's definitions and the on-disk filename
+  layout are open.
+
+### Changed
+
+- **`metrics` is now `scan`.** A run is called a scan everywhere else in the
+  codebase — `ScanIdentifier`, `scan_id`, `scan_date` — and the command that
+  stamps those values now shares their word. It also stops being a name that
+  only fits half of what the command is growing into. `metrics` is retired
+  rather than recycled, as `repo` was before it.
+- **`repo_name` is now `name`.** `repo_name` said `repo` twice in a file whose
+  every row is a repository, and the per-repository JSON this column set feeds
+  calls it `name`. One spelling across both artifacts means the CSV and the
+  JSON join on identical keys rather than through a translation table.
+- **`docs/example.json` corrected** against the shipped column set: the
+  `prevalance_score` spelling, `trusted_org: ""` replaced by the
+  `is_trusted_org` boolean the CSV already carries, and the columns reordered
+  to the canonical order so the example and the header cannot disagree.
+- **Field selection is documented as a rendering filter and nothing more.**
+  The docstring still described it as a rate-limit lever, which was withdrawn
+  in v0.1.0 once every column came from one GraphQL query costing one point.
+
+### Fixed
+
+- **Null Island in the contributor example.** An ungeocoded contributor carried
+  `"latitude": "0", "longitude": "0"`, but 0,0 is a real coordinate in the Gulf
+  of Guinea, so a failed lookup was indistinguishable from a successful one
+  — the same mistake the "metric fields default to `None`, never `0`" rule
+  exists to prevent. Unknown coordinates are `null`, as is the rest of an
+  address that was never resolved. `"location": "null"` was also the string
+  rather than the value.
 
 ## [0.1.0] - 2026-08-30
 

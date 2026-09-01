@@ -1,0 +1,89 @@
+{
+  "name": "cline",
+  "owner": "cline",
+  "organization": "cline",
+  "url": "https://github.com/cline/cline",
+  "scan_date": "2026-07-12 20:33:07.254804+00:00",
+  "scan_id": "ca219015-79a4-4bd6-b37e-272fa74bd8c2",
+  "stars": 64574,
+  "forks": 6900,
+  "age_days": 736.5466017006597,
+  "last_update_hours": 8.10177526,
+  "closed_issues": 0,
+  "releases": 825,
+  "prevalence_score": 20.0,
+  "stars_score": 10.0,
+  "forks_score": 15.0,
+  "maturity_score": 12.0,
+  "last_update_score": 15.0,
+  "trusted_org_bonus": 0.0,
+  "total_score": 72.0,
+  "is_trusted_org": false,
+  "contributors": [
+    {
+      "scan_id": "ca219015-79a4-4bd6-b37e-272fa74bd8c2",
+      "scan_date": "2026-07-12 20:33:07.254804+00:00",
+      "github_id": "7799382",
+      "name": "Saoud Rizwan",
+      "organization": "",
+      "location": "United States",
+      "internal_address": {
+        "query": "United States",
+        "formatted_address": "Decatur County, Kansas, United States",
+        "street": "",
+        "house_number": "",
+        "suburb": "",
+        "post_code": "",
+        "state": "Kansas",
+        "state_code": "US-KS",
+        "state_district": "",
+        "county": "Decatur County",
+        "country": "United States",
+        "country_code": "us",
+        "city": "",
+        "internal_location": {
+          "latitude": 39.784824,
+          "longitude": -100.4458771
+        }
+      },
+      "contribution": 2192,
+      "foreign": false,
+      "adversarial": false
+    },
+    {
+      "scan_id": "ca219015-79a4-4bd6-b37e-272fa74bd8c2",
+      "scan_date": "2026-07-12 20:33:07.254804+00:00",
+      "github_id": "68532117",
+      "name": "Bee",
+      "organization": "",
+      "location": null,
+      "internal_address": {
+        "query": null,
+        "formatted_address": null,
+        "street": null,
+        "house_number": null,
+        "suburb": null,
+        "post_code": null,
+        "state": null,
+        "state_code": null,
+        "state_district": null,
+        "county": null,
+        "country": null,
+        "country_code": null,
+        "city": null,
+        "internal_location": {
+          "latitude": null,
+          "longitude": null
+        }
+      },
+      "contribution": 834,
+      "foreign": false,
+      "adversarial": false
+    }
+  ],
+  "contribution_total": 6393,
+  "foreign_contribution": 0,
+  "adversarial_contribution": 0,
+  "foreign_percent": 0,
+  "adversarial_percent": 0
+}

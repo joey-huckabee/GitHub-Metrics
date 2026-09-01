@@ -1,10 +1,12 @@
 """Choosing which columns to emit.
 
-Selecting fields is not only a rendering filter. Because a column that nobody
-asked for needs no data, the selection also decides which API calls a run has
-to make, which is what makes it a rate-limit lever rather than cosmetics. That
-mapping lives with the collection layer; this module owns the vocabulary it
-selects from.
+Selection is a rendering filter, and only that. It was specified as a
+rate-limit lever too - a column nobody asked for needs no data, so the
+selection would decide which calls a run makes - but that was designed when
+collection was assumed to be several REST calls per repository. Every column a
+row needs now comes from one GraphQL query costing one point, so there is no
+call left to skip and nothing cheaper than one point to reach for. The lever
+was withdrawn rather than carried forward; see `docs/ROADMAP.md`.
 """
 
 from __future__ import annotations
@@ -20,8 +22,9 @@ ALL_FIELDS: Final[tuple[str, ...]] = SoftwareRow.to_header()
 """Every emittable column, in canonical output order."""
 
 IDENTITY_FIELDS: Final[tuple[str, ...]] = (
-    "repo_name",
+    "name",
     "owner",
+    "url",
     "scan_date",
     "scan_id",
 )
@@ -29,8 +32,8 @@ IDENTITY_FIELDS: Final[tuple[str, ...]] = (
 
 Every one of these survives a failed read: they come from the input row and
 from the scan, so a repository that 404s still produces a row that says which
-repository it was. `repo_name` prefers GitHub's value when there is one, but it
-has an answer either way.
+repository it was. `name` prefers GitHub's value when there is one, and `url`
+is built from `owner` and `name`, so both have an answer either way.
 
 `organization` is deliberately not among them. It reads like identity, but only
 the API can report it — so it costs a call, and it is empty for an

@@ -132,6 +132,17 @@ class RepoMetaData:
         return self.resolved_owner if self.owner_type == ORGANIZATION_TYPE else ""
 
     @property
+    def url(self) -> str:
+        """The repository's canonical address, as GitHub spells it.
+
+        Built from the resolved owner and name rather than from the inventory's
+        spelling, so the address is the one that will still resolve. The two
+        differ only in case for a repository that collection accepted, since a
+        renamed or transferred one is refused rather than collected.
+        """
+        return f"https://github.com/{self.resolved_owner}/{self.resolved_name}"
+
+    @property
     def is_organization(self) -> bool:
         """Whether the repository is owned by an organisation."""
         return self.owner_type == ORGANIZATION_TYPE

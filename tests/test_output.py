@@ -24,7 +24,7 @@ from github_metrics.output.destination import DEFAULT_FILENAME, DEFAULT_JSON_FIL
 from github_metrics.output.fields import split_selection
 
 EXPECTED_HEADER = (
-    "repo_name,owner,organization,scan_date,scan_id,stars,forks,age_days,"
+    "name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,"
     "last_update_hours,closed_issues,releases,prevalence_score,stars_score,"
     "forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,"
     "is_trusted_org"
@@ -38,9 +38,10 @@ SCAN_ID = UUID("ca219015-79a4-4bd6-b37e-272fa74bd8c2")
 def reference_row() -> SoftwareRow:
     """The worked example from docs/METRICS.md."""
     return SoftwareRow(
-        repo_name="cline",
+        name="cline",
         owner="cline",
         organization="cline",
+        url="https://github.com/cline/cline",
         scan_date=SCAN_DATE,
         scan_id=SCAN_ID,
         stars=64574,
@@ -64,8 +65,9 @@ def reference_row() -> SoftwareRow:
 def unfetchable_row() -> SoftwareRow:
     """A repository that could not be read: identity known, nothing measured."""
     return SoftwareRow(
-        repo_name="ghost-repo",
+        name="ghost-repo",
         owner="ghost",
+        url="https://github.com/ghost/ghost-repo",
         scan_date=SCAN_DATE,
         scan_id=SCAN_ID,
     )
@@ -93,7 +95,7 @@ def json_text(rows: list[SoftwareRow], **kwargs: object) -> str:
 @pytest.mark.requirement("L3-OUT-001")
 def test_the_header_is_the_agreed_column_set_in_the_agreed_order() -> None:
     assert ",".join(ALL_FIELDS) == EXPECTED_HEADER
-    assert len(ALL_FIELDS) == 19
+    assert len(ALL_FIELDS) == 20
 
 
 @pytest.mark.requirement("L3-OUT-001")
@@ -108,7 +110,8 @@ def test_the_reference_row_renders_exactly_as_documented(reference_row: Software
     rendered = csv_text([reference_row]).splitlines()[1]
 
     assert rendered == (
-        "cline,cline,cline,2026-07-12 20:33:07.254804+00:00,"
+        "cline,cline,cline,https://github.com/cline/cline,"
+        "2026-07-12 20:33:07.254804+00:00,"
         "ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,"
         "8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false"
     )
@@ -196,11 +199,13 @@ def test_an_unfetchable_row_keeps_its_identity_and_empties_the_rest(
     cells = csv_text([unfetchable_row]).splitlines()[1].split(",")
 
     # `organization` is reported by the API, so an unreadable repository has
-    # none. The columns that say which repository this was still survive.
-    assert cells[:3] == ["ghost-repo", "ghost", ""]
-    assert cells[3] == str(SCAN_DATE)
-    assert cells[4] == str(SCAN_ID)
-    assert all(cell == "" for cell in cells[5:])
+    # none. The columns that say which repository this was still survive,
+    # `url` among them: it is built from `owner` and `name` rather than
+    # reported, so it is exactly as knowable as they are.
+    assert cells[:4] == ["ghost-repo", "ghost", "", "https://github.com/ghost/ghost-repo"]
+    assert cells[4] == str(SCAN_DATE)
+    assert cells[5] == str(SCAN_ID)
+    assert all(cell == "" for cell in cells[6:])
 
 
 @pytest.mark.requirement("L3-OUT-004")

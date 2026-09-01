@@ -20,7 +20,7 @@ EMPTY: Final = ""
 """How an unknown value is rendered in every output format."""
 
 
-# The attribute count is the output contract: nineteen columns, defined in
+# The attribute count is the output contract: twenty columns, defined in
 # docs/METRICS.md. The design check is aimed at classes that carry behaviour,
 # not at a record whose whole purpose is to hold one row.
 @dataclass
@@ -41,13 +41,18 @@ class SoftwareRow(DataClassJsonMixin):  # pylint: disable=too-many-instance-attr
     empty for a repository that could not be read.
 
     Attributes:
-        repo_name: The repository's name. GitHub's value when the repository
+        name: The repository's name. GitHub's value when the repository
             was read, since a renamed repository still resolves through a
             redirect and GitHub reports the current name; the `repoid` value
             from the input row otherwise, so the column survives a failed read.
         owner: The `owner` value from the input row, verbatim.
         organization: The owning organisation's login, or empty when the
             repository is owned by an individual account.
+        url: The repository's canonical `https://github.com/owner/name`
+            address, built from the values above rather than reported
+            separately. It is an identity column: a row for a repository
+            that could not be read still carries the address the input
+            asked for, which is what someone checking the failure needs.
         scan_date: Start of the run that produced this row, UTC.
         scan_id: UUID4 of the run that produced this row.
         stars: Raw star count.
@@ -66,9 +71,10 @@ class SoftwareRow(DataClassJsonMixin):  # pylint: disable=too-many-instance-attr
         is_trusted_org: Whether the owner is on the trusted list.
     """
 
-    repo_name: str = ""
+    name: str = ""
     owner: str = ""
     organization: str = ""
+    url: str = ""
     scan_date: datetime | None = None
     scan_id: UUID | None = None
     stars: int | None = None

@@ -98,6 +98,49 @@ def test_the_header_is_the_agreed_column_set_in_the_agreed_order() -> None:
     assert len(ALL_FIELDS) == 20
 
 
+EXAMPLE_JSON = Path(__file__).resolve().parents[1] / "docs" / "example.json"
+
+
+@pytest.mark.requirement("L3-OUT-001")
+def test_the_documented_json_example_leads_with_the_shipped_column_set() -> None:
+    """`docs/example.json` is the agreed shape for the per-repository JSON.
+
+    Its first twenty keys are the CSV's columns, in canonical order, because
+    the two artifacts are the same row and are meant to join on identical
+    keys. This is the check that keeps them joinable: the example drifted once
+    already, carrying `prevalance_score` and a `trusted_org` string against a
+    `prevalence_score` and an `is_trusted_org` boolean in the code, and
+    nothing failed.
+    """
+    example = json.loads(EXAMPLE_JSON.read_text(encoding="utf-8"))
+
+    assert tuple(example)[: len(ALL_FIELDS)] == ALL_FIELDS
+    # Everything after them is the contributor block, which the CSV has no
+    # column for. It must not overlap, or a key would mean two things.
+    assert not set(tuple(example)[len(ALL_FIELDS) :]) & set(ALL_FIELDS)
+
+
+@pytest.mark.requirement("L3-OUT-001")
+def test_the_documented_json_example_never_geocodes_to_null_island() -> None:
+    """0,0 is a real place, so it cannot double as "not resolved".
+
+    A contributor whose location could not be geocoded carries `null`
+    coordinates. Zeroes would put the Gulf of Guinea and an unknown address in
+    the same bucket, which is the failure the "None, never 0" rule exists to
+    prevent - and it survives review, because 0,0 plots.
+    """
+    example = json.loads(EXAMPLE_JSON.read_text(encoding="utf-8"))
+
+    for contributor in example["contributors"]:
+        coordinates = contributor["internal_address"]["internal_location"]
+        for axis in ("latitude", "longitude"):
+            value = coordinates[axis]
+            # A number or nothing. The string "0" would pass a bare `!= 0`
+            # while still rendering as Null Island wherever it is plotted.
+            assert value is None or isinstance(value, float), (axis, value)
+            assert value != 0, (axis, value)
+
+
 @pytest.mark.requirement("L3-OUT-001")
 def test_the_header_is_derived_from_the_dataclass_not_a_parallel_list() -> None:
     # A field added to SoftwareRow must appear in the output automatically;

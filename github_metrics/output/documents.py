@@ -1,17 +1,15 @@
 """Writing one JSON document per repository.
 
-The document is `SoftwareRow` followed by the contributor block, in that order,
-and nothing else. That is not a convenience: it is what makes the two artifacts
-of a run joinable. **Every column of `githubmetrics.csv` is a key here,
-spelled the same way and in the same order**, so moving between them needs no
-translation table - and both carry the `scan_id` and `scan_date` of the one
-run that produced them.
+A document is one repository's detail record: `SoftwareRow` followed by the
+contributor block, in that order, and nothing else. `githubmetrics.csv` is the
+other half of a run and a different thing - the comparable table, fixed at
+twenty columns so that two runs diff and a column sorts.
 
-The block is the part only the document has: the contributor records, and the
-five aggregates over them. They are not CSV columns because they exist only
-where a contributor list was read, and a repository whose list failed produces
-a row and no document - so the columns would be empty in the CSV for exactly
-the rows with no document to explain them.
+What they share is the row. **Every column of `githubmetrics.csv` is a key
+here, spelled the same way and in the same order**, so moving between them
+needs no translation table, and both carry the `scan_id` and `scan_date` of the
+one run that produced them. The block - the contributor records and the five
+aggregates over them - is what the document is for.
 
 Where the files go
 ------------------

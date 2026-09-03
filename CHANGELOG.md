@@ -19,19 +19,13 @@ dataset, so one `scan` now collects and writes both under one scan identity.
   resolved to, and its commits in that repository.
 - **The contributor block**: `contributors` plus five aggregates over it —
   `contribution_total`, `foreign_contribution`, `adversarial_contribution`,
-  `foreign_percent`, `adversarial_percent`. These are **document keys, not CSV
-  columns**; `githubmetrics.csv` stays at twenty. Promoting them to columns was
-  considered — their grain is the repository, and it would make "which
-  repositories carry the most foreign contribution" a spreadsheet sort — and
-  rejected, because they exist only for a repository whose contributor list was
-  read, which is exactly the set that produces a document. As columns they
-  would be empty for precisely the rows with no document to explain the gap,
-  and `contribution_total` would have to become optional to tell "no
-  contributors" from "not collected", a distinction the document never has to
-  make.
+  `foreign_percent`, `adversarial_percent`. These belong to the document.
+  `githubmetrics.csv` is unchanged at twenty columns: it is the comparable
+  table, and its shape is fixed so that two runs diff and a column sorts, while
+  the document is one repository's detail record.
 
-  A document is therefore the twenty columns, complete and in canonical order,
-  then a fixed six-key suffix — which is a rule a test states in one line. The
+  A document is the twenty columns, complete and in canonical order, then that
+  fixed six-key suffix — which is a rule a test states in one line. The
   previous formulation, "the first twenty keys must not collide with the rest",
   could not.
 - **`--format console`**, printing the tabular artifact instead of writing it.
@@ -149,13 +143,11 @@ dataset, so one `scan` now collects and writes both under one scan identity.
 ### Fixed
 
 - **`contribution_total` would have reported `0` for a repository whose
-  contributors could not be read.** Zero is a legitimate measurement — a
-  repository really can have no contributors — so it cannot also mean "not
-  collected". Caught by a test written for the failure path before the path had
-  one. Keeping the aggregates out of the CSV settles it for good: a document
-  exists only when the list was read, so a `0` there always means the list was
-  read and was empty, and there is no state left for the number to be
-  ambiguous about.
+  contributors could not be read**, in an intermediate version that carried the
+  aggregates as columns. Zero is a legitimate measurement — a repository really
+  can have no contributors — so it cannot also mean "not collected". The
+  shipped shape has no such state: a document exists only where the list was
+  read, so a `0` there always means read and empty.
 - **Null Island in the contributor example.** An ungeocoded contributor carried
   `"latitude": "0", "longitude": "0"`, but 0,0 is a real coordinate in the Gulf
   of Guinea, so a failed lookup was indistinguishable from a successful one

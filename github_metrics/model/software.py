@@ -4,13 +4,14 @@
 writer, the JSON writer, the console renderer and the per-repository JSON
 document all derive their columns from it, so the four cannot drift apart.
 
-The per-repository document is this row followed by a contributor block -
-the contributors themselves and the five contribution aggregates over them.
-That block is **not** part of this type. It exists only where a contributor
-list exists, so folding it in here would put five columns in
-`githubmetrics.csv` that are empty for every repository whose contributors
-were not read, and would change the CSV's twenty-column contract for the sake
-of data the CSV has no grain for.
+`githubmetrics.csv` is the comparable table: twenty columns, one row per
+accepted reference, a shape fixed so that two runs diff and a column sorts.
+
+The per-repository document is one repository's detail record - this row,
+followed by a contributor block that this type deliberately does not define.
+The block belongs to `model.contributor`, because a nested contributor array
+and the aggregates over it are what a detail record carries and have no
+representation at a table's grain.
 
 Field definitions and scoring bands live in `docs/METRICS.md`.
 """

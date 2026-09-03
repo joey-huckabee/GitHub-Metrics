@@ -88,11 +88,11 @@ def test_a_document_is_the_row_then_the_block() -> None:
 
 @pytest.mark.requirement("L3-OUT-012")
 def test_the_aggregates_are_document_keys_and_not_csv_columns() -> None:
-    """They exist only where a contributor list was read.
+    """Contributor detail is the document's job; the table is the comparable one.
 
-    A repository whose list failed produces a row and no document, so as
-    columns they would be empty in the CSV for exactly the rows that have no
-    document to explain them.
+    The CSV's shape is fixed at twenty columns so that two runs diff and a
+    column sorts, and a name appearing in both artifacts would mean two
+    different things depending on which was being read.
     """
     assert "contribution_total" not in SoftwareRow.to_header()
     assert not set(ContributorBlock.keys()) & set(SoftwareRow.to_header())

@@ -228,10 +228,8 @@ def test_a_document_is_its_csv_row_then_the_contributor_block(tmp_path: Path) ->
 def test_the_csv_carries_no_contributor_columns(tmp_path: Path) -> None:
     """Twenty columns, whatever the contributors turn out to be.
 
-    The aggregates exist only where a contributor list was read, and a
-    repository whose list failed produces a row and no document - so as
-    columns they would be empty for exactly the rows with nothing to explain
-    them.
+    The table is the comparable record and its shape is fixed, so two runs
+    diff and a column sorts. Contributor detail is the document's job.
     """
     run("pypa/virtualenv", "--output", str(tmp_path))
 

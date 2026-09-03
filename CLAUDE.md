@@ -264,20 +264,20 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   budget. A scan therefore costs 2 GraphQL points and 1 REST request per
   repository, and `check_budget` checks **both**.
 
-- **A document is the CSV row, complete, then the contributor block.**
-  `SoftwareRow`'s twenty columns in canonical order, then `contributors` and
-  the five aggregates over it. Every CSV column is a document key spelled the
-  same way, which is what lets the two artifacts join without a translation
-  table; the block is the part only the document has. `--fields` filters the
-  tabular artifact only, because a document with columns missing would stop
-  being the row it joins with.
+- **Two artifacts, two purposes.** `githubmetrics.csv` is the comparable
+  table - twenty columns, fixed shape, sortable and diffable. A document is one
+  repository's detail record: those twenty keys in canonical order, then
+  `contributors` and the five aggregates over it. The contributor block belongs
+  to the document because that is what the document is for, and because a
+  nested array has no representation at the table's grain.
 
-  **The aggregates are deliberately not columns.** They exist only where a
-  contributor list was read, and that is exactly the set of repositories that
-  produce a document - so as columns they would be empty for precisely the rows
-  with no document to explain the gap, and `contribution_total` would have to
-  be optional to tell "no contributors" from "not collected". As a document key
-  it is never in doubt. `githubmetrics.csv` stays at twenty columns.
+  What they share is the row. Every CSV column is a document key spelled the
+  same way and in the same order, and both carry the same `scan_id`, so the two
+  join on the run that produced them. `--fields` filters the tabular artifact
+  only, because a document with columns missing would stop being the row it
+  joins with. Keeping the block out of the row is also what lets
+  `contribution_total` be a plain number rather than an optional one: a
+  document exists only where the list was read.
 
 - **A repository that was not fully collected gets a row and no document.** A
   CSV row is positional, so omitting one shifts what every later row means; a

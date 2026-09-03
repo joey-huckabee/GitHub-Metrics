@@ -130,33 +130,27 @@ documents, and no CSV form of a nested contributor array. `--fields` likewise
 filters only the tabular artifact, because a document with columns missing
 would stop being the row it has to join with.
 
-### The column set
+### Two artifacts, two purposes
 
-**`githubmetrics.csv` stays at twenty columns.** A document is those twenty
-keys, in canonical order and complete, followed by the six keys of the
-contributor block: `contributors`, `contribution_total`,
-`foreign_contribution`, `adversarial_contribution`, `foreign_percent`,
-`adversarial_percent`.
+`githubmetrics.csv` is the comparable table: one row per accepted reference,
+**twenty columns**, for ranking and comparing a portfolio. A document is the
+detail record for one repository: those twenty keys, in canonical order and
+complete, followed by the contributor block - `contributors`,
+`contribution_total`, `foreign_contribution`, `adversarial_contribution`,
+`foreign_percent`, `adversarial_percent`.
 
-Every CSV column is a document key, spelled the same way and in the same order.
-That prefix relationship is the join, and it is a rule a test states in one
-line - which the earlier formulation, "the first twenty keys must not collide
-with the rest", could not.
+The split is by purpose, not by cost or convenience. A contributor array has no
+representation at the table's grain, and the aggregates over it are what the
+document exists to carry; the table exists to be sorted and diffed, which is
+why its shape is fixed at twenty columns and does not vary with what a
+contributor list turned out to contain.
 
-**The aggregates are document keys rather than columns.** Promoting them to
-`SoftwareRow` was considered: their grain is the repository, which is the CSV's
-grain, and it would put "which repositories carry the most foreign
-contribution" one spreadsheet sort away instead of behind a walk over four
-hundred files.
-
-It was rejected because the aggregates exist only where a contributor list was
-read, and that is exactly the set of repositories that get a document. A
-repository whose list failed produces a row and no document, so as columns they
-would be empty for precisely the rows with no document to explain the gap - and
-`contribution_total` would need to be optional in order to distinguish "no
-contributors" from "not collected", when as a document key it is never in
-doubt. Changing a twenty-column contract to carry data the CSV cannot always
-have is the wrong trade.
+What the two share is the row. Every CSV column is a document key, spelled the
+same way and in the same order, and both carry the same `scan_id` and
+`scan_date` - so the table and the documents of one run join on the run that
+produced them. Stated as "the columns, complete, then a fixed suffix", that is
+a rule a test checks in one line, which the earlier formulation - "the first
+twenty keys must not collide with the rest" - could not.
 
 The per-contributor `foreign` and `adversarial`, and the four aggregates that
 depend on them, are **collected as `null`** until `METRICS.md` defines them.
@@ -266,7 +260,9 @@ Good:
 - What a run produced is readable from the command alone
 - Every CSV column is a document key, in the same order, so a consumer that can
   read one needs no mapping to read the other
-- `githubmetrics.csv` keeps the twenty-column contract v0.1.0 shipped
+- Each artifact keeps the shape its purpose needs: a fixed twenty-column table
+  that sorts and diffs, and a per-repository record that carries a nested
+  contributor array
 - `contributors`' unsettled JSON output stops being a separate contract
 
 Bad:
@@ -294,9 +290,6 @@ Bad:
   what a run is called for the life of the tool.
 - Four aggregate keys and two contributor fields ship as permanently `null`
   until their definitions land.
-- The contribution aggregates are reachable only by reading the documents. An
-  analyst who wants them across a portfolio has to walk the directory rather
-  than sort a column.
 
 Neutral:
 

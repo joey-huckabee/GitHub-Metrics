@@ -3,17 +3,21 @@
 The authoritative definition of every column a scan produces: where the value
 comes from, how it is calculated, and how it is scored.
 
-A run writes two artifacts. `githubmetrics.csv` is one row per accepted
-reference, twenty columns. `<owner>/<repoid>.json` is **that same row, in the
-same order, under the same names**, followed by a contributor block.
+A run writes two artifacts, and they are for different things.
 
-Every CSV column is therefore a document key, which is what lets the two join
-without a translation table. The block is the part only the document has:
-the contributor records and the five aggregates over them. They are not
-columns because they exist only where a contributor list was read, and a
-repository whose list failed produces a row and no document — so as columns
-they would be empty for exactly the rows that have no document to explain
-them.
+`githubmetrics.csv` is the **comparable table**: one row per accepted
+reference, twenty columns, for ranking and comparing a portfolio. Its grain is
+the repository and its shape is fixed, which is what makes two runs diffable
+and a column sortable.
+
+`<owner>/<repoid>.json` is the **detail record for one repository**: that same
+row, in the same order and under the same names, followed by the contributor
+block — who contributed, where they are, and the totals over them.
+
+Every CSV column is a document key, which is what lets the two be joined on
+the run that produced them. The block is what the document is *for*, and it
+belongs there rather than in the table for the same reason: a contributor
+array has no representation at the table's grain.
 
 **Every metric and score column is Settled.** Six fields are not: the four
 contribution aggregates that depend on `foreign` and `adversarial`, and those

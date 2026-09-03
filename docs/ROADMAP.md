@@ -182,11 +182,10 @@ of those is what it is.
   artifacts a run writes** - it writes both, always. The flagged design was
   considered and rejected: it buys one state nothing else expresses, and in
   exchange what a run produced stops being readable from the command
-- The five contribution aggregates added to the document, not to the CSV,
-  which stays at twenty columns. Promoting them was considered and rejected:
-  they exist only for a repository whose contributor list was read, which is
-  exactly the set that produces a document, so as columns they would be empty
-  for precisely the rows with no document to explain the gap
+- The contributor block — the contributor array and the five aggregates over
+  it — carried by the document. `githubmetrics.csv` is unchanged at twenty
+  columns: the table is the comparable record, the document is one
+  repository's detail record, and the two join on the row and the scan
 - Contributor collection itself: the ranked list from REST, every account's
   detail from one aliased GraphQL document, and locations resolved to a
   fourteen-field address through Nominatim

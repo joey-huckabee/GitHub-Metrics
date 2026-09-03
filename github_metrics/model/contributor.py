@@ -1,17 +1,16 @@
 """The contributor block of a per-repository document.
 
 Everything here belongs to the document and **nothing here reaches
-`githubmetrics.csv`**. A contributor list has no representation at the CSV's
-grain that would not either break the one-row-per-input-row contract or bury a
-nested structure in a cell, and the five aggregates over that list share its
-fate: they exist only where a contributor list was read, so putting them in
-the CSV would add five columns that are empty for every repository whose
-contributors could not be collected.
+`githubmetrics.csv`**. The two artifacts are for different things: the CSV is
+the comparable table, twenty columns wide and fixed so that two runs diff and
+a column sorts, while a document is one repository's detail record. A
+contributor array and the totals over it are what that record carries, and a
+nested array has no representation at a table's grain that would not either
+break the one-row-per-input-row contract or bury a structure in a cell.
 
-The CSV therefore stays at twenty columns and the document is those twenty
-followed by this block. Every CSV column is still a document key, spelled the
-same way, which is what lets the two artifacts join; the block is the part
-only one of them has.
+What the two share is the row. Every CSV column is a document key, spelled the
+same way and in the same order, and both carry the same run identity - so the
+table and the documents of one run join on the run that produced them.
 
 Empty against null
 ------------------
@@ -184,11 +183,10 @@ class ContributorBlock:
     """One repository's contributors, and the aggregates over them.
 
     The block exists only for a repository whose contributor list was read, so
-    every aggregate here is a real measurement rather than a placeholder. That
-    is the reason these five are not columns of `SoftwareRow`: a repository
+    every aggregate here is a real measurement rather than a placeholder -
+    which is what lets `contribution_total` be a plain `int`. A repository
     whose contributors could not be collected produces a CSV row and no
-    document, so the columns would be empty in the CSV for exactly the rows
-    that have no document to explain them.
+    document at all, so there is no state in which these numbers are unknown.
 
     Attributes:
         contributors: The records, most commits first.

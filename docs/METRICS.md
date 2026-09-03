@@ -326,7 +326,7 @@ a plain number while every metric column is optional.
 |---|---|---|---|---|
 | `scan_id` | `UUID` | run | The run that collected this record, identical to the document's. | **Settled** |
 | `scan_date` | `datetime` | run | As above. | **Settled** |
-| `github_id` | `str` | API | The account's numeric GitHub id, as a string. Stable across a rename, which the login is not. | **Settled** |
+| `github_id` | `str` | API | The account's numeric GitHub id, **as a string**. Stable across a rename, which the login is not. See [Why the id is a string](#why-the-id-is-a-string). | **Settled** |
 | `name` | `str` | API | The account's display name, falling back to its login when it publishes none. | **Settled** |
 | `organization` | `str` | API | The account's self-reported company, or `""` when it publishes none. | **Settled** |
 | `location` | `str` | API | The account's self-reported location, verbatim, or `null` when it publishes none. Free text; GitHub does not validate it. | **Settled** |
@@ -344,6 +344,18 @@ An account that is deleted or suspended between reading the contributor list
 and reading its detail is still recorded, carrying its login as `name` and
 nothing else resolved. Its `contribution` is a real measurement of this
 repository, so dropping the record would quietly reduce `contribution_total`.
+
+### Why the id is a string
+
+Not because Python needs it to be. Python integers are arbitrary-precision, so
+there is no width to check on this side and no 64-bit guard to write.
+
+The ceiling is downstream. A JSON number greater than 2<sup>53</sup> - 1 loses
+precision in any consumer backed by an IEEE-754 double — JavaScript and
+everything built on it — and it does so **silently**, yielding an id that is
+close to the right one rather than an error. GitHub account ids are comfortably
+below that today and nothing guarantees they stay there. A string has no such
+ceiling, and nothing arithmetic is ever done with an account id.
 
 ### Addresses
 

@@ -130,8 +130,17 @@ class Contributor:
     Attributes:
         scan_id: UUID4 of the run that collected this record.
         scan_date: Start of that run, UTC.
-        github_id: The account's numeric GitHub id, as a string. Stable across
-            a rename, which the login is not.
+        github_id: The account's numeric GitHub id, **as a string**. Stable
+            across a rename, which the login is not.
+
+            A string rather than an integer, and not because Python needs it
+            to be: Python integers are arbitrary-precision, so there is no
+            width to check on this side. The ceiling is downstream. A JSON
+            number above 2**53 - 1 loses precision in any consumer backed by
+            an IEEE-754 double - JavaScript, and every tool built on it - and
+            it does so silently, producing an id that is close to the right
+            one. A string has no such ceiling, and nothing arithmetic is ever
+            done with an account id.
         name: The account's display name, falling back to its login when the
             account publishes no name.
         organization: The account's self-reported company, or `""` when it

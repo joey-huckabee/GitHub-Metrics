@@ -1,4 +1,4 @@
-"""Tests for the `github-metrics metrics` command."""
+"""Tests for the `github-metrics scan` command."""
 
 from __future__ import annotations
 
@@ -85,9 +85,7 @@ def offline(monkeypatch: pytest.MonkeyPatch) -> list[RepositoryRef]:
 
 def run(*args: str) -> Any:
     """Invoke the CLI with a token supplied, against no real environment."""
-    return CliRunner().invoke(
-        main, ["--env-file", os.devnull, "--token", "ghp_x", "metrics", *args]
-    )
+    return CliRunner().invoke(main, ["--env-file", os.devnull, "--token", "ghp_x", "scan", *args])
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +102,7 @@ def test_a_csv_is_written_with_one_row_per_reference(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     rows = list(csv.DictReader(destination.read_text(encoding="utf-8").splitlines()))
-    assert [row["repo_name"] for row in rows] == ["virtualenv", "urllib3"]
+    assert [row["name"] for row in rows] == ["virtualenv", "urllib3"]
     assert rows[0]["total_score"] == "75.0"
 
 
@@ -123,9 +121,9 @@ def test_no_output_renders_to_the_console(tmp_path: Path) -> None:
     del tmp_path
     result = run("pypa/virtualenv")
 
-    # Vertical, because nineteen columns do not fit across a terminal.
+    # Vertical, because twenty columns do not fit across a terminal.
     assert result.exit_code == 0
-    assert "repo_name" in result.output
+    assert "name" in result.output
     assert "total_score" in result.output
 
 
@@ -134,7 +132,7 @@ def test_no_output_renders_to_the_console(tmp_path: Path) -> None:
 def test_json_is_available_as_a_file_and_to_the_console(tmp_path: Path) -> None:
     printed = run("pypa/virtualenv", "--format", "json")
     assert printed.exit_code == 0
-    assert json.loads(printed.stdout)[0]["repo_name"] == "virtualenv"
+    assert json.loads(printed.stdout)[0]["name"] == "virtualenv"
 
     destination = tmp_path / "out.json"
     written = run("pypa/virtualenv", "--format", "json", "--output", str(destination))
@@ -220,7 +218,7 @@ def test_an_unreadable_repository_still_gets_a_row(
     rows = list(csv.DictReader(destination.read_text(encoding="utf-8").splitlines()))
     assert len(rows) == 2
     # Identity kept, measurements empty. Empty rather than zero.
-    assert rows[1]["repo_name"] == "missing"
+    assert rows[1]["name"] == "missing"
     assert rows[1]["owner"] == "ghost"
     assert rows[1]["stars"] == ""
     assert rows[1]["total_score"] == ""
@@ -291,7 +289,7 @@ def test_a_run_that_names_nothing_still_produces_a_well_formed_file(
     # A header and no rows: "no repositories" is distinguishable from "the run
     # produced nothing at all".
     assert destination.read_text(encoding="utf-8").splitlines() == [
-        "repo_name,owner,organization,scan_date,scan_id,stars,forks,age_days,"
+        "name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,"
         "last_update_hours,closed_issues,releases,prevalence_score,stars_score,"
         "forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,"
         "is_trusted_org"

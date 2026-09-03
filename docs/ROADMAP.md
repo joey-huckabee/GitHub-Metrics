@@ -17,7 +17,7 @@ about and deliberately scheduled; that is different from being promised.
   URL input was scheduled for v0.2.0 and arrived early, because it fell out of
   giving every command the same inputs
 - `github-metrics validate`, the offline check — formerly `ingest`
-- `github-metrics metrics`, the release deliverable: collection over an
+- `github-metrics scan`, the release deliverable: collection over an
   inventory, concurrently, with a rate-limit pre-flight, into
   `githubmetrics.csv`
 - `github-metrics contributors`, the same sources into a separate dataset
@@ -48,11 +48,16 @@ trusted list, and neither is being pulled now.
 
 The current release target. Everything below is in scope now.
 
-### The `metrics` sub-command
+### The `metrics` sub-command, renamed `scan` in v0.2.0
 
 **Delivered.** Replaced `repo`, which was scaffolding collecting a different
 set of fields. Collects metrics for every repository named by the input and
 writes `githubmetrics.csv`.
+
+It shipped as `metrics` and is `scan` from v0.2.0, because the per-repository
+JSON turned out to be the same row plus a contributor block, so one command
+produces both under one scan identity. See
+[ADR-0005](adr/0005-one-scan-command-and-per-repository-json.md).
 
 - **Input:** any number of sources, mixed — slugs, GitHub URLs and CSV
   inventories, exactly as `validate` takes them. Directories are not walked.
@@ -64,7 +69,7 @@ writes `githubmetrics.csv`.
 - **Destination:** a file named by `--output`. When only a directory is given,
   the file is written there as `githubmetrics.csv`. With no `--output` at all,
   the report goes to the console.
-- **Console format:** a **vertical** table, one block per input row. Nineteen
+- **Console format:** a **vertical** table, one block per input row. Twenty
   columns do not fit across a terminal, so the columns become rows.
 - **Field selection:** the caller selects which columns to emit; selecting none
   emits all. Columns come out in canonical order whatever order they are asked
@@ -150,7 +155,61 @@ the program embedding it.
 
 ---
 
-## v0.2.0 — rate-limit tuning
+## v0.2.0 — contributor collection, and rate-limit tuning
+
+Two bodies of work. The contributor dataset is the one being built now; the
+rate-limit knobs were already scheduled here and keep their place.
+
+### Contributor collection
+
+The shape is [`example.json`](example.json): the twenty `SoftwareRow` columns,
+then a contributor block. One JSON file per repository, at
+`githubmetrics/<owner>/<repoid>.json` unless `--output` says otherwise,
+lower-cased throughout, and written only for a repository that was actually
+read. See
+[ADR-0005](adr/0005-one-scan-command-and-per-repository-json.md) for why each
+of those three is what it is.
+
+**Merged so far:**
+
+- `repo_name` renamed `name`, and `url` added as a column after `name`, `owner`
+  and `organization`. The CSV and the JSON now share one set of key names, so
+  the two artifacts join without a translation table
+- `metrics` renamed `scan`, so one run is one scan and the command shares a
+  word with the `scan_id` and `scan_date` it stamps
+- `example.json` corrected: `prevalance_score` spelling, `trusted_org: ""`
+  replaced by the `is_trusted_org` boolean the CSV already carries, and the
+  0/0 coordinates for an ungeocoded contributor replaced by `null`
+
+**Settled since:**
+
+- The output layout is `githubmetrics/<owner>/<repoid>.json`. The flat
+  `<owner>-<repoid>.json` was rejected because hyphens are legal in both an
+  account name and a repository name, so it maps `foo-bar/baz` and
+  `foo/bar-baz` to one file - two different repositories rather than a
+  duplicate pair, so duplicate detection correctly says nothing while one
+  overwrites the other
+- Paths are always lower case, because GitHub names are case-insensitive and
+  `RepositoryRef.key` already folds case to say so
+- A repository that could not be read gets **no file**. The run warns,
+  continues and exits 4, and the CSV still carries its identity-only row
+
+**Still to do:**
+
+- Collecting the contributor block and writing the per-repository files
+- Folding `contributors` into `scan` behind a flag, per
+  [ADR-0005](adr/0005-one-scan-command-and-per-repository-json.md), so the
+  cheap path stays the default
+
+**Blocked on definitions**, per the rule that nothing is implemented before
+`METRICS.md` defines it:
+
+- `foreign` — foreign to the United States. The rule that applies it is coming
+  from Joey as code
+- `adversarial` — no agreed rule yet. Also coming as code
+
+Neither has a definition anywhere in the repository today, and both attach a
+judgement to a named person, so both wait.
 
 ### Delivered early: GitHub URL input
 

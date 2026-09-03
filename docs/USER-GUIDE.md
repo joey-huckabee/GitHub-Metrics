@@ -354,7 +354,7 @@ in a spreadsheet.
 This is what the tool is for.
 
 ```console
-$ github-metrics metrics inventory.csv --output githubmetrics.csv
+$ github-metrics scan inventory.csv --output githubmetrics.csv
 Wrote 3 rows to githubmetrics.csv
 ```
 
@@ -362,18 +362,19 @@ The sources are the same ones `validate` takes, so a list you have checked is a
 list you can collect:
 
 ```bash
-github-metrics metrics inventory.csv cline/cline github.com/psf/requests
+github-metrics scan inventory.csv cline/cline github.com/psf/requests
 ```
 
-With no `--output`, the rows go to the console as vertical blocks — nineteen
+With no `--output`, the rows go to the console as vertical blocks — twenty
 columns do not fit across a terminal, and a truncated metric is worse than no
 metric:
 
 ```console
-$ github-metrics metrics pypa/virtualenv
-repo_name          virtualenv
+$ github-metrics scan pypa/virtualenv
+name               virtualenv
 owner              pypa
 organization       pypa
+url                https://github.com/pypa/virtualenv
 scan_date          2026-08-31 01:18:25.560138+00:00
 scan_id            0beab6d7-0b71-45e6-8826-841e05d0a3bd
 stars              5041
@@ -399,7 +400,7 @@ spends 400 of the 5,000 available each hour. The run confirms that before
 collecting anything:
 
 ```console
-$ github-metrics metrics huge-inventory.csv
+$ github-metrics scan huge-inventory.csv
 Error: [GM-COL-004] 6000 repositories need 6000 GraphQL points but only 4983
 remain. Short by 1017. Wait for the hourly reset, or collect fewer repositories
 per run
@@ -439,7 +440,7 @@ repository your inventory does not name, and nothing in the file would say so.
 ### Only the columns you want
 
 ```bash
-github-metrics metrics inventory.csv --fields owner,repo_name,total_score
+github-metrics scan inventory.csv --fields owner,name,total_score
 ```
 
 Columns come out in canonical order whatever order you ask for them, so two
@@ -572,14 +573,14 @@ rows = [
 ]
 
 buffer = io.StringIO()
-write_csv(rows, buffer, columns=["owner", "repo_name", "stars", "total_score"])
+write_csv(rows, buffer, columns=["owner", "name", "stars", "total_score"])
 print(buffer.getvalue())
 
 failed = [o.reference.full_name for o in outcomes if not o.ok]
 ```
 
 ```csv
-repo_name,owner,stars,total_score
+name,owner,stars,total_score
 virtualenv,pypa,5041,75.0
 urllib3,urllib3,4054,75.0
 nope,ghost,,
@@ -589,7 +590,7 @@ Four things that are the same as on the command line, because they are the same
 code:
 
 - **Columns come out in canonical order**, not the order you asked for. The
-  example asked for `owner` first and got `repo_name` first.
+  example asked for `owner` first and got `name` first.
 - **A repository that could not be read still produces a row**, carrying its
   identity with the measurements empty. `outcomes` tells you which, and why:
   `o.error` is the exception rather than a string.
@@ -611,7 +612,7 @@ credential-free, and safe to run before spending any API quota.
 
 Existence is established by the collection stage: a well-formed reference to a
 repository that was deleted, renamed or made private surfaces there, and
-`metrics` exits 4 saying which ones.
+`scan` exits 4 saying which ones.
 
 ## Every command and flag
 
@@ -627,7 +628,7 @@ detail is in [`CLI-REFERENCE.md`](CLI-REFERENCE.md).
 | `--token-file` | `github-metrics --token-file /run/secrets/github rate-limit` |
 | `--no-verify-token` | `github-metrics --no-verify-token metrics inventory.csv` |
 | `-V`, `--version` | `github-metrics -V` |
-| `-h`, `--help` | `github-metrics metrics --help` |
+| `-h`, `--help` | `github-metrics scan --help` |
 
 `LOG_LEVEL=DEBUG` on any of them turns on per-repository detail. Diagnostics go
 to stderr, so a pipe stays clean.
@@ -643,17 +644,17 @@ to stderr, so a pipe stays clean.
 | `--format` | `github-metrics validate inventory.csv --format json` |
 | `--output` | `github-metrics validate inventory.csv --format json --output report.json` |
 
-### `metrics` — the deliverable
+### `scan` — the deliverable
 
 | Flag | Example |
 |---|---|
-| *(none)* | `github-metrics metrics pypa/virtualenv` |
-| `--output` (file) | `github-metrics metrics inventory.csv --output githubmetrics.csv` |
-| `--output` (directory) | `github-metrics metrics inventory.csv --output ./results/` |
-| `--format` | `github-metrics metrics inventory.csv --format json` |
-| `--fields` | `github-metrics metrics inventory.csv --fields owner,repo_name,total_score` |
-| `--workers` | `github-metrics metrics inventory.csv --workers 4` |
-| `--strict` | `github-metrics metrics inventory.csv --strict` |
+| *(none)* | `github-metrics scan pypa/virtualenv` |
+| `--output` (file) | `github-metrics scan inventory.csv --output githubmetrics.csv` |
+| `--output` (directory) | `github-metrics scan inventory.csv --output ./results/` |
+| `--format` | `github-metrics scan inventory.csv --format json` |
+| `--fields` | `github-metrics scan inventory.csv --fields owner,name,total_score` |
+| `--workers` | `github-metrics scan inventory.csv --workers 4` |
+| `--strict` | `github-metrics scan inventory.csv --strict` |
 
 ### `contributors` — a separate dataset
 

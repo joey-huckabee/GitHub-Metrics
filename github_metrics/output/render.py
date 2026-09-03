@@ -72,7 +72,7 @@ def render_console(
 ) -> str:
     """Render rows as vertical blocks, one per repository.
 
-    Vertical rather than horizontal because there are nineteen columns: a
+    Vertical rather than horizontal because there are twenty columns: a
     horizontal table wraps or is truncated on any normal terminal, and a
     truncated metric is worse than no metric. Turning the columns into rows
     keeps every value readable and the block width constant.

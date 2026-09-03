@@ -15,13 +15,13 @@ One row per accepted input row, in input order. Column order is fixed and is
 the order below.
 
 ```csv
-repo_name,owner,organization,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org
+name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org
 ```
 
 Reference row (the worked example this document is calibrated against):
 
 ```csv
-cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15,0,72.0,false
+cline,cline,cline,https://github.com/cline/cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false
 ```
 
 ---
@@ -30,9 +30,10 @@ cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa
 
 | Column | Type | Source | Definition | Status |
 |---|---|---|---|---|
-| `repo_name` | `str` | API, input fallback | The repository's name. GitHub's value when the repository was read; the `repoid` from the input row otherwise. | **Settled** |
+| `name` | `str` | API, input fallback | The repository's name. GitHub's value when the repository was read; the `repoid` from the input row otherwise. | **Settled** |
 | `owner` | `str` | input | The `owner` value from the input row, verbatim. | **Settled** |
 | `organization` | `str` | API | The owning organisation's login, or **empty** when the repository is owned by an individual account. | **Settled** |
+| `url` | `str` | derived | The repository's canonical `https://github.com/owner/name` address. Built from the two columns above rather than reported separately, so it is filled even for a repository that could not be read. | **Settled** |
 | `scan_date` | `datetime` | run | One timestamp for the entire run, identical in every row. UTC, rendered as Python `str(datetime)` — `2026-07-12 20:33:07.254804+00:00`. | **Settled** |
 | `scan_id` | `UUID` | run | One UUID4 for the entire run, identical in every row. | **Settled** |
 
@@ -40,13 +41,15 @@ cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa
 the same invocation always carry the same pair, which is what makes a stored
 result set groupable later.
 
-### `repo_name`, formerly `client_name`
+### `name`, formerly `repo_name`, formerly `client_name`
 
 The first column was named `client_name` and was read — by this tool, wrongly
 — as another copy of the owner. It is the **repository's name**, and the
 mistake was possible only because the reference row is `cline/cline`, where the
-owner and the repository are spelled the same. The column is renamed to say
-what it holds.
+owner and the repository are spelled the same. The column was renamed to say
+what it holds, and then shortened again: `repo_name` said `repo` twice in a
+file whose every row is a repository, and the per-repository JSON this column
+set also feeds calls it `name`. One word, one spelling, both artifacts.
 
 Together with `owner` it is what makes a row identifiable: without it a file of
 four hundred rows cannot say which repository any of them describes except by
@@ -257,8 +260,8 @@ A repository that 404s, is private, or otherwise cannot be read still produces
 a row — the output has one row per accepted input row regardless of what
 happened to it.
 
-Filled: `repo_name`, `owner`, `scan_date`, `scan_id` — everything that comes
-from the input row and from the scan. Empty: `organization`, every metric and
+Filled: `name`, `owner`, `url`, `scan_date`, `scan_id` — everything that
+comes from the input row, from the scan, or from those two together. Empty: `organization`, every metric and
 every score, written as an empty field rather than a zero. Zero is a legitimate
 value — a repository really can have zero releases — so using it for "not
 known" would make the two indistinguishable in the output.

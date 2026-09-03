@@ -1,8 +1,17 @@
 """One row of the metrics output.
 
 `SoftwareRow` is the single definition of what a result looks like. The CSV
-writer, the JSON writer and the console renderer all derive their columns from
-it, so the three formats cannot drift apart.
+writer, the JSON writer, the console renderer and the per-repository JSON
+document all derive their columns from it, so the four cannot drift apart.
+
+`githubmetrics.csv` is the comparable table: twenty columns, one row per
+accepted reference, a shape fixed so that two runs diff and a column sorts.
+
+The per-repository document is one repository's detail record - this row,
+followed by a contributor block that this type deliberately does not define.
+The block belongs to `model.contributor`, because a nested contributor array
+and the aggregates over it are what a detail record carries and have no
+representation at a table's grain.
 
 Field definitions and scoring bands live in `docs/METRICS.md`.
 """

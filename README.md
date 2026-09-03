@@ -58,17 +58,20 @@ a file could not be read at all.
 ### Collect metrics
 
 ```bash
-# The deliverable: one row per repository, in input order
-poetry run github-metrics scan inventory.csv --output githubmetrics.csv
+# The deliverable: both artifacts, into ./githubmetrics/
+poetry run github-metrics scan inventory.csv
+
+# Somewhere else
+poetry run github-metrics scan inventory.csv --output ./results/
 
 # Sources mix freely - slugs, URLs and inventories
 poetry run github-metrics scan inventory.csv cline/cline github.com/psf/requests
 
-# Just the columns a dashboard needs
+# Just the columns a dashboard needs, in the CSV
 poetry run github-metrics scan inventory.csv --fields owner,name,total_score
 
-# Contributor detail, a separate dataset
-poetry run github-metrics contributors inventory.csv --geocode --output contributors.json
+# Print the table instead of writing it; documents are still written
+poetry run github-metrics scan pypa/virtualenv --format console
 
 # Print the scoring bands - no token, no network
 poetry run github-metrics bands
@@ -80,14 +83,32 @@ poetry run github-metrics rate-limit
 poetry run github-metrics --version
 ```
 
-Collection costs **one GraphQL point per repository**, and the run confirms the
-token can cover it before collecting anything. A repository that cannot be read
-still produces a row, carrying its identity with every measurement empty, and
-the run exits 4 naming which ones failed.
+One run produces **two artifacts under one scan identity**:
+
+```
+githubmetrics/
+  githubmetrics.csv        one row per accepted reference, in input order
+  pypa/virtualenv.json     that row, then its contributors
+```
+
+The document is the CSV row — the same twenty fields, same names, same order
+— followed by the contributor block, so the two join without a translation
+table. That is why one command produces both rather than two commands producing
+half each.
+
+Collection costs **two GraphQL points and one REST request per repository**,
+and the run confirms the token can cover both budgets before collecting
+anything. A repository that cannot be read still produces a row, carrying its
+identity with every measurement empty, and produces no document; the run exits
+4 naming which ones failed.
+
+Contributor locations are geocoded through Nominatim, which permits one request
+per second. Locations are cached per run, but a first run over a large
+inventory is measured in hours rather than minutes.
 
 Logs go to **stderr**, which keeps stdout clean —
-`github-metrics scan inventory.csv --format json | jq '.[].total_score'`
-works even at `LOG_LEVEL=DEBUG`.
+`github-metrics scan inventory.csv --format json` writes a clean file even at
+`LOG_LEVEL=DEBUG`.
 
 The same entry point is available as `python -m github_metrics`.
 
@@ -121,14 +142,22 @@ code and let `reset_logger()` own the configuration.
 
 ```python
 from github_metrics.client import GitHubClient
+from github_metrics.collect.contributors import get_contributors
+from github_metrics.collect.repository import get_repository
 from github_metrics.config import Settings
-from github_metrics.metrics import collect_repository_metrics
+from github_metrics.model.scan import ScanIdentifier
+from github_metrics.analysis.row import build_row
+from github_metrics.output.documents import build_document
 
+scan = ScanIdentifier()
 settings = Settings.from_env()
-with GitHubClient(settings) as client:
-    metrics = collect_repository_metrics(client, "python/cpython")
 
-print(metrics.to_json(indent=2))
+with GitHubClient(settings) as client:
+    metadata = get_repository(client, "python", "cpython")
+    people = get_contributors(client, "python", "cpython")
+
+row = build_row(reference, metadata, scan, contributors=people)
+document = build_document(row, people)
 ```
 
 ## Documentation

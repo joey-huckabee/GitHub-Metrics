@@ -32,7 +32,7 @@ the workspace is configured for you:
   isort, Ruff, and Pylint default to 79 or 88 columns, so without these settings
   you would see spurious `line too long` errors.
 - Format-on-save runs black, and imports are organised with isort.
-- `Run and Debug` ships configurations for the CLI (`repo`, `repo --geocode`,
+- `Run and Debug` ships configurations for the CLI (`scan`, `validate`,
   `rate-limit`), each loading `.env`, plus pytest for the whole suite or the
   current file.
 - The test explorer is wired to pytest with the `integration` marker excluded.

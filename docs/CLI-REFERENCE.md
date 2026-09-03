@@ -296,8 +296,8 @@ named on the command line, which has no line to point at.
 
 ## `scan`
 
-Collect metrics for every repository SOURCES names and write
-`githubmetrics.csv`. **Requires `GITHUB_TOKEN`.**
+Collect metrics and contributors for every repository SOURCES names, and write
+both artifacts. **Requires `GITHUB_TOKEN`.**
 
 ```
 github-metrics scan [OPTIONS] SOURCES...
@@ -308,21 +308,73 @@ inventories `validate` takes, mixed freely.
 
 | Option | Default | Description |
 |---|---|---|
-| `--output PATH` | console | Where to write. A directory receives `githubmetrics.csv`. |
-| `--format {csv,json}` | `csv` | Output format, for a file or the console. |
-| `--fields a,b,c` | all | Columns to emit, always rendered in canonical order. |
+| `--output DIR` | `./githubmetrics` | Directory both artifacts are written into. |
+| `--format {csv,json,console}` | `csv` | Form of the tabular artifact. The documents are always JSON. |
+| `--fields a,b,c` | all | Columns the tabular artifact emits, always in canonical order. |
 | `--workers N` | `min(repositories, 8)` | Concurrent collections. |
 | `--strict` | off | Abort on the first bad input reference. |
 
+### What one run produces
+
+Two artifacts, in one directory, under one scan identity:
+
+```
+githubmetrics/
+  githubmetrics.csv          one row per accepted reference, in input order
+  pypa/
+    virtualenv.json          that row, then its contributors
+  urllib3/
+    urllib3.json
+```
+
+**There is no flag governing which of the two is written.** Both, always. The
+two carry the same `scan_id` and `scan_date`, which is the whole reason one
+command produces them: two invocations would produce two identities, and a CSV
+and a folder of documents collected minutes apart cannot be joined or grouped
+by the run that made them. See
+[ADR-0005](adr/0005-one-scan-command-and-per-repository-json.md).
+
+**Every CSV column is a document key.** A document is the twenty columns, in
+canonical order and complete, followed by the contributor block: `contributors`
+and the five aggregates over it. So a consumer that can read one needs no
+mapping to read the other. The aggregates are not CSV columns — they exist
+only where a contributor list was read, which is exactly when a document is
+written.
+
+`--format` and `--fields` govern the **tabular** artifact only. `--format
+console` prints it instead of writing it, and the documents are still written
+— there is no console rendering of four hundred documents, and no CSV form of
+a nested contributor array. A document with columns filtered out would stop
+being the row it has to join with, so `--fields` does not reach it either.
+
+### Where the documents go
+
+```
+<output>/<owner>/<repoid>.json
+```
+
+Lower-cased throughout, because GitHub names are case-insensitive and
+`PyPA/virtualenv` and `pypa/virtualenv` are one repository. Nested by owner
+rather than flattened to `<owner>-<repoid>.json`, because hyphens are legal in
+both names — the flat form maps `foo-bar/baz` and `foo/bar-baz` onto one file,
+which are two different repositories rather than a duplicate pair.
+
+**A repository that could not be fully collected gets no document.** Its CSV
+row is still there, carrying whatever was known. The asymmetry is deliberate:
+a CSV row is positional, so omitting one would shift what every later row
+means, while a directory has no positions and an absent file says "named, not
+measured" on its own.
+
 ### What it costs, and when it refuses
 
-One GraphQL point per repository, checked **before anything is collected**:
+**Two GraphQL points and one REST request per repository**, checked from both
+budgets **before anything is collected**:
 
 ```console
 $ github-metrics scan huge-inventory.csv
-Error: [GM-COL-004] 6000 repositories need 6000 GraphQL points but only 4983
-remain. Short by 1017. Wait for the hourly reset, or collect fewer repositories
-per run
+Error: [GM-COL-004] 6000 repositories need 12000 GraphQL points but only 4983
+remain (short by 7017). Wait for the hourly reset, or collect fewer
+repositories per run
 ```
 
 The check is the point. A run that discovers exhaustion halfway has already
@@ -331,10 +383,17 @@ absence, with nothing to distinguish the two — the repositories at the end of
 the inventory look exactly like ones that could not be read. Refusing costs one
 request that does not count against the limit.
 
-No reserve is held back, so the budget runs to zero and a full hourly quota
-collects exactly 5,000 repositories — the largest run the tool can do. Keeping
-points back would buy a convenience by refusing a run the token could actually
-have finished.
+No reserve is held back, so the budgets run to zero and a full hourly quota
+collects exactly 2,500 repositories — GraphQL binds first, at two points
+against REST's one request. Keeping points back would buy a convenience by
+refusing a run the token could actually have finished.
+
+**Geocoding, not the API, sets the pace of a large run.** Nominatim permits one
+request per second, and the tool enforces it: exceeding the policy gets the
+user agent blocked, which fails every later run rather than the one that
+misbehaved. Locations are cached per run, so the cost is the number of
+*distinct* locations rather than of contributors — but a first run over a
+large inventory takes hours.
 
 ### Rows
 
@@ -362,6 +421,12 @@ something went wrong and only this says what:
 ! tiangolo/fastapi: [GM-COL-003] tiangolo/fastapi has been moved to fastapi/fastapi; update the inventory
 ```
 
+A repository whose *contributors* could not be read is a lesser case
+(`GM-COL-005`): the row keeps every measurement it collected — it is a
+complete row, because no column of it is derived from contributors — and no
+document is written. The absent file is the only record that the contributor
+half failed, which is why the run also warns.
+
 ### Exit status
 
 | Code | Meaning |
@@ -379,56 +444,27 @@ usable file, and an unreadable repository is the worse news.
 ### Examples
 
 ```bash
-# Console, vertical, one block per repository
-github-metrics scan pypa/virtualenv
+# Both artifacts into ./githubmetrics/
+github-metrics scan inventory.csv
 
-# The deliverable
-github-metrics scan inventory.csv --output githubmetrics.csv
-
-# A directory picks the filename
+# Both artifacts into a directory of your choosing
 github-metrics scan inventory.csv --output ./results/
 
 # Mixed sources
 github-metrics scan inventory.csv cline/cline github.com/psf/requests
 
-# Only the columns a dashboard needs
+# Print the table instead of writing it; documents are still written
+github-metrics scan pypa/virtualenv --format console
+
+# Only the columns a dashboard needs, in the CSV
 github-metrics scan inventory.csv --fields owner,name,total_score
 
-# JSON, to a file or a pipe
-github-metrics scan inventory.csv --format json | jq '.[].total_score'
-```
+# The tabular artifact as JSON
+github-metrics scan inventory.csv --format json
+jq '.[].total_score' githubmetrics/githubmetrics.json
 
----
-
-## `contributors`
-
-Collect contributor detail for every repository SOURCES names. **Requires
-`GITHUB_TOKEN`.**
-
-```
-github-metrics contributors [OPTIONS] SOURCES...
-```
-
-A **separate dataset** from `githubmetrics.csv`, and deliberately a separate
-command: `scan` never pays for contributor pages, which are the expensive
-half of the request budget and produce columns `githubmetrics.csv` does not
-have.
-
-| Option | Default | Description |
-|---|---|---|
-| `--contributors N` | `25` | Maximum contributors to inspect per repository. |
-| `--geocode` | off | Resolve contributor locations to coordinates via Nominatim. |
-| `--output PATH` | stdout | Write JSON here instead. |
-
-> **Its columns are not settled.** The output is JSON until they are, and the
-> shape may change. `scan` is the stable contract.
-
-Unlike `scan`, this walks contributor pages, so its cost is **not** one
-point per repository and it is not covered by the pre-flight budget check.
-
-```bash
-github-metrics contributors pypa/virtualenv
-github-metrics contributors inventory.csv --geocode --output contributors.json
+# One repository's contributors
+jq '.contributors[].name' githubmetrics/pypa/virtualenv.json
 ```
 
 ---

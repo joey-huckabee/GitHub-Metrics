@@ -241,6 +241,45 @@ reference.
 
 ---
 
+### `GM-COL-004` - Rate limit exhausted
+
+**Class**: `RateLimitExhaustedError`
+**Exit status**: 5
+**Meaning**: The token has too little of one of the two hourly budgets left to
+finish the run.
+**Typical cause**: An earlier run in the same hour, or an inventory larger than
+a full quota covers. A scan costs two GraphQL points and one REST request per
+repository, so a full quota covers 2,500 repositories and GraphQL binds first.
+**Resolution**: The message names which budget is short and by how much. Wait
+for the hourly reset, or split the inventory.
+
+Raised **before** collection starts, never during it. A run that discovers
+exhaustion halfway has already spent what it had and produced a file that is
+part measurement and part absence, with nothing in it to tell the two apart.
+Refusing costs one free request and leaves the quota intact for a smaller run.
+
+### `GM-COL-005` - Contributor list unreadable
+
+**Class**: `ContributorCollectionError`
+**Exit status**: 4
+**Meaning**: The repository was read, but its contributor list was not.
+**Typical cause**: A transient API failure, or a repository whose contributor
+statistics GitHub is still computing - a 202 while a cache warms.
+**Resolution**: Re-run. The repository's measurements were collected and are in
+the CSV; only its document is missing.
+
+Separate from `GM-COL-001` because the reference is good and only the second
+half of the collection failed. The repository's row in `githubmetrics.csv` is
+**complete** - every column of it was collected - so the comparable table is
+unaffected and the repository still ranks correctly.
+
+No document is written, for the reason `METRICS.md` gives: a document carrying
+an empty contributor array and a `contribution_total` of zero cannot be told
+from a repository that genuinely has no contributors. The absent file and the
+warning are the record that the contributor half failed.
+
+---
+
 ### `GM-ING-016` - Malformed reference
 
 **Class**: `RowIssue`
@@ -259,6 +298,48 @@ that it is wrong — `'a/b/c' is not owner/repoid: it has 2 '/' separators`.
 is why it is refused rather than reduced: the result would be a plausible
 reference to a different repository. On GitHub Enterprise, name the repository
 as `owner/repoid` and point `GITHUB_API_URL` at the instance.
+
+---
+
+## Output errors
+
+Raised when a result cannot be rendered or written. The destination ones are
+checked **before** collection wherever possible, because discovering an
+unwritable path after a run has spent an hour of quota is the expensive way to
+find out, and quota does not refill on request.
+
+### `GM-OUT-001` - Unknown field
+
+**Class**: `UnknownFieldError`
+**Exit status**: 2
+**Meaning**: `--fields` named a column that does not exist.
+**Typical cause**: A typo, or a column name from an older version.
+**Resolution**: The message names the closest valid column when there is one.
+Silently ignoring the name would produce output missing a column the caller
+believed they had asked for, discovered much later and blamed on the data.
+
+### `GM-OUT-002` - Destination unwritable
+
+**Class**: `OutputDestinationError`
+**Exit status**: 2
+**Meaning**: The file named by `--output` cannot be written.
+**Typical cause**: A parent directory that does not exist.
+**Resolution**: Create the directory, or name one that exists.
+
+### `GM-OUT-003` - Document directory unusable
+
+**Class**: `DocumentDirectoryError`
+**Exit status**: 2
+**Meaning**: The directory the per-repository documents go in cannot be
+created, or exists as a file.
+**Typical cause**: `--output` naming an existing file, or a path the process
+cannot write to.
+**Resolution**: Name a directory, or one that can be created.
+
+Checked before collection alongside `GM-OUT-002`. The same code covers a single
+document that cannot be written during a run; there, one failure is reported on
+stderr and the remaining documents are still written, because the CSV is
+already on disk and the rest are still worth having.
 
 ---
 

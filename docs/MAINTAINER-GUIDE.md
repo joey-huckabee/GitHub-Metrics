@@ -150,13 +150,19 @@ it in an ADR before doing it.
 
 ## Releasing
 
-1. Update `CHANGELOG.md` under `Unreleased`.
+1. Move `CHANGELOG.md`'s `Unreleased` entries under the new version and date,
+   and update the comparison links at the foot of the file.
 2. Bump the version in `pyproject.toml`. It is exposed as
-   `github_metrics.__version__`, shown by `--version` and `--help`, and stamped
-   into every `RepositoryMetrics` snapshot as `tool_version` — so a released
-   artefact stays attributable.
-3. `make check`.
-4. Tag and push. CI builds the distribution.
+   `github_metrics.__version__` and shown by `--version` and `--help`.
+
+   **It is not written into the output.** `RepositoryMetrics.tool_version`
+   carried it until v0.2.0 removed that type with the `contributors` command,
+   and `SoftwareRow` has no equivalent column. A collected artefact is
+   attributable to a *run* through `scan_id` and `scan_date`, but not to a
+   tool version. Adding one is a column-set change and needs an ADR.
+3. `make check`. The version is read from installed package metadata, so run
+   `poetry install` after the bump or `--version` reports the previous one.
+4. Tag `vX.Y.Z` and push. CI builds the distribution.
 
 ## Architecture decisions
 
@@ -165,5 +171,6 @@ YAML frontmatter (`status`, `date`, `decision-makers`). Record the options that
 were rejected and *why*; a decision without its alternatives is unreviewable
 later.
 
-Current: the CSV contract (0001), concurrency placement (0002), lenient-by-default
-ingestion (0003).
+Current: the CSV contract (0001), concurrency placement (0002),
+lenient-by-default ingestion (0003), the exit-code scheme (0004), and one
+`scan` producing both artifacts (0005).

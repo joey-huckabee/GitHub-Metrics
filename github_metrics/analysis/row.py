@@ -20,6 +20,8 @@ absorb the difference.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
+from dataclasses import replace
 
 from github_metrics.analysis.elapsed import age_days, last_update_hours
 from github_metrics.analysis.last_update import score_last_update
@@ -33,11 +35,49 @@ from github_metrics.analysis.trusted_orgs import (
     score_org_bonus,
 )
 from github_metrics.collect.repository import RepoMetaData
+from github_metrics.model.contributor import Contributor, ContributorBlock
 from github_metrics.model.scan import ScanIdentifier
 from github_metrics.model.software import SoftwareRow
 from github_metrics.sources import RepositoryRef
 
 LOGGER = logging.getLogger(__name__)
+
+
+def build_block(
+    contributors: Sequence[Contributor],
+    scan: ScanIdentifier,
+) -> ContributorBlock:
+    """Assemble the contributor block of one repository's document.
+
+    Called only for a repository whose contributor list was read. A repository
+    whose list failed produces a CSV row and no document at all, so there is no
+    block to build and no aggregate to leave unset - which is why
+    `contribution_total` is a plain `int` here rather than an optional one.
+
+    The run identity is stamped here rather than in `collect` for the same
+    reason a row's is: the scan is a property of the run, and collection should
+    not have to know which run it is part of.
+
+    Args:
+        contributors: The records as collected, most commits first.
+        scan: Identity of this run.
+
+    Returns:
+        The block, stamped and totalled. The four judgement-dependent
+        aggregates are left `None`: nothing has measured them, and a `0` would
+        assert that a repository has no foreign contribution rather than say
+        that no rule has been applied.
+    """
+    stamped = tuple(
+        replace(entry, scan_id=scan.scan_id, scan_date=scan.scan_date) for entry in contributors
+    )
+    # Counts what was collected, not what exists: the list is truncated at
+    # DEFAULT_CONTRIBUTOR_LIMIT, ranked by commits descending. METRICS.md says
+    # so, because a total that silently means something narrower than its name
+    # is the kind of number that survives review.
+    total = sum(entry.contribution or 0 for entry in stamped)
+
+    return ContributorBlock(contributors=stamped, contribution_total=total)
 
 
 def build_row(
@@ -48,6 +88,11 @@ def build_row(
     registry: TrustedOrganizations | None = None,
 ) -> SoftwareRow:
     """Score one collected repository into an output row.
+
+    Contributors are deliberately not an argument. The row is the twenty
+    columns `githubmetrics.csv` publishes, and none of them is derived from a
+    contributor list; what is derived from one lives in `ContributorBlock` and
+    reaches only the document.
 
     Args:
         reference: The reference as the input named it.

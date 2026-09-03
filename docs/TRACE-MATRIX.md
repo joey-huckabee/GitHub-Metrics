@@ -20,10 +20,10 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 ## Coverage summary
 
-- L1 requirements: 18
-- L2 requirements: 73
-- L3 requirements: 101
-- Verified L2+L3: 174 of 174 (100.0%)
+- L1 requirements: 19
+- L2 requirements: 77
+- L3 requirements: 106
+- Verified L2+L3: 183 of 183 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -80,7 +80,7 @@ through their children, so counting them too would count the same work twice.
 | L2-CLI-004 | L1-CLI-001 | L3-CLI-004 | _(none)_ | Implemented |
 | L2-CLI-005 | L1-CLI-001 | L3-CLI-005, L3-CLI-006 | _(none)_ | Implemented |
 | L2-CLI-006 | L1-SCR-001 | L3-CLI-007 | _(none)_ | Implemented |
-| L2-CLI-007 | L1-CLI-001 | L3-CLI-008, L3-CLI-009 | _(none)_ | Implemented |
+| L2-CLI-007 | L1-CLI-001 | L3-CLI-008, L3-CLI-009, L3-CLI-010 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -93,8 +93,9 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-005 | L2-CLI-005 | `tests/test_cli_closed_issues.py::test_a_disabled_tracker_is_called_out`<br>`tests/test_cli_closed_issues.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_cli_closed_issues.py::test_an_unreadable_repository_exits_four`<br>`tests/test_cli_closed_issues.py::test_explain_appends_the_bands`<br>`tests/test_cli_closed_issues.py::test_it_appears_in_the_command_list`<br>`tests/test_cli_closed_issues.py::test_it_reports_counts_the_tracker_state_and_the_weight`<br>`tests/test_cli_closed_issues.py::test_json_carries_the_same_values`<br>`tests/test_cli_closed_issues.py::test_json_includes_the_bands_only_when_explained` | Implemented |
 | L3-CLI-006 | L2-CLI-005 | `tests/test_releases.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_releases.py::test_an_unreadable_repository_exits_four`<br>`tests/test_releases.py::test_the_command_emits_json`<br>`tests/test_releases.py::test_the_command_explains_the_release_bands`<br>`tests/test_releases.py::test_the_command_flags_a_tags_only_project`<br>`tests/test_releases.py::test_the_command_reports_both_counts_and_the_distinct_total`<br>`tests/test_releases.py::test_the_command_shows_the_weight_and_warns_about_saturation` | Implemented |
 | L3-CLI-007 | L2-CLI-006 | `tests/test_cli_bands.py::test_an_unknown_metric_is_a_usage_error`<br>`tests/test_cli_bands.py::test_every_scoring_table_is_reachable`<br>`tests/test_cli_bands.py::test_it_needs_no_token`<br>`tests/test_cli_bands.py::test_no_argument_prints_every_table`<br>`tests/test_cli_bands.py::test_the_tables_carry_their_boundaries` | Implemented |
-| L3-CLI-008 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_csv_is_written_with_one_row_per_reference`<br>`tests/test_cli_scan.py::test_a_directory_gets_the_default_filename`<br>`tests/test_cli_scan.py::test_every_row_of_one_run_carries_the_same_scan`<br>`tests/test_cli_scan.py::test_fields_selects_columns_in_canonical_order`<br>`tests/test_cli_scan.py::test_json_is_available_as_a_file_and_to_the_console`<br>`tests/test_cli_scan.py::test_no_output_renders_to_the_console`<br>`tests/test_cli_scan.py::test_the_sources_are_the_same_ones_validate_takes`<br>`tests/test_cli_scan.py::test_two_runs_are_told_apart` | Implemented |
-| L3-CLI-009 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_bad_destination_fails_before_any_quota_is_spent`<br>`tests/test_cli_scan.py::test_a_rejected_reference_is_a_lesser_status_than_an_unreadable_one`<br>`tests/test_cli_scan.py::test_a_run_that_names_nothing_still_produces_a_well_formed_file`<br>`tests/test_cli_scan.py::test_an_unaffordable_run_spends_nothing`<br>`tests/test_cli_scan.py::test_an_unreadable_repository_still_gets_a_row` | Implemented |
+| L3-CLI-008 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_csv_is_written_with_one_row_per_reference`<br>`tests/test_cli_scan.py::test_console_format_prints_the_rows_and_still_writes_documents`<br>`tests/test_cli_scan.py::test_fields_selects_columns_in_canonical_order`<br>`tests/test_cli_scan.py::test_json_is_available_for_the_tabular_artifact`<br>`tests/test_cli_scan.py::test_the_csv_carries_no_contributor_columns`<br>`tests/test_cli_scan.py::test_the_sources_are_the_same_ones_validate_takes`<br>`tests/test_cli_scan.py::test_two_runs_are_told_apart` | Implemented |
+| L3-CLI-009 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_bad_destination_fails_before_any_quota_is_spent`<br>`tests/test_cli_scan.py::test_a_rejected_reference_is_a_lesser_status_than_an_unreadable_one`<br>`tests/test_cli_scan.py::test_a_repository_whose_contributors_failed_keeps_its_row_and_loses_its_document`<br>`tests/test_cli_scan.py::test_a_run_that_names_nothing_still_produces_a_well_formed_file`<br>`tests/test_cli_scan.py::test_an_unaffordable_run_spends_nothing`<br>`tests/test_cli_scan.py::test_an_unreadable_repository_gets_a_row_but_no_document` | Implemented |
+| L3-CLI-010 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_document_is_written_for_every_repository_that_was_read`<br>`tests/test_cli_scan.py::test_both_artifacts_of_one_run_carry_the_same_scan`<br>`tests/test_cli_scan.py::test_the_default_destination_is_a_githubmetrics_directory` | Implemented |
 
 ### COL: COL
 
@@ -112,7 +113,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-COL-001 | L2-COL-001 | `tests/test_runner.py::test_a_failure_does_not_take_the_rest_of_the_run_with_it`<br>`tests/test_runner.py::test_an_outcome_keeps_the_reference_that_produced_it`<br>`tests/test_runner.py::test_nothing_to_collect_is_not_an_error`<br>`tests/test_runner.py::test_the_failures_are_named_in_the_log` | Implemented |
 | L3-COL-002 | L2-COL-002 | `tests/test_runner.py::test_results_come_back_in_input_order_not_completion_order`<br>`tests/test_runner.py::test_the_pool_never_exceeds_the_work_available`<br>`tests/test_runner.py::test_the_same_inventory_collects_identically_every_time`<br>`tests/test_runner.py::test_the_worker_count_is_respected` | Implemented |
-| L3-COL-003 | L2-COL-003 | `tests/test_runner.py::test_a_run_that_does_not_fit_is_refused_before_it_starts`<br>`tests/test_runner.py::test_a_run_that_fits_reports_what_it_will_cost`<br>`tests/test_runner.py::test_the_budget_runs_to_zero`<br>`tests/test_runner.py::test_the_cost_is_one_point_per_repository` | Implemented |
+| L3-COL-003 | L2-COL-003 | `tests/test_runner.py::test_a_run_that_does_not_fit_is_refused_before_it_starts`<br>`tests/test_runner.py::test_a_run_that_fits_reports_what_it_will_cost`<br>`tests/test_runner.py::test_the_budget_runs_to_zero`<br>`tests/test_runner.py::test_the_cost_is_two_points_and_one_request_per_repository`<br>`tests/test_runner.py::test_the_rest_budget_is_checked_as_well_as_the_graphql_one` | Implemented |
 
 ### CON: Concurrency
 
@@ -228,8 +229,8 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-MET-001 | L2-COL-003, L2-MET-001, L2-MET-002, L2-MET-003, L2-MET-005, L2-MET-006, L2-MET-008, L2-MET-010 | _(none)_ | Implemented |
-| L1-MET-002 | L2-MET-004, L2-MET-007, L2-MET-009, L2-MET-011, L2-ROW-002, L2-SCR-004 | _(none)_ | Implemented |
+| L1-MET-001 | L2-COL-003, L2-MET-001, L2-MET-002, L2-MET-003, L2-MET-005, L2-MET-006, L2-MET-008, L2-MET-010, L2-MET-012 | _(none)_ | Implemented |
+| L1-MET-002 | L2-MET-004, L2-MET-007, L2-MET-009, L2-MET-011, L2-MET-013, L2-ROW-002, L2-SCR-004 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -246,6 +247,8 @@ through their children, so counting them too would count the same work twice.
 | L2-MET-009 | L1-MET-002 | L3-MET-010 | _(none)_ | Implemented |
 | L2-MET-010 | L1-MET-001 | L3-MET-012 | _(none)_ | Implemented |
 | L2-MET-011 | L1-MET-002 | L3-MET-013, L3-MET-014, L3-MET-015, L3-MET-016 | _(none)_ | Implemented |
+| L2-MET-012 | L1-MET-001 | L3-MET-017 | _(none)_ | Implemented |
+| L2-MET-013 | L1-MET-002 | L3-MET-018 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -267,6 +270,8 @@ through their children, so counting them too would count the same work twice.
 | L3-MET-014 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_transfer`<br>`tests/test_repository.py::test_a_transfer_names_where_it_went`<br>`tests/test_repository.py::test_a_transferred_repository_is_refused` | Implemented |
 | L3-MET-015 | L2-MET-011 | `tests/test_repository.py::test_a_case_difference_is_not_a_rename`<br>`tests/test_repository.py::test_a_missing_name_falls_back_to_the_inventory`<br>`tests/test_repository.py::test_the_name_is_taken_from_the_api_not_from_the_inventory` | Implemented |
 | L3-MET-016 | L2-MET-011 | `tests/test_repository.py::test_a_renamed_repository_is_refused`<br>`tests/test_repository.py::test_the_new_location_is_reported_so_it_can_be_pasted_in` | Implemented |
+| L3-MET-017 | L2-MET-012 | `tests/test_contributors.py::test_a_contributor_carries_its_identity_and_its_commits`<br>`tests/test_contributors.py::test_aliases_are_positional_rather_than_logins`<br>`tests/test_contributors.py::test_an_account_record_is_immutable`<br>`tests/test_contributors.py::test_an_account_that_vanished_is_still_recorded`<br>`tests/test_contributors.py::test_an_account_with_no_name_falls_back_to_its_login`<br>`tests/test_contributors.py::test_an_unreadable_contributor_list_is_its_own_failure`<br>`tests/test_contributors.py::test_no_accounts_asks_for_no_details`<br>`tests/test_contributors.py::test_the_detail_query_asks_for_every_account_at_once`<br>`tests/test_contributors.py::test_the_detail_query_selects_no_nodes`<br>`tests/test_contributors.py::test_the_judgement_columns_are_not_asserted`<br>`tests/test_contributors.py::test_the_list_is_truncated_at_the_limit` | Implemented |
+| L3-MET-018 | L2-MET-013 | `tests/test_contributors.py::test_a_published_location_is_resolved`<br>`tests/test_contributors.py::test_no_location_is_never_looked_up`<br>`tests/test_geo.py::test_a_cached_address_cannot_be_mutated_by_a_caller`<br>`tests/test_geo.py::test_a_component_the_match_lacks_is_empty_not_null`<br>`tests/test_geo.py::test_a_country_code_is_lower_cased`<br>`tests/test_geo.py::test_a_location_of_only_whitespace_is_never_asked`<br>`tests/test_geo.py::test_a_match_is_decomposed_into_components`<br>`tests/test_geo.py::test_a_repeated_location_is_asked_once`<br>`tests/test_geo.py::test_a_service_failure_is_a_warning_not_a_crash`<br>`tests/test_geo.py::test_a_settlement_is_found_whatever_kind_it_is`<br>`tests/test_geo.py::test_an_unresolved_location_never_plots`<br>`tests/test_geo.py::test_asked_and_unresolved_records_the_question`<br>`tests/test_geo.py::test_capitalisation_and_spacing_are_one_lookup`<br>`tests/test_geo.py::test_each_contributor_records_its_own_spelling`<br>`tests/test_geo.py::test_invisible_characters_do_not_split_a_lookup`<br>`tests/test_geo.py::test_nothing_published_is_never_asked`<br>`tests/test_geo.py::test_place_names_are_pinned_to_one_language`<br>`tests/test_geo.py::test_the_subdivision_code_is_found_at_whatever_level_a_country_uses` | Implemented |
 
 ### OUT: Result output and destinations
 
@@ -277,6 +282,7 @@ through their children, so counting them too would count the same work twice.
 | L1-OUT-001 | L2-COL-001, L2-OUT-001, L2-OUT-002, L2-OUT-003, L2-OUT-004, L2-OUT-008, L2-OUT-009, L2-ROW-001 | _(none)_ | Implemented |
 | L1-OUT-002 | L2-OUT-005, L2-OUT-006 | _(none)_ | Implemented |
 | L1-OUT-003 | L2-OUT-007 | _(none)_ | Implemented |
+| L1-OUT-004 | L2-OUT-010, L2-OUT-011 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -291,12 +297,14 @@ through their children, so counting them too would count the same work twice.
 | L2-OUT-007 | L1-OUT-003 | L3-OUT-004, L3-OUT-005 | _(none)_ | Implemented |
 | L2-OUT-008 | L1-OUT-001 | L3-OUT-009 | _(none)_ | Implemented |
 | L2-OUT-009 | L1-OUT-001 | L3-OUT-010 | _(none)_ | Implemented |
+| L2-OUT-010 | L1-OUT-004 | L3-OUT-011 | _(none)_ | Implemented |
+| L2-OUT-011 | L1-OUT-004 | L3-OUT-012 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-OUT-001 | L2-OUT-001 | `tests/test_output.py::test_the_documented_json_example_leads_with_the_shipped_column_set`<br>`tests/test_output.py::test_the_documented_json_example_never_geocodes_to_null_island`<br>`tests/test_output.py::test_the_header_is_derived_from_the_dataclass_not_a_parallel_list`<br>`tests/test_output.py::test_the_header_is_the_agreed_column_set_in_the_agreed_order`<br>`tests/test_output.py::test_the_reference_row_renders_exactly_as_documented` | Implemented |
+| L3-OUT-001 | L2-OUT-001 | `tests/test_output.py::test_the_documented_json_example_is_the_row_then_the_block`<br>`tests/test_output.py::test_the_documented_json_example_never_geocodes_to_null_island`<br>`tests/test_output.py::test_the_header_is_derived_from_the_dataclass_not_a_parallel_list`<br>`tests/test_output.py::test_the_header_is_the_agreed_column_set_in_the_agreed_order`<br>`tests/test_output.py::test_the_reference_row_renders_exactly_as_documented` | Implemented |
 | L3-OUT-002 | L2-OUT-002 | `tests/test_output.py::test_csv_preserves_the_order_it_was_given`<br>`tests/test_output.py::test_csv_uses_lf_regardless_of_platform`<br>`tests/test_output.py::test_csv_writes_a_header_even_with_no_rows` | Implemented |
 | L3-OUT-003 | L2-OUT-003 | `tests/test_output.py::test_json_is_an_array_of_objects_keyed_by_column_name`<br>`tests/test_output.py::test_json_keeps_native_types_rather_than_stringifying`<br>`tests/test_output.py::test_json_repeats_the_run_identity_in_every_object` | Implemented |
 | L3-OUT-004 | L2-OUT-007 | `tests/test_output.py::test_an_unfetchable_row_keeps_its_identity_and_empties_the_rest`<br>`tests/test_output.py::test_not_collected_is_distinguishable_from_collected_zero`<br>`tests/test_output.py::test_unknown_values_are_null_in_json_not_zero` | Implemented |
@@ -306,6 +314,8 @@ through their children, so counting them too would count the same work twice.
 | L3-OUT-008 | L2-OUT-004 | `tests/test_output.py::test_console_marks_an_unknown_value_rather_than_leaving_a_gap`<br>`tests/test_output.py::test_console_renders_vertically_one_label_per_line`<br>`tests/test_output.py::test_console_says_so_when_there_is_nothing_to_show`<br>`tests/test_output.py::test_console_separates_repositories` | Implemented |
 | L3-OUT-009 | L2-OUT-008 | `tests/test_output.py::test_a_directory_gets_the_default_filename`<br>`tests/test_output.py::test_a_missing_parent_directory_fails_early`<br>`tests/test_output.py::test_a_named_file_is_used_as_given`<br>`tests/test_output.py::test_a_trailing_separator_reads_as_a_directory_even_if_absent`<br>`tests/test_output.py::test_no_destination_means_the_console` | Implemented |
 | L3-OUT-010 | L2-OUT-009 | `tests/test_output.py::test_a_naive_scan_date_is_rejected`<br>`tests/test_output.py::test_a_scan_identifier_is_timezone_aware_and_unique`<br>`tests/test_output.py::test_one_identity_stamps_every_row_of_a_run` | Implemented |
+| L3-OUT-011 | L2-OUT-010 | `tests/test_cli_scan.py::test_document_paths_are_nested_and_lower_cased`<br>`tests/test_documents.py::test_a_document_is_written_with_lf_endings`<br>`tests/test_documents.py::test_a_missing_root_is_created`<br>`tests/test_documents.py::test_a_root_that_is_a_file_is_refused`<br>`tests/test_documents.py::test_a_windows_reserved_name_needs_no_sanitising`<br>`tests/test_documents.py::test_nesting_removes_a_collision_that_flattening_would_create`<br>`tests/test_documents.py::test_the_default_root_is_used_when_none_is_named`<br>`tests/test_documents.py::test_the_path_is_lower_cased`<br>`tests/test_documents.py::test_the_path_is_nested_by_owner` | Implemented |
+| L3-OUT-012 | L2-OUT-011 | `tests/test_cli_scan.py::test_a_document_is_its_csv_row_then_the_contributor_block`<br>`tests/test_cli_scan.py::test_an_unresolved_address_is_null_throughout`<br>`tests/test_cli_scan.py::test_field_selection_does_not_reach_the_documents`<br>`tests/test_cli_scan.py::test_the_contributor_block_carries_the_run_identity`<br>`tests/test_contributor_model.py::test_a_github_id_survives_beyond_the_javascript_safe_integer`<br>`tests/test_contributor_model.py::test_every_declared_field_is_rendered_and_every_rendered_key_declared`<br>`tests/test_contributor_model.py::test_the_address_carries_country_and_country_code`<br>`tests/test_contributor_model.py::test_the_block_keys_are_derived_rather_than_restated`<br>`tests/test_contributor_model.py::test_two_blocks_do_not_share_one_address`<br>`tests/test_documents.py::test_a_document_is_the_row_then_the_block`<br>`tests/test_documents.py::test_a_document_keeps_json_types`<br>`tests/test_documents.py::test_a_repository_with_no_contributors_totals_zero`<br>`tests/test_documents.py::test_the_aggregates_are_document_keys_and_not_csv_columns`<br>`tests/test_documents.py::test_the_contributor_block_matches_the_documented_example` | Implemented |
 
 ### ROW: ROW
 

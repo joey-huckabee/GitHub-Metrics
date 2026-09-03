@@ -12,6 +12,7 @@ import pytest
 
 from github_metrics.errors import OutputDestinationError, UnknownFieldError
 from github_metrics.model import ScanIdentifier, SoftwareRow
+from github_metrics.model.contributor import ContributorBlock
 from github_metrics.output import (
     ALL_FIELDS,
     render_console,
@@ -102,22 +103,26 @@ EXAMPLE_JSON = Path(__file__).resolve().parents[1] / "docs" / "example.json"
 
 
 @pytest.mark.requirement("L3-OUT-001")
-def test_the_documented_json_example_leads_with_the_shipped_column_set() -> None:
+def test_the_documented_json_example_is_the_row_then_the_block() -> None:
     """`docs/example.json` is the agreed shape for the per-repository JSON.
 
-    Its first twenty keys are the CSV's columns, in canonical order, because
-    the two artifacts are the same row and are meant to join on identical
-    keys. This is the check that keeps them joinable: the example drifted once
-    already, carrying `prevalance_score` and a `trusted_org` string against a
-    `prevalence_score` and an `is_trusted_org` boolean in the code, and
-    nothing failed.
+    The document is every CSV column in canonical order, complete, and then the
+    contributor block. Stating it as a prefix and a fixed suffix is the
+    strongest form of the rule the two artifacts have to keep: every CSV column
+    is a document key, spelled the same way and in the same order, so a row and
+    a document join without a translation table.
+
+    The example drifted once already, carrying `prevalance_score` and a
+    `trusted_org` string against a `prevalence_score` and an `is_trusted_org`
+    boolean in the code, and nothing failed. This is the check.
     """
     example = json.loads(EXAMPLE_JSON.read_text(encoding="utf-8"))
 
     assert tuple(example)[: len(ALL_FIELDS)] == ALL_FIELDS
-    # Everything after them is the contributor block, which the CSV has no
-    # column for. It must not overlap, or a key would mean two things.
-    assert not set(tuple(example)[len(ALL_FIELDS) :]) & set(ALL_FIELDS)
+    assert tuple(example)[len(ALL_FIELDS) :] == ContributorBlock.keys()
+    # The block's keys are the document's alone. A name in both would mean two
+    # different things depending on which artifact was being read.
+    assert not set(ContributorBlock.keys()) & set(ALL_FIELDS)
 
 
 @pytest.mark.requirement("L3-OUT-001")

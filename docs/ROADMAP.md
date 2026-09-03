@@ -19,9 +19,9 @@ about and deliberately scheduled; that is different from being promised.
 - `github-metrics validate`, the offline check — formerly `ingest`
 - `github-metrics scan`, the release deliverable: collection over an
   inventory, concurrently, with a rate-limit pre-flight, into
-  `githubmetrics.csv`
-- `github-metrics contributors`, the same sources into a separate dataset
-  — its columns are still to be agreed
+  `githubmetrics.csv` **and** one JSON document per repository
+- Contributor collection, folded into `scan` rather than a command of its own.
+  `github-metrics contributors` is retired
 - A three-level requirements tree traced to tests, checked in CI
 
 **Merged, output half of v0.1.0:** the `SoftwareRow` column definition, the CSV,
@@ -46,7 +46,8 @@ trusted list, and neither is being pulled now.
 
 ## v0.1.0 — `githubmetrics.csv`
 
-The current release target. Everything below is in scope now.
+**Released 2026-08-30.** Kept here as the record of what that release covered
+and why; v0.2.0 changes several of these decisions, and says so where it does.
 
 ### The `metrics` sub-command, renamed `scan` in v0.2.0
 
@@ -162,44 +163,36 @@ rate-limit knobs were already scheduled here and keep their place.
 
 ### Contributor collection
 
-The shape is [`example.json`](example.json): the twenty `SoftwareRow` columns,
-then a contributor block. One JSON file per repository, at
-`githubmetrics/<owner>/<repoid>.json` unless `--output` says otherwise,
-lower-cased throughout, and written only for a repository that was actually
-read. See
+**Built.** The shape is [`example.json`](example.json): the twenty-five
+`SoftwareRow` columns, then a `contributors` array. One JSON document per
+repository, at `githubmetrics/<owner>/<repoid>.json` unless `--output` says
+otherwise, lower-cased throughout, and written only for a repository that was
+fully collected. See
 [ADR-0005](adr/0005-one-scan-command-and-per-repository-json.md) for why each
-of those three is what it is.
+of those is what it is.
 
-**Merged so far:**
+**Merged:**
 
 - `repo_name` renamed `name`, and `url` added as a column after `name`, `owner`
-  and `organization`. The CSV and the JSON now share one set of key names, so
+  and `organization`. The CSV and the documents share one set of key names, so
   the two artifacts join without a translation table
 - `metrics` renamed `scan`, so one run is one scan and the command shares a
   word with the `scan_id` and `scan_date` it stamps
-- `example.json` corrected: `prevalance_score` spelling, `trusted_org: ""`
-  replaced by the `is_trusted_org` boolean the CSV already carries, and the
-  0/0 coordinates for an ungeocoded contributor replaced by `null`
-
-**Settled since:**
-
-- The output layout is `githubmetrics/<owner>/<repoid>.json`. The flat
-  `<owner>-<repoid>.json` was rejected because hyphens are legal in both an
-  account name and a repository name, so it maps `foo-bar/baz` and
-  `foo/bar-baz` to one file - two different repositories rather than a
-  duplicate pair, so duplicate detection correctly says nothing while one
-  overwrites the other
-- Paths are always lower case, because GitHub names are case-insensitive and
-  `RepositoryRef.key` already folds case to say so
-- A repository that could not be read gets **no file**. The run warns,
-  continues and exits 4, and the CSV still carries its identity-only row
-
-**Still to do:**
-
-- Collecting the contributor block and writing the per-repository files
-- Folding `contributors` into `scan` behind a flag, per
-  [ADR-0005](adr/0005-one-scan-command-and-per-repository-json.md), so the
-  cheap path stays the default
+- `contributors` removed, and folded into `scan`. **No flag governs which
+  artifacts a run writes** - it writes both, always. The flagged design was
+  considered and rejected: it buys one state nothing else expresses, and in
+  exchange what a run produced stops being readable from the command
+- The five contribution aggregates added as columns 21-25, so the CSV and the
+  documents carry the same fields. Their grain is the repository, which is the
+  CSV's grain
+- Contributor collection itself: the ranked list from REST, every account's
+  detail from one aliased GraphQL document, and locations resolved to a
+  fourteen-field address through Nominatim
+- `check_budget` extended to both currencies. A scan costs 2 GraphQL points and
+  1 REST request per repository, so GraphQL binds first at 2,500 repositories
+  an hour
+- `--geocode` and `--contributors N` removed. Geocoding is unconditional; the
+  limit is `DEFAULT_CONTRIBUTOR_LIMIT`
 
 **Blocked on definitions**, per the rule that nothing is implemented before
 `METRICS.md` defines it:
@@ -209,7 +202,31 @@ of those three is what it is.
 - `adversarial` — no agreed rule yet. Also coming as code
 
 Neither has a definition anywhere in the repository today, and both attach a
-judgement to a named person, so both wait.
+judgement to a named person, so neither is computed. Both are **emitted as
+`null`**, along with the four aggregates that depend on them
+(`foreign_contribution`, `adversarial_contribution`, `foreign_percent`,
+`adversarial_percent`), so that the shape does not change when the definitions
+land. Reserving a column is not implementing the metric: a `null` publishes no
+number and makes no claim.
+
+**Open, and worth revisiting once there is a real run to look at:**
+
+- **The cost of the default.** Every scan now pays for contributor pages and
+  geocodes. That was the thing the v0.1.0 command split existed to avoid, and
+  it is accepted here as the price of one identity per run. If it hurts, the
+  lever is `DEFAULT_CONTRIBUTOR_LIMIT`, not a flag
+- **Geocoding throughput.** Nominatim permits one request per second, so a
+  first run over a large inventory is measured in hours. The per-run cache
+  makes the cost the number of distinct locations rather than of contributors,
+  but a cache that survived between runs would make re-runs nearly free. That
+  belongs with v0.3.0's store
+- **The contributor-detail query cost is calculated, not measured.** The
+  metrics query's one point was confirmed against the live API; the aliased
+  detail query's has not been. The repository's own convention is that a cost
+  is measured rather than assumed
+- **The probe commands.** `closed-issues` and `releases` exist to check a
+  metric definition against real repositories before wiring it in, and every
+  metric now reads Settled. Whether they are retired is still open
 
 ### Delivered early: GitHub URL input
 
@@ -282,7 +299,7 @@ metadata — the request cost scales with the number of contributors rather than
 being constant per repository — so the rate-limit work from v0.1.0 and v0.2.0
 is a prerequisite rather than a nicety.
 
-The existing `--geocode` path already resolves contributor locations to
+The geocoding path already resolves contributor locations to
 coordinates and is the obvious seam to build on.
 
 ---

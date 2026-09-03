@@ -6,12 +6,40 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Groundwork for v0.2.0's contributor dataset. The per-repository JSON in
-`docs/example.json` turned out to be the metrics row plus a contributor block,
-not a second dataset, so this release aligns the two before any of it is
-collected.
+v0.2.0's contributor dataset. The per-repository JSON in `docs/example.json`
+turned out to be the metrics row plus a contributor block, not a second
+dataset, so one `scan` now collects and writes both under one scan identity.
 
 ### Added
+
+- **Contributor collection, in `scan`.** Every run writes one JSON document per
+  repository at `<output>/<owner>/<repoid>.json`, carrying that repository's
+  row followed by its contributors. Each contributor record has the account's
+  id, display name, company, self-reported location, the address that location
+  resolved to, and its commits in that repository.
+- **The five contribution aggregates as columns 21-25** —
+  `contribution_total`, `foreign_contribution`, `adversarial_contribution`,
+  `foreign_percent`, `adversarial_percent`. Twenty-five columns now, not
+  twenty. They are columns rather than document-only keys because their grain
+  is the repository, which is the CSV's grain: "which repositories carry the
+  most foreign contribution" should be a spreadsheet sort, not a walk over four
+  hundred JSON files. It also makes a document exactly *the row plus one key*,
+  which is a rule a test can state in one line — the previous formulation,
+  "the first twenty keys must not collide with the rest", could not.
+- **`--format console`**, printing the tabular artifact instead of writing it.
+  The documents are still written: there is no console rendering of four
+  hundred of them.
+- **Structured addresses.** `geo.py` returns Nominatim's fourteen address
+  components rather than a bare coordinate pair, and distinguishes three states
+  that a naive implementation collapses into one — never asked (every field
+  `null`), asked and unresolved (`query` only), and matched (`""` for a
+  component the match genuinely lacks). Without the middle state an account
+  publishing nothing is indistinguishable from one publishing `she/her`, and
+  those are different facts about that account.
+- **`GM-COL-005`**, for a repository that was read but whose contributor list
+  was not, and **`GM-OUT-003`**, for a document directory that cannot be used.
+- **`GM-COL-004`, `GM-OUT-001` and `GM-OUT-002` documented** in the error
+  catalogue, which claimed to carry every code and was missing three.
 
 - **`url` as an output column**, after `name`, `owner` and `organization`. It
   is derived from the owner and the name rather than reported separately, which
@@ -40,6 +68,59 @@ collected.
 
 ### Changed
 
+- **`contributors` is removed, and `scan` writes both artifacts every time.**
+  No flag governs which — not `--contributors`, not `--metrics`. Both
+  artifacts carry `scan_id` and `scan_date`, and those are assigned once per
+  run, so two commands produce two identities and a CSV and a folder of
+  documents collected minutes apart cannot be joined or grouped by the run that
+  measured them. That is the only reason those columns exist.
+
+  A flag was considered and rejected. It buys exactly one state nothing else
+  expresses — documents without a table — and charges for it by making what a
+  run produced depend on how it was invoked rather than on which command was
+  run. It is also not the cost lever it looks like: the repository query
+  returns every column of a row for one point whether or not a document is
+  written, so the saving is asymmetric while the flag looks symmetric.
+
+  The cost is real and is accepted rather than hidden: every run now pays for
+  contributor pages and geocodes, which is what the v0.1.0 command split
+  existed to avoid. See
+  [ADR-0005](docs/adr/0005-one-scan-command-and-per-repository-json.md), now
+  `accepted`.
+- **`--output` names a directory, and both artifacts go in it**, defaulting to
+  `./githubmetrics`. Keeping them together is not tidiness — they share a
+  `scan_id`, and separating them by default would undo the joinability the
+  whole design is for.
+- **A scan costs two GraphQL points and one REST request per repository**, and
+  `check_budget` now checks both budgets. GraphQL binds first, at 2,500
+  repositories an hour rather than 5,000. The contributor *list* is the one
+  REST call, because GraphQL has no connection reporting commits attributed per
+  account; the contributor *details* deliberately are not, because the REST
+  payload carries no name, company or location and PyGithub would complete each
+  account lazily at one request each — 26 per repository, so a 200-repository
+  inventory would exhaust the REST budget before finishing. One aliased GraphQL
+  document makes a repository's cost independent of its contributor count, and
+  carries no `nodes`, so it is not priced by how many accounts could come back.
+- **Geocoding is unconditional and paced at one request per second.**
+  `--geocode` is gone. The pace is enforced rather than trusted to politeness:
+  Nominatim's penalty is blocking the user agent, which fails every *later* run
+  rather than the one that misbehaved. Locations are cached per run, so the
+  cost is the number of distinct locations rather than of contributors — but a
+  first run over a large inventory takes hours.
+- **`--contributors N` is gone**; the limit is a fixed 25.
+  `contribution_total` counts what was collected rather than what exists, and
+  `METRICS.md` says so, because a total that silently means something narrower
+  than its name is the kind of number that survives review.
+- **`docs/example.json` reordered**: the twenty-five columns in canonical
+  order, then `contributors` last. `foreign`, `adversarial` and the four
+  aggregates that depend on them are `null` rather than `false`/`0`, because
+  `false` is a judgement about a named person that nothing in this repository
+  has measured. Its `contribution_total` is now the sum of the contributors it
+  actually shows.
+- **The legacy `metrics.py` and `models.py` are deleted.** They backed the
+  `contributors` command and collected a different field set — watchers, open
+  issues, commits in the last year, licence, language — that appears in
+  neither artifact.
 - **`metrics` is now `scan`.** A run is called a scan everywhere else in the
   codebase — `ScanIdentifier`, `scan_id`, `scan_date` — and the command that
   stamps those values now shares their word. It also stops being a name that
@@ -59,6 +140,11 @@ collected.
 
 ### Fixed
 
+- **`contribution_total` reported `0` for a repository whose contributors could
+  not be read.** Zero is a legitimate measurement — a repository really can
+  have no contributors — so it cannot also mean "not collected". It is now
+  empty in CSV and `null` in JSON, matching every other metric column. Caught
+  by a test written for the failure path before the path had one.
 - **Null Island in the contributor example.** An ungeocoded contributor carried
   `"latitude": "0", "longitude": "0"`, but 0,0 is a real coordinate in the Gulf
   of Guinea, so a failed lookup was indistinguishable from a successful one

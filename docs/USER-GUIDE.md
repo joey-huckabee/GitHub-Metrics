@@ -446,16 +446,28 @@ github-metrics scan inventory.csv --fields owner,name,total_score
 Columns come out in canonical order whatever order you ask for them, so two
 runs wanting the same columns produce identical headers.
 
-### Contributors are a separate command
+### Contributors come with every scan
+
+There is no separate command and no flag. `scan` writes the CSV and one JSON
+document per repository, and the document is that repository's row followed by
+its contributors:
 
 ```bash
-github-metrics contributors inventory.csv --geocode --output contributors.json
+github-metrics scan inventory.csv
+jq '.contributors[].name' githubmetrics/pypa/virtualenv.json
 ```
 
-Separate because contributor pages are the expensive half of the request
-budget, and none of what they return is in `githubmetrics.csv`. Making every
-metrics run pay for them would buy data the file has no columns for. Its own
-columns are not settled yet, so its output is JSON.
+They come together because both artifacts carry `scan_id` and `scan_date`, and
+those are assigned once per run. Two commands would produce two identities, and
+a CSV and a folder of documents collected minutes apart could not be joined or
+grouped by the run that measured them — which is the only reason those columns
+exist.
+
+The price is that every run now pays for contributor pages and for geocoding.
+Nominatim permits one request per second, so a first run over a few hundred
+repositories takes hours; locations are cached within a run, and they repeat
+heavily, so the cost is the number of *distinct* locations rather than of
+contributors.
 
 ## In a pipeline
 
@@ -649,21 +661,12 @@ to stderr, so a pipe stays clean.
 | Flag | Example |
 |---|---|
 | *(none)* | `github-metrics scan pypa/virtualenv` |
-| `--output` (file) | `github-metrics scan inventory.csv --output githubmetrics.csv` |
-| `--output` (directory) | `github-metrics scan inventory.csv --output ./results/` |
+| `--output` | `github-metrics scan inventory.csv --output ./results/` |
 | `--format` | `github-metrics scan inventory.csv --format json` |
+| `--format console` | `github-metrics scan pypa/virtualenv --format console` |
 | `--fields` | `github-metrics scan inventory.csv --fields owner,name,total_score` |
 | `--workers` | `github-metrics scan inventory.csv --workers 4` |
 | `--strict` | `github-metrics scan inventory.csv --strict` |
-
-### `contributors` — a separate dataset
-
-| Flag | Example |
-|---|---|
-| *(none)* | `github-metrics contributors pypa/virtualenv` |
-| `--contributors` | `github-metrics contributors inventory.csv --contributors 50` |
-| `--geocode` | `github-metrics contributors inventory.csv --geocode` |
-| `--output` | `github-metrics contributors inventory.csv --output contributors.json` |
 
 ### Probes and diagnostics
 

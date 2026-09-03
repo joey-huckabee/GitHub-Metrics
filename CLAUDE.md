@@ -17,9 +17,12 @@ this codebase:
 2. **Collection** turns those references into metrics by calling the GitHub
    API. It needs a token and it spends rate limit.
 
-The shipping release target is v0.1.0: `githubmetrics.csv`, produced by a
-`scan` sub-command. See `docs/ROADMAP.md` for what each version covers and
-`CHANGELOG.md` for the release history.
+v0.1.0 shipped `githubmetrics.csv`. The current target is v0.2.0, where one
+`scan` produces **two artifacts under one scan identity**: that CSV, and one
+JSON document per repository carrying the same row followed by its
+contributors. There is no flag selecting between them - see
+`docs/adr/0005-one-scan-command-and-per-repository-json.md` for why. `docs/ROADMAP.md`
+covers each version and `CHANGELOG.md` the release history.
 
 **Metric definitions and scoring bands are still being agreed.** `docs/METRICS.md`
 is the working document, and entries marked **TBD** are not settled. Nothing is
@@ -52,9 +55,8 @@ poetry run python scripts/build-trace-matrix.py --check
 # The CLI
 poetry run github-metrics validate inventory.csv
 poetry run github-metrics validate inventory.csv --format json --output out.json
-poetry run github-metrics scan inventory.csv --output githubmetrics.csv
+poetry run github-metrics scan inventory.csv --output ./results/
 poetry run github-metrics scan pypa/virtualenv github.com/psf/requests
-poetry run github-metrics contributors inventory.csv
 poetry run github-metrics bands
 poetry run github-metrics rate-limit
 LOG_LEVEL=DEBUG poetry run github-metrics validate inventory.csv
@@ -86,13 +88,12 @@ before doing it.
 | `errors` | Stable `GM-<AREA>-<NNN>` taxonomy, exceptions and `RowIssue` | never |
 | `logger` | Logging configuration, once, at startup | never |
 | `config` | `Settings` from environment; requires `GITHUB_TOKEN` | never |
-| `model/` | `ScanIdentifier`, `SoftwareRow` | never |
-| `output/` | CSV, JSON, console; field selection; destination resolution | never |
+| `model/` | `ScanIdentifier`, `SoftwareRow`, `Contributor`, `Address` | never |
+| `output/` | CSV, JSON, console, per-repository documents; field selection; destinations | never |
 | `client` | Authenticated PyGithub wrapper | yes |
-| `collect/` | GraphQL collection: repository, counts, timestamps, credentials | via `client` |
+| `collect/` | Collection: repository, counts, timestamps, contributors, credentials | via `client` |
 | `analysis/` | Scoring. Band tables and the weights they produce | never |
-| `metrics` | Legacy single-repository snapshot, behind `contributors` | via `client` |
-| `geo` | Location to coordinates (Nominatim, cached per run) | yes |
+| `geo` | Location to a structured address (Nominatim, paced and cached per run) | yes |
 
 `sources/` is where a repository gets named, in any of the three forms a
 command accepts: a slug, a GitHub URL, or a CSV inventory. `resolve_sources`
@@ -245,14 +246,48 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   construction, and costs one point per repository for the whole query.
   `Requester.graphql_query()` is on PyGithub already, so this adds no
   dependency.
-- **One query per repository, and it asks for `totalCount`, never `nodes`.**
-  GraphQL bills per query rather than per field, so `collect/repository.py`
-  folds every value a row needs into one document costing **one point** —
-  measured, not assumed. The condition that keeps it there is the absence of a
+- **Two queries per repository, and neither asks for `nodes`.** GraphQL bills
+  per query rather than per field, so `collect/repository.py` folds every value
+  a row needs into one document costing **one point** - measured, not assumed
+  - and `collect/contributors.py` folds every contributor's detail into a
+  second, aliased one. The condition that keeps both cheap is the absence of a
   `nodes` selection: `nodes` prices a query by the number of objects it could
   return, so adding one would make the cheapest route the most expensive one
-  for exactly the largest repositories, and nothing would fail visibly. A test
-  asserts the query contains no `nodes`.
+  for exactly the largest repositories, and nothing would fail visibly. Tests
+  assert neither query contains `nodes`.
+
+  The contributor **list** is the one REST call in a scan, because GraphQL has
+  no connection reporting commits attributed per account. Its *details* are
+  deliberately not REST: the contributors payload carries no name, company or
+  location, so PyGithub would complete each account lazily at one request each
+  - 26 per repository - and a 200-repository inventory would exhaust the REST
+  budget. A scan therefore costs 2 GraphQL points and 1 REST request per
+  repository, and `check_budget` checks **both**.
+
+- **The CSV and the per-repository JSON carry the same fields.** A document is
+  `SoftwareRow`'s twenty-five columns in canonical order, then `contributors`,
+  and nothing else. That is what lets the two artifacts join without a
+  translation table, and it is why the five contribution aggregates are columns
+  rather than document-only keys - their grain is the repository. `--fields`
+  filters the tabular artifact only; a document with columns missing would stop
+  being the row it joins with.
+
+- **A repository that was not fully collected gets a row and no document.** A
+  CSV row is positional, so omitting one shifts what every later row means; a
+  directory has no positions, so an absent file says "named, not measured" on
+  its own. Writing it anyway would publish an empty contributor array and a
+  `contribution_total` of zero, which nothing reading a directory of documents
+  could tell from a repository that genuinely has none. This is also why
+  `contribution_total` is `None` rather than `0` when the contributor list
+  could not be read.
+
+- **Geocoding is paced at one request per second, and that is not politeness.**
+  Nominatim's policy penalty is blocking the user agent, which fails every
+  later run rather than the one that misbehaved, so `geo.py` enforces it with
+  `RateLimiter`. An address has three distinguishable states - never asked
+  (all `None`), asked and unresolved (`query` only), and matched (`""` for
+  components the match lacks) - because collapsing them would make an account
+  publishing nothing look like one publishing `she/her`.
 - **`organization` is empty for a personally owned repository, and that is the
   answer.** GitHub says whether an owner is a `User` or an `Organization`, and
   empty is the only place a row records the former. Echoing the user's login

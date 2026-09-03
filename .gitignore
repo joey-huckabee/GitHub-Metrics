@@ -219,3 +219,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Scan output. `githubmetrics` is where `scan` writes when --output is omitted,
+# so a run from the repository root drops both artifacts here. They are
+# measurements of other people's repositories at one moment, not source.
+githubmetrics/
+githubmetrics.csv
+githubmetrics.json

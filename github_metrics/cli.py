@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import logging
 import os
@@ -12,7 +11,6 @@ from pathlib import Path
 
 import click
 from dotenv import load_dotenv
-from github import GithubException
 
 from github_metrics import __version__
 from github_metrics.analysis.closed_issues import (
@@ -26,7 +24,7 @@ from github_metrics.analysis.popularity import describe_bands as describe_popula
 from github_metrics.analysis.releases import RELEASE_BANDS, SATURATION_COUNT
 from github_metrics.analysis.releases import describe_bands as describe_release_bands
 from github_metrics.analysis.releases import score_releases
-from github_metrics.analysis.row import build_empty_row, build_row
+from github_metrics.analysis.row import build_empty_row, build_row, stamp
 from github_metrics.client import GitHubClient
 from github_metrics.collect.budget import check_budget
 from github_metrics.collect.closed_issues import ClosedIssueCounts, get_closed_issues
@@ -36,6 +34,7 @@ from github_metrics.collect.runner import Outcome, collect_all
 from github_metrics.config import Settings
 from github_metrics.errors import (
     CollectionError,
+    DocumentDirectoryError,
     IngestError,
     InvalidCredentialsError,
     MissingCredentialsError,
@@ -43,7 +42,6 @@ from github_metrics.errors import (
 )
 from github_metrics.geo import Geocoder
 from github_metrics.logger import LogLevels, reset_logger
-from github_metrics.metrics import DEFAULT_CONTRIBUTOR_LIMIT, collect_repository_metrics
 from github_metrics.model.scan import ScanIdentifier
 from github_metrics.model.software import SoftwareRow
 from github_metrics.output import (
@@ -52,6 +50,10 @@ from github_metrics.output import (
     resolve_fields,
     write_csv,
     write_json,
+)
+from github_metrics.output.documents import (
+    prepare_root,
+    write_document,
 )
 from github_metrics.output.fields import split_selection
 from github_metrics.sources import RepositoryRef, ResolvedSources, resolve_sources
@@ -229,17 +231,17 @@ def main(
 @click.argument("sources", nargs=-1, required=True)
 @click.option(
     "--output",
-    type=click.Path(path_type=Path),
+    type=click.Path(file_okay=False, path_type=Path),
     default=None,
-    help="Write here. A directory gets githubmetrics.csv. Omit for the console.",
+    help=("Directory for both artifacts. Defaults to ./githubmetrics."),
 )
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["csv", "json"]),
+    type=click.Choice(["csv", "json", "console"]),
     default="csv",
     show_default=True,
-    help="Output format.",
+    help="Format for the tabular artifact. The documents are always JSON.",
 )
 @click.option(
     "--fields",
@@ -267,20 +269,28 @@ def scan_command(
     workers: int | None,
     strict: bool,
 ) -> None:
-    """Scan every repository SOURCES names and report its metrics.
+    """Scan every repository SOURCES names and write its metrics.
 
     Each SOURCE is a slug (pypa/virtualenv), a GitHub URL, or a CSV inventory,
     and the three can be mixed. Check a list first with `validate`, which needs
     no token.
 
-    One row per accepted reference, in input order. A repository that cannot be
-    read still produces a row, carrying its identity and no measurements.
+    One run produces two artifacts under one scan identity: githubmetrics.csv,
+    one row per accepted reference in input order, and one JSON document per
+    repository at <owner>/<repoid>.json. The document is the row plus its
+    contributors, so the two join on identical keys.
 
-    Costs one GraphQL point per repository, confirmed against the token's
-    remaining budget before anything is collected.
+    A repository that cannot be read still produces a row, carrying its
+    identity and no measurements. It produces no document: an absent file
+    says 'named, not measured', while a document with an empty contributor
+    array would read as a repository that has none.
+
+    Costs two GraphQL points and one REST request per repository, confirmed
+    against the token's remaining budget before anything is collected.
     """
     context: CliContext = ctx.obj
-    destination = _destination(output, json_format=output_format == "json")
+    root = _document_root(output)
+    destination = _destination(root, output_format=output_format)
     columns = resolve_fields(split_selection(fields) if fields else None)
 
     try:
@@ -294,7 +304,14 @@ def scan_command(
     outcomes = _collect(context, resolved.repositories, workers=workers)
     rows = [
         (
-            build_row(outcome.reference, outcome.metadata, scan)
+            build_row(
+                outcome.reference,
+                outcome.metadata,
+                scan,
+                # None, not the empty tuple: a repository whose contributor
+                # list could not be read has not been measured as zero.
+                contributors=outcome.contributors if outcome.documented else None,
+            )
             if outcome.metadata is not None
             else build_empty_row(outcome.reference, scan)
         )
@@ -302,6 +319,7 @@ def scan_command(
     ]
 
     _emit(rows, destination, output_format=output_format, columns=columns)
+    _write_documents(root, rows, outcomes, scan)
     _report_failures(outcomes)
 
     # Severity-ordered, highest applicable wins: an unreadable repository is
@@ -312,10 +330,34 @@ def scan_command(
         ctx.exit(EXIT_ROWS_REJECTED)
 
 
-def _destination(output: Path | None, *, json_format: bool) -> Path | None:
-    """Resolve where output goes, failing before any budget is spent."""
+def _document_root(output: Path | None) -> Path:
+    """Resolve and create the directory both artifacts go in.
+
+    Done before collection for the same reason the budget check is: an
+    unwritable destination discovered afterwards has already cost an hour of
+    quota, and quota does not refill on request.
+
+    Args:
+        output: What ``--output`` named, or `None` for ``./githubmetrics``.
+
+    Returns:
+        The prepared directory.
+
+    Raises:
+        InputError: The directory cannot be created or is not a directory.
+    """
     try:
-        return resolve_destination(output, json_format=json_format)
+        return prepare_root(output)
+    except DocumentDirectoryError as exc:
+        raise InputError(str(exc)) from exc
+
+
+def _destination(root: Path, *, output_format: str) -> Path | None:
+    """Resolve the tabular artifact's path, or `None` for the console."""
+    if output_format == "console":
+        return None
+    try:
+        return resolve_destination(root, json_format=output_format == "json")
     except OutputDestinationError as exc:
         raise InputError(str(exc)) from exc
 
@@ -333,15 +375,23 @@ def _collect(
         LOGGER.warning("No repositories to collect")
         return []
 
-    with GitHubClient(context.settings()) as client:
+    settings = context.settings()
+    # One geocoder for the run, shared across the workers: its cache and its
+    # one-request-per-second pace are properties of the run, and a geocoder
+    # per repository would honour neither.
+    geocoder = Geocoder(settings.geocoder_user_agent)
+
+    with GitHubClient(settings) as client:
         budget = check_budget(client, len(references))
         LOGGER.info(
-            "Budget: %d of %d GraphQL points for %d repositories",
+            "Budget: %d of %d GraphQL points and %d of %d REST requests for %d repositories",
             budget.required,
             budget.available,
+            budget.requests_required,
+            budget.requests_available,
             budget.repositories,
         )
-        return collect_all(client, references, max_workers=workers)
+        return collect_all(client, references, max_workers=workers, geocoder=geocoder)
 
 
 def _emit(
@@ -353,12 +403,7 @@ def _emit(
 ) -> None:
     """Write the rows where the caller asked for them."""
     if destination is None:
-        if output_format == "json":
-            stream = io.StringIO()
-            write_json(rows, stream, columns=columns)
-            click.echo(stream.getvalue().rstrip())
-        else:
-            click.echo(render_console(rows, columns=columns))
+        click.echo(render_console(rows, columns=columns))
         return
 
     # newline="" because the csv module writes its own line terminators.
@@ -370,6 +415,41 @@ def _emit(
     click.echo(f"Wrote {len(rows)} rows to {destination}")
 
 
+def _write_documents(
+    root: Path,
+    rows: Sequence[SoftwareRow],
+    outcomes: Sequence[Outcome],
+    scan: ScanIdentifier,
+) -> None:
+    """Write one JSON document per repository that was fully collected.
+
+    Rows and outcomes are positionally aligned - both come from the same
+    input order - so a document is written for outcome *i* using row *i*.
+
+    Args:
+        root: The prepared output directory.
+        rows: The finished rows, in input order.
+        outcomes: What each reference produced, in the same order.
+        scan: Identity of this run, stamped onto every contributor.
+    """
+    written = 0
+    # strict: the two come from the same input order and must stay aligned,
+    # so a length mismatch is a defect rather than something to truncate past.
+    for row, outcome in zip(rows, outcomes, strict=True):
+        if not outcome.documented:
+            continue
+        try:
+            write_document(root, row, stamp(outcome.contributors, scan))
+        except DocumentDirectoryError as exc:
+            # One unwritable file does not abandon the rest; the CSV is
+            # already written and the other documents are still worth having.
+            click.echo(f"! {outcome.reference.full_name}: {exc}", err=True)
+            continue
+        written += 1
+
+    click.echo(f"Wrote {written} documents to {root}")
+
+
 def _report_failures(outcomes: Sequence[Outcome]) -> None:
     """Name the repositories that produced no measurements.
 
@@ -379,79 +459,6 @@ def _report_failures(outcomes: Sequence[Outcome]) -> None:
     for outcome in outcomes:
         if outcome.error is not None:
             click.echo(f"! {outcome.reference.full_name}: {outcome.error}", err=True)
-
-
-@main.command("contributors")
-@click.argument("sources", nargs=-1, required=True)
-@click.option("--geocode", is_flag=True, help="Resolve contributor locations to coordinates.")
-@click.option(
-    "--contributors",
-    "contributor_limit",
-    default=DEFAULT_CONTRIBUTOR_LIMIT,
-    show_default=True,
-    help="Maximum number of contributors to inspect per repository.",
-)
-@click.option(
-    "--output",
-    type=click.Path(dir_okay=False, path_type=Path),
-    help="Write JSON here instead of stdout.",
-)
-@click.pass_context
-def contributors_command(
-    ctx: click.Context,
-    sources: tuple[str, ...],
-    geocode: bool,
-    contributor_limit: int,
-    output: Path | None,
-) -> None:
-    """Collect contributor detail for every repository SOURCES names.
-
-    Takes the same sources as `metrics`: slugs, GitHub URLs and CSV
-    inventories, mixed freely.
-
-    This is a separate dataset from `githubmetrics.csv`, and separate from
-    `metrics`, which never pays for contributor pages. Its columns are not
-    settled, so the output is JSON until they are.
-    """
-    context: CliContext = ctx.obj
-    try:
-        resolved = resolve_sources(sources)
-    except IngestError as exc:
-        raise InputError(str(exc)) from exc
-
-    settings = context.settings()
-    geocoder = Geocoder(settings.geocoder_user_agent) if geocode else None
-
-    collected = []
-    failures = 0
-    with GitHubClient(settings) as client:
-        for reference in resolved.repositories:
-            try:
-                collected.append(
-                    collect_repository_metrics(
-                        client,
-                        reference.full_name,
-                        geocoder=geocoder,
-                        contributor_limit=contributor_limit,
-                    )
-                )
-            except GithubException as exc:
-                # One unreadable repository does not end the run; the ones
-                # before it were already paid for.
-                failures += 1
-                click.echo(f"! {reference.full_name}: {exc}", err=True)
-
-    payload = json.dumps([entry.to_dict() for entry in collected], indent=2, default=str)
-    if output is not None:
-        output.write_text(payload + chr(10), encoding="utf-8")
-        click.echo(f"Wrote {output}")
-    else:
-        click.echo(payload)
-
-    if failures:
-        ctx.exit(EXIT_REPOSITORY_UNFETCHABLE)
-    if resolved.issues:
-        ctx.exit(EXIT_ROWS_REJECTED)
 
 
 @main.command("rate-limit")

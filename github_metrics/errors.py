@@ -185,6 +185,20 @@ class RateLimitExhaustedError(CollectionError):
     code = "GM-COL-004"
 
 
+class ContributorCollectionError(CollectionError):
+    """The contributor list for a repository could not be read.
+
+    Separate from `RepositoryNotFoundError` because it is reached only after
+    the repository itself was read successfully, so the reference is good and
+    the failure is in the second half of the collection. The repository still
+    produces a CSV row carrying its measurements; what it does not produce is
+    a document, because a contributor block that silently came back empty
+    would read as a repository with no contributors.
+    """
+
+    code = "GM-COL-005"
+
+
 class OutputError(GitHubMetricsError):
     """Base class for failures producing output."""
 
@@ -206,6 +220,17 @@ class OutputDestinationError(OutputError):
     """
 
     code = "GM-OUT-002"
+
+
+class DocumentDirectoryError(OutputError):
+    """The per-repository document tree cannot be written.
+
+    Checked before collection for the same reason `OutputDestinationError` is:
+    a run that discovers an unwritable directory after collecting has spent an
+    hour of quota to produce nothing it can keep.
+    """
+
+    code = "GM-OUT-003"
 
 
 # --------------------------------------------------------------------------

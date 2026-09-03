@@ -23,12 +23,43 @@ REFERENCES = [
 ]
 
 
+class _StubContributor:
+    """One entry of the REST contributors list."""
+
+    def __init__(self, login: str, identifier: int, contributions: int) -> None:
+        self.login = login
+        self.id = identifier
+        self.contributions = contributions
+
+
+class _StubRepository:
+    """Just enough of a PyGithub repository to list contributors."""
+
+    def __init__(self, contributors: list[_StubContributor]) -> None:
+        self._contributors = contributors
+
+    def get_contributors(self) -> list[_StubContributor]:
+        """Mimic the paginated list, which the caller slices."""
+        return self._contributors
+
+
 class _StubClient:
     """Answers a repository query, and can be told to fail for one slug."""
 
-    def __init__(self, *, missing: set[str] | None = None, points: int = 5000) -> None:
+    def __init__(
+        self,
+        *,
+        missing: set[str] | None = None,
+        points: int = 5000,
+        requests: int = 5000,
+    ) -> None:
         self.missing = missing or {"ghost/missing"}
         self.points = points
+        self.requests = requests
+        self.contributors = [
+            _StubContributor("alice", 1, 120),
+            _StubContributor("bob", 2, 30),
+        ]
         self.calls: list[str] = []
         self.concurrent = 0
         self.peak = 0
@@ -39,6 +70,20 @@ class _StubClient:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Mimic `GitHubClient.graphql`, recording concurrency as it goes."""
         del query
+        if "owner" not in variables:
+            # The aliased contributor-detail document.
+            return {}, {
+                "data": {
+                    f"u{index}": {
+                        "databaseId": 1000 + index,
+                        "name": f"Person {index}",
+                        "company": "",
+                        "location": None,
+                    }
+                    for index in range(len(variables))
+                }
+            }
+
         slug = f"{variables['owner']}/{variables['name']}"
         with self._lock:
             self.calls.append(slug)
@@ -52,9 +97,18 @@ class _StubClient:
             with self._lock:
                 self.concurrent -= 1
 
+    def repository(self, full_name: str) -> _StubRepository:
+        """Mimic the REST repository lookup the contributor list needs."""
+        del full_name
+        return _StubRepository(self.contributors)
+
     def graphql_points_remaining(self) -> int:
-        """Mimic the budget lookup."""
+        """Mimic the GraphQL budget lookup."""
         return self.points
+
+    def rate_limit_remaining(self) -> int:
+        """Mimic the REST budget lookup."""
+        return self.requests
 
 
 def _payload(owner: str, name: str) -> dict[str, Any]:
@@ -192,9 +246,16 @@ def test_the_same_inventory_collects_identically_every_time() -> None:
 def test_a_run_that_fits_reports_what_it_will_cost() -> None:
     budget = check_budget(cast(GitHubClient, _StubClient(points=5000)), 400)
 
-    assert budget == Budget(repositories=400, required=400, available=5000)
+    assert budget == Budget(
+        repositories=400,
+        required=800,
+        available=5000,
+        requests_required=400,
+        requests_available=5000,
+    )
     assert budget.affordable is True
     assert budget.shortfall == 0
+    assert budget.request_shortfall == 0
 
 
 @pytest.mark.requirement("L3-COL-003")
@@ -208,20 +269,20 @@ def test_a_run_that_does_not_fit_is_refused_before_it_starts() -> None:
         check_budget(cast(GitHubClient, _StubClient(points=50)), 400)
 
     message = str(caught.value)
-    assert "400 repositories need 400" in message
+    assert "400 repositories need 800 GraphQL points" in message
     assert "only 50 remain" in message
-    assert "Short by 350" in message
+    assert "short by 750" in message
 
 
 @pytest.mark.requirement("L3-COL-003")
 def test_the_budget_runs_to_zero() -> None:
     """No reserve is held back.
 
-    A full hourly quota therefore collects exactly 5,000 repositories, which is
-    the largest run the tool can do. Holding points back would refuse a run the
-    token could actually have finished.
+    A full hourly quota therefore collects exactly 2,500 repositories, which is
+    the largest run the tool can do at two points each. Holding points back
+    would refuse a run the token could actually have finished.
     """
-    exact = _StubClient(points=100)
+    exact = _StubClient(points=200)
 
     assert check_budget(cast(GitHubClient, exact), 100).shortfall == 0
     with pytest.raises(RateLimitExhaustedError):
@@ -229,7 +290,28 @@ def test_the_budget_runs_to_zero() -> None:
 
 
 @pytest.mark.requirement("L3-COL-003")
-def test_the_cost_is_one_point_per_repository() -> None:
-    # Measured against the live API, and the reason a 400-row inventory fits.
-    assert check_budget(cast(GitHubClient, _StubClient()), 1).required == 1
-    assert check_budget(cast(GitHubClient, _StubClient()), 400).required == 400
+def test_the_cost_is_two_points_and_one_request_per_repository() -> None:
+    # One point for the metrics query, one for the aliased contributor detail,
+    # and one REST request for the contributor list itself.
+    one = check_budget(cast(GitHubClient, _StubClient()), 1)
+    assert (one.required, one.requests_required) == (2, 1)
+
+    many = check_budget(cast(GitHubClient, _StubClient()), 400)
+    assert (many.required, many.requests_required) == (800, 400)
+
+
+@pytest.mark.requirement("L3-COL-003")
+def test_the_rest_budget_is_checked_as_well_as_the_graphql_one() -> None:
+    """GraphQL binds first at two points against one request, but not always.
+
+    A token that has spent its REST budget elsewhere can hold plenty of
+    GraphQL points and still be unable to read a single contributor list.
+    Checking only the GraphQL side would start that run.
+    """
+    with pytest.raises(RateLimitExhaustedError) as caught:
+        check_budget(cast(GitHubClient, _StubClient(points=5000, requests=10)), 400)
+
+    message = str(caught.value)
+    assert "400 REST requests" in message
+    assert "only 10 remain" in message
+    assert "GraphQL" not in message

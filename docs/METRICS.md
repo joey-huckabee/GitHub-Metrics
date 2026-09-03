@@ -1,13 +1,26 @@
 # GitHub-Metrics — Metric Definitions and Scoring
 
-The authoritative definition of every column in `githubmetrics.csv`: where the
-value comes from, how it is calculated, and how it is scored.
+The authoritative definition of every column a scan produces: where the value
+comes from, how it is calculated, and how it is scored.
 
-**Every column is now defined and every row reads Settled.** The rule that got
-it here still applies: nothing is implemented that is not defined here first
-— a metric with an undocumented definition is not comparable across
-repositories, which is the whole point of collecting it. A row marked **TBD**
-means the definition is still being argued about and no code depends on it.
+A run writes two artifacts and they carry the same fields. `githubmetrics.csv`
+is one row per accepted reference; `<owner>/<repoid>.json` is that same row
+followed by the repository's contributors. Everything under *Output shape*
+through *Contribution aggregates* defines both; the *Contributor block*
+defines the one key the document adds.
+
+**Every metric and score column is Settled.** Six fields are not: the four
+contribution aggregates that depend on `foreign` and `adversarial`, and those
+two contributor fields themselves. All six are emitted as empty or `null` and
+nothing computes them.
+
+The rule that got the rest here still applies: nothing is implemented that is
+not defined here first — a metric with an undocumented definition is not
+comparable across repositories, which is the whole point of collecting it. A
+row marked **TBD** means the definition is still being argued about and no code
+depends on it. Reserving a column is not implementing the metric: a `null`
+publishes no number, which is exactly why the six can ship ahead of their
+definitions without making a claim.
 
 ## Output shape
 
@@ -15,14 +28,19 @@ One row per accepted input row, in input order. Column order is fixed and is
 the order below.
 
 ```csv
-name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org
+name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org,contribution_total,foreign_contribution,adversarial_contribution,foreign_percent,adversarial_percent
 ```
 
-Reference row (the worked example this document is calibrated against):
+Reference row (the worked example this document is calibrated against). The
+last four fields are empty because their definitions are still **TBD**:
 
 ```csv
-cline,cline,cline,https://github.com/cline/cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false
+cline,cline,cline,https://github.com/cline/cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false,3026,,,,
 ```
+
+A document is these twenty-five keys, in this order, then `contributors`. That
+is the whole difference between the two artifacts, and it is what lets a row
+and a document be joined without a translation table.
 
 ---
 
@@ -243,6 +261,119 @@ genuinely inactive one in the same bucket, and every average over the file
 would absorb the difference. See *Unfetchable repositories* below for what the
 row contains and what the run does about it.
 
+## Contribution aggregates
+
+Five columns, one per repository, derived from the contributor block rather
+than reported by the API. They live in the CSV as well as the document because
+their grain is the repository: answering "which repositories carry the most
+foreign contribution" should be a spreadsheet sort, not a walk over four
+hundred JSON files.
+
+| Column | Type | Source | Definition | Status |
+|---|---|---|---|---|
+| `contribution_total` | `int` | derived | Sum of `contribution` over every contributor **collected** for this repository. See [What the total counts](#what-the-total-counts). | **Settled** |
+| `foreign_contribution` | `int` | derived | Commits by contributors where `foreign` is true. | **TBD** |
+| `adversarial_contribution` | `int` | derived | Commits by contributors where `adversarial` is true. | **TBD** |
+| `foreign_percent` | `float` | derived | `foreign_contribution` as a percentage of `contribution_total`. | **TBD** |
+| `adversarial_percent` | `float` | derived | `adversarial_contribution` as a percentage of `contribution_total`. | **TBD** |
+
+The four **TBD** columns are emitted as empty in CSV and `null` in JSON, for
+every repository, and no code computes them. They are present in the column
+set so that the shape does not change when the definitions land — but a
+`null` publishes no number and makes no claim, whereas a `0` would assert that
+a repository has no foreign contribution, which is an assertion about named
+people that nothing has measured.
+
+### What the total counts
+
+`contribution_total` is the sum over the contributors this tool collected, not
+over every contributor the repository has ever had. The list is truncated at
+**25 accounts**, ranked by commits descending, which is what
+`DEFAULT_CONTRIBUTOR_LIMIT` fixes.
+
+That is a narrower thing than the name suggests, so it is stated here rather
+than left to be discovered. The truncation is logged at DEBUG when it bites,
+which is what makes a total reconcilable against GitHub's own figure later.
+The limit is fixed rather than configurable: GitHub ranks the list by
+contribution, so the first 25 accounts carry the great majority of a
+repository's commits, while the tail is long enough that collecting all of it
+would let one very large repository set the cost of an entire run.
+
+`contribution_total` is `0` for a repository that genuinely has no
+contributors, and **empty** for one whose contributor list could not be read
+(`GM-COL-005`). Those are different facts and a zero can only express the
+first.
+
+## Contributor block
+
+The one key a document has that a CSV row does not: `contributors`, an array
+ordered by commits descending. Each entry:
+
+| Field | Type | Source | Definition | Status |
+|---|---|---|---|---|
+| `scan_id` | `UUID` | run | The run that collected this record, identical to the document's. | **Settled** |
+| `scan_date` | `datetime` | run | As above. | **Settled** |
+| `github_id` | `str` | API | The account's numeric GitHub id, as a string. Stable across a rename, which the login is not. | **Settled** |
+| `name` | `str` | API | The account's display name, falling back to its login when it publishes none. | **Settled** |
+| `organization` | `str` | API | The account's self-reported company, or `""` when it publishes none. | **Settled** |
+| `location` | `str` | API | The account's self-reported location, verbatim, or `null` when it publishes none. Free text; GitHub does not validate it. | **Settled** |
+| `internal_address` | `object` | derived | What `location` resolved to. See [Addresses](#addresses). | **Settled** |
+| `contribution` | `int` | API | Commits attributed to this account in this repository. | **Settled** |
+| `foreign` | `bool` | policy | Whether the contributor is foreign to the United States. | **TBD** |
+| `adversarial` | `bool` | policy | Whether the contributor is adversarial. | **TBD** |
+
+`foreign` and `adversarial` are emitted as `null`. Both attach a judgement to a
+named person, and neither has a definition anywhere in this repository, so
+neither is computed. `null` rather than `false`, because `false` is the
+judgement, not the absence of one.
+
+An account that is deleted or suspended between reading the contributor list
+and reading its detail is still recorded, carrying its login as `name` and
+nothing else resolved. Its `contribution` is a real measurement of this
+repository, so dropping the record would quietly reduce `contribution_total`.
+
+### Addresses
+
+`internal_address` decomposes a location into components, and it has three
+states that must stay distinguishable:
+
+| State | Looks like | Means |
+|---|---|---|
+| Never asked | every field `null` | the account published no location |
+| Asked, unresolved | `query` set, the rest `null` | the account published something no gazetteer recognises |
+| Matched | `query`, `formatted_address` and the components set; `""` for components the match lacks | resolved |
+
+The middle state is why `query` exists. Without it, an account publishing
+`she/her` would be indistinguishable from one publishing nothing, and those
+are different facts about that account.
+
+The `""` in the third state is a measurement too: a country-level match
+genuinely has no city, and recording that is not the same as never having
+looked.
+
+| Field | Type | Nominatim source |
+|---|---|---|
+| `query` | `str` | the location string, verbatim |
+| `formatted_address` | `str` | the single-line rendering of the match |
+| `street` | `str` | `road` |
+| `house_number` | `str` | `house_number` |
+| `suburb` | `str` | `suburb`, else `neighbourhood`, else `quarter` |
+| `post_code` | `str` | `postcode` |
+| `state` | `str` | `state` |
+| `state_code` | `str` | `ISO3166-2-lvl4`, else `-lvl3`, else `-lvl6` |
+| `state_district` | `str` | `state_district` |
+| `county` | `str` | `county` |
+| `country` | `str` | `country` |
+| `country_code` | `str` | `country_code`, lower case |
+| `city` | `str` | `city`, else `town`, else `village`, else `municipality` |
+| `internal_location` | `object` | `{ latitude, longitude }` |
+
+**Coordinates are `null` when unresolved, never `0.0`.** 0,0 is a real
+position in the Gulf of Guinea, so a zeroed pair plots as Null Island and
+reads as data rather than announcing itself as a failure. This is the same
+rule as *Unknown vs. zero* below, applied to a number that has no other way to
+say "nothing here".
+
 ## Formatting rules
 
 | Concern | Rule | Status |
@@ -251,6 +382,8 @@ row contains and what the run does about it.
 | `scan_date` | Python `str(datetime)`, UTC, microsecond precision | **Settled** |
 | Floats | Full precision, no rounding (`736.5466017006597`) | **Settled** |
 | Score columns | All six components are `float` and render with a decimal point | **Settled** |
+| Undefined columns | The four TBD aggregates render empty in CSV and `null` in JSON, always | **Settled** |
+| Coordinates | `null` when unresolved, never `0.0` — 0,0 is a real place | **Settled** |
 | Unfetchable repositories | Input and scan columns filled, everything else empty, run exits 4 | **Settled** |
 | Unknown vs. zero | Empty field in CSV, `null` in JSON — never `0` | **Settled** |
 
@@ -271,8 +404,20 @@ can report it, and the API reported nothing. It is the one identity-looking
 column a failed read cannot fill.
 
 ```csv
-cpython,python,,<scan_date>,<scan_id>,,,,,,,,,,,,,,
+cpython,python,,https://github.com/python/cpython,<scan_date>,<scan_id>,,,,,,,,,,,,,,,,,,,
 ```
+
+**And it produces no document.** A CSV row is positional — one row per
+accepted input row — so omitting one would shift what every later row means.
+A directory has no positions, so an absent file says "named, not measured" on
+its own. Writing the document anyway would publish an empty contributor array
+and a `contribution_total` of zero, which nothing reading a directory of
+documents could tell from a repository that genuinely has no contributors.
+
+The same applies, one step later, to a repository that was read successfully
+but whose contributor list was not (`GM-COL-005`): the row keeps every
+measurement it collected, `contribution_total` is empty rather than zero, and
+no document is written.
 
 **The run reports which repositories failed and exits non-zero.** A row of
 empty measurements is not a result, and a file that contains some of those
@@ -293,54 +438,91 @@ column, is a separate question deferred to that design.
 
 ## Field selection
 
-The caller may choose which columns to emit; selecting none emits all of them.
+The caller may choose which columns the **tabular** artifact emits; selecting
+none emits all of them.
 
-Selection drives collection, not just rendering: **if no selected column needs
-a given API call, that call is not made.** On a large inventory this is the
-difference between fitting inside the token's budget and not.
+It is a rendering filter and nothing more. Selection was specified as a
+rate-limit lever as well — a column nobody asked for would need no data, so
+the selection would decide which API calls a run must make. That promise is
+withdrawn rather than carried forward: every column a row needs comes from one
+GraphQL query costing one point, so there is no call left to skip and no quota
+to save. The lever was designed when collection was assumed to be several REST
+calls per repository.
 
-The dependency is not one-to-one, because scores derive from raw metrics. A
-selection of `stars_score` alone still requires the repository fetch that
-provides `stars`; a selection that excludes everything derived from releases
-skips the release request entirely. The mapping from selected column to
-required request is the table below, and it cannot be finalised until the
-metric definitions are.
+**Selection does not reach the documents.** A document with columns missing
+would stop being the row it has to join with, which is the one property the
+pair of artifacts exists to have.
 
 ## JSON output
 
-An array of objects, one per row, using the same field names as the CSV
-columns. `scan_date` and `scan_id` repeat in every object, exactly as they
-repeat in every CSV row — the two formats carry the same information in the
-same shape, so a consumer can switch between them without a mapping layer.
+Two different things carry JSON, and they are not the same artifact.
+
+`--format json` renders the **tabular** artifact as an array of objects, one
+per row, using the same field names as the CSV columns. `scan_date` and
+`scan_id` repeat in every object, exactly as they repeat in every CSV row.
+
+The **documents** are always JSON and always written, one per repository, at
+`<owner>/<repoid>.json`. Each is the twenty-five columns in canonical order
+followed by `contributors`. `--format` does not affect them: there is no CSV
+form of a nested contributor array, and no console rendering of four hundred
+documents.
 
 ## Rate-limit cost per repository
 
-Every metric that needs its own API call adds to the per-repository request
-cost, which multiplies across the inventory and determines whether a run fits
-inside the token's budget. This table is what the pre-flight check will be
-computed from, and it cannot be completed until the definitions above are.
+A scan spends from **two** separate hourly budgets, and `check_budget` refuses
+a run that does not fit either one before collecting anything.
 
-| Metric | Route | Cost per repository | Status |
+| What | Route | Cost per repository | Status |
 |---|---|---|---|
 | `closed_issues` | GraphQL `issues(states: CLOSED) { totalCount }` | 1 point | **Settled** |
 | `stars`, `forks`, `organization`, dates | GraphQL, same query | 0 additional | **Settled** |
 | `releases`, `tags` | GraphQL, same query | 0 additional | **Settled** |
+| contributor list | REST `/repos/{owner}/{repo}/contributors` | 1 request | **Settled** |
+| contributor detail | GraphQL, one aliased document | 1 point | **Calculated, not measured** |
+
+**Two GraphQL points and one REST request per repository.** GraphQL binds
+first, at 2,500 repositories an hour against REST's 5,000.
 
 Because GraphQL bills per query rather than per field, folding every count into
-one document costs **one point per repository** regardless of how many metrics
-are collected. That is 5,000 repositories per hour, against roughly 1,600 for
-the three-request REST equivalent - which would still be wrong.
+one document costs one point per repository regardless of how many metrics are
+collected — against roughly 1,600 repositories an hour for the three-request
+REST equivalent, which would still be wrong.
 
-Confirmed against the live API. `collect.repository` sends one document
-returning eleven fields and the response reports a cost of **1**. The whole
-per-repository cost is therefore one point, whatever the size of the
-repository - a run of 400 repositories spends 400 of 5,000.
+The metrics query's cost is confirmed against the live API:
+`collect.repository` sends one document returning eleven fields and the
+response reports a cost of **1**. The contributor-detail query's cost is
+**calculated rather than measured** — it follows from GitHub's documented
+formula for a document of single-object selections — and remains a debt to
+settle with a real token.
 
-The condition that keeps it there is that the query asks for `totalCount` and
-never for `nodes`. A `nodes` selection prices a query by the number of objects
-it could return, so a repository with 825 releases would cost more than one
-with 3 - the cheapest route would become the most expensive one for exactly
-the largest projects. A test asserts the query contains no `nodes`.
+The condition that keeps both cheap is that neither asks for `nodes`. A
+`nodes` selection prices a query by the number of objects it could return, so
+a repository with 825 releases would cost more than one with 3, and the
+cheapest route would become the most expensive one for exactly the largest
+projects. Tests assert that neither query contains `nodes`.
+
+### Why the contributor detail is not REST
+
+The REST contributors payload is a minimal account object — login, id, avatar
+— and carries no name, company or location. Reading those through PyGithub
+completes each account lazily, which is **one REST request per contributor**:
+26 per repository at the collection limit, so a 200-repository inventory
+exhausts REST's 5,000-per-hour budget before it finishes. Aliasing the
+accounts into one GraphQL document makes a repository's cost independent of
+how many contributors it has.
+
+### Geocoding is the slow part
+
+Nominatim's usage policy permits **one request per second**, and that is
+enforced in `geo.py` rather than trusted to politeness: the penalty for
+exceeding it is the service blocking the user agent, which fails every later
+run rather than the one that misbehaved.
+
+That makes the geocoder, not the GitHub API, the pace of a large scan. The
+per-run cache is what makes it survivable — contributor locations repeat
+heavily across a portfolio, so the cost is the number of *distinct* locations
+rather than the number of contributors — but a first run over a large
+inventory is measured in hours.
 
 ---
 

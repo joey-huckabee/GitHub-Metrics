@@ -1,8 +1,14 @@
 """One row of the metrics output.
 
 `SoftwareRow` is the single definition of what a result looks like. The CSV
-writer, the JSON writer and the console renderer all derive their columns from
-it, so the three formats cannot drift apart.
+writer, the JSON writer, the console renderer and the per-repository JSON
+document all derive their columns from it, so the four cannot drift apart.
+
+The per-repository document is this row plus a `contributors` array and
+nothing else, which is why the five contribution aggregates are columns here
+rather than keys that exist only in the JSON. They are per repository, so the
+CSV's grain is where they belong; putting them anywhere else would give the
+two artifacts different fields.
 
 Field definitions and scoring bands live in `docs/METRICS.md`.
 """
@@ -20,7 +26,7 @@ EMPTY: Final = ""
 """How an unknown value is rendered in every output format."""
 
 
-# The attribute count is the output contract: twenty columns, defined in
+# The attribute count is the output contract: twenty-five columns, defined in
 # docs/METRICS.md. The design check is aimed at classes that carry behaviour,
 # not at a record whose whole purpose is to hold one row.
 @dataclass
@@ -69,6 +75,18 @@ class SoftwareRow(DataClassJsonMixin):  # pylint: disable=too-many-instance-attr
         trusted_org_bonus: Score component derived from `is_trusted_org`.
         total_score: Sum of the six score components.
         is_trusted_org: Whether the owner is on the trusted list.
+        contribution_total: Commits across every contributor collected for
+            this repository.
+        foreign_contribution: Commits by contributors foreign to the United
+            States. **Undefined**; always `None` until `docs/METRICS.md`
+            settles the rule.
+        adversarial_contribution: Commits by adversarial contributors.
+            **Undefined**; always `None` until `docs/METRICS.md` settles the
+            rule.
+        foreign_percent: `foreign_contribution` as a percentage of
+            `contribution_total`. **Undefined**, as its numerator is.
+        adversarial_percent: `adversarial_contribution` as a percentage of
+            `contribution_total`. **Undefined**, as its numerator is.
     """
 
     name: str = ""
@@ -91,6 +109,11 @@ class SoftwareRow(DataClassJsonMixin):  # pylint: disable=too-many-instance-attr
     trusted_org_bonus: float | None = None
     total_score: float | None = None
     is_trusted_org: bool | None = None
+    contribution_total: int | None = None
+    foreign_contribution: int | None = None
+    adversarial_contribution: int | None = None
+    foreign_percent: float | None = None
+    adversarial_percent: float | None = None
 
     @classmethod
     def to_header(cls) -> tuple[str, ...]:

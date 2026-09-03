@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from click.testing import CliRunner
 
 from github_metrics.analysis.releases import (
     MAX_RELEASE_WEIGHT,
@@ -16,7 +13,6 @@ from github_metrics.analysis.releases import (
 )
 from github_metrics.analysis.releases import describe_bands as describe_release_bands
 from github_metrics.analysis.releases import score_releases
-from github_metrics.cli import EXIT_REPOSITORY_UNFETCHABLE, main
 from github_metrics.client import GitHubClient
 from github_metrics.collect.releases import ReleaseCounts, get_release_counts
 from github_metrics.errors import RepositoryNotFoundError
@@ -209,116 +205,6 @@ def test_a_null_repository_fails_rather_than_raising_a_key_error() -> None:
 
 
 # ---------------------------------------------------------------------------
-# The probe command
-# ---------------------------------------------------------------------------
-
-
-class _NullClient:
-    def __enter__(self) -> _NullClient:
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        return None
-
-
-@pytest.fixture
-def offline(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Credentials present, network absent.
-
-    The credential check makes a real request through a client it creates
-    itself, so it has to be neutralised alongside `GitHubClient`.
-    """
-    monkeypatch.setenv("GITHUB_TOKEN", "test-token")
-    monkeypatch.setattr("github_metrics.cli.GitHubClient", lambda _settings: _NullClient())
-    monkeypatch.setattr("github_metrics.cli.verify_credentials", lambda _settings: None)
-
-
-def stub_cli(monkeypatch: pytest.MonkeyPatch, counts: ReleaseCounts) -> None:
-    """Make the command's collection return canned counts."""
-    monkeypatch.setattr(
-        "github_metrics.cli.get_release_counts",
-        lambda _client, _owner, _repoid: counts,
-    )
-
-
-def run(args: list[str], env_file: Path) -> Any:
-    """Invoke the CLI with an explicit env file."""
-    return CliRunner().invoke(main, ["--env-file", str(env_file), *args])
-
-
-@pytest.mark.requirement("L3-CLI-006")
-@pytest.mark.usefixtures("offline")
-def test_the_command_reports_both_counts_and_the_distinct_total(
-    monkeypatch: pytest.MonkeyPatch, empty_env_file: Path
-) -> None:
-    stub_cli(monkeypatch, ReleaseCounts(releases=398, tags=717))
-
-    result = run(["releases", "cline/cline"], empty_env_file)
-
-    assert result.exit_code == 0
-    assert "398" in result.output
-    assert "717" in result.output
-    assert "1115" in result.output  # the previous definition, for comparison
-
-
-@pytest.mark.requirement("L3-CLI-006")
-@pytest.mark.usefixtures("offline")
-def test_the_command_flags_a_tags_only_project(
-    monkeypatch: pytest.MonkeyPatch, empty_env_file: Path
-) -> None:
-    stub_cli(monkeypatch, ReleaseCounts(releases=0, tags=151))
-
-    result = run(["releases", "bokeh/bokeh"], empty_env_file)
-
-    assert "no GitHub Releases" in result.output
-
-
-@pytest.mark.requirement("L3-CLI-006")
-@pytest.mark.usefixtures("offline")
-def test_the_command_emits_json(monkeypatch: pytest.MonkeyPatch, empty_env_file: Path) -> None:
-    stub_cli(monkeypatch, ReleaseCounts(releases=58, tags=108))
-
-    result = run(["releases", "urllib3/urllib3", "--format", "json"], empty_env_file)
-
-    assert json.loads(result.stdout) == {
-        "owner": "urllib3",
-        "repoid": "urllib3",
-        "releases": 58,
-        "tags": 108,
-        "distinct_versions": 108,
-        "legacy_sum": 166,
-        "weight": 1.0,
-        "bands": None,
-    }
-
-
-@pytest.mark.requirement("L3-CLI-006")
-@pytest.mark.usefixtures("offline")
-def test_an_unreadable_repository_exits_four(
-    monkeypatch: pytest.MonkeyPatch, empty_env_file: Path
-) -> None:
-    def _fail(_client: Any, _owner: str, _repoid: str) -> ReleaseCounts:
-        raise RepositoryNotFoundError("ghost/missing: could not resolve")
-
-    monkeypatch.setattr("github_metrics.cli.get_release_counts", _fail)
-
-    result = run(["releases", "ghost/missing"], empty_env_file)
-
-    assert result.exit_code == EXIT_REPOSITORY_UNFETCHABLE
-    assert "GM-COL-001" in result.output
-
-
-@pytest.mark.requirement("L3-CLI-006")
-@pytest.mark.usefixtures("offline")
-@pytest.mark.parametrize("slug", ["not-a-slug", "owner/", "/repoid", ""])
-def test_a_malformed_slug_is_a_usage_error(slug: str, empty_env_file: Path) -> None:
-    result = run(["releases", slug], empty_env_file)
-
-    assert result.exit_code != 0
-    assert "OWNER/REPOID" in result.output
-
-
-# ---------------------------------------------------------------------------
 # Scoring bands
 # ---------------------------------------------------------------------------
 
@@ -430,30 +316,3 @@ def test_the_release_band_table_renders_for_diagnostics() -> None:
 
     assert "<80" in rendered
     assert ">=80" in rendered
-
-
-@pytest.mark.requirement("L3-CLI-006")
-@pytest.mark.usefixtures("offline")
-def test_the_command_shows_the_weight_and_warns_about_saturation(
-    monkeypatch: pytest.MonkeyPatch, empty_env_file: Path
-) -> None:
-    stub_cli(monkeypatch, ReleaseCounts(releases=398, tags=717))
-
-    result = run(["releases", "cline/cline"], empty_env_file)
-
-    assert "weight" in result.output
-    assert "1.0" in result.output
-    assert "capped at 1.0" in result.output
-
-
-@pytest.mark.requirement("L3-CLI-006")
-@pytest.mark.usefixtures("offline")
-def test_the_command_explains_the_release_bands(
-    monkeypatch: pytest.MonkeyPatch, empty_env_file: Path
-) -> None:
-    stub_cli(monkeypatch, ReleaseCounts(releases=2, tags=3))
-
-    result = run(["releases", "a/b", "--explain"], empty_env_file)
-
-    assert "release bands" in result.output
-    assert ">=80" in result.output

@@ -275,7 +275,33 @@ Each of these is deferred from v0.1.0, where the behaviour is fixed:
 
 ---
 
-## v0.3.0 — Persistence
+## v0.3.0 — Retiring the metric probes
+
+**Released 2026-09-03.** `github-metrics closed-issues` and `github-metrics
+releases` are removed.
+
+They existed so a metric definition could be checked against real repositories
+while it was still being argued about — `L2-CLI-005` said so in as many words.
+Every definition in `METRICS.md` now reads Settled, so the condition that
+justified them no longer holds, and two commands that duplicate what `scan`
+collects are two more surfaces to keep correct.
+
+The **columns are untouched**: `closed_issues` and `releases` are Settled
+metrics, they are collected by `scan` in the same GraphQL query as everything
+else, and they appear in both artifacts exactly as before. What went is the
+per-metric command, not the measurement.
+
+`github-metrics bands` survives and is the half that was still earning its
+place: the scoring tables stay printable, for every metric, without a token.
+`collect.closed_issues` and `collect.releases` stay too, as library API for a
+caller that wants one number rather than a row.
+
+`L2-CLI-005`, `L3-CLI-005` and `L3-CLI-006` are retired. Their identifiers are
+permanent and are recorded with their conditions in `L2.md` and `L3.md`.
+
+---
+
+## v0.5.0 — Persistence
 
 Capture results in **SQLite**, behind an interface that allows the store to be
 swapped for **PostgreSQL** later without changing the collection code.

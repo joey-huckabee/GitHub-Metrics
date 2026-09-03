@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 19
-- L2 requirements: 77
-- L3 requirements: 106
-- Verified L2+L3: 183 of 183 (100.0%)
+- L2 requirements: 76
+- L3 requirements: 104
+- Verified L2+L3: 180 of 180 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -68,7 +68,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-CLI-001 | L2-CLI-001, L2-CLI-002, L2-CLI-003, L2-CLI-004, L2-CLI-005, L2-CLI-007 | _(none)_ | Implemented |
+| L1-CLI-001 | L2-CLI-001, L2-CLI-002, L2-CLI-003, L2-CLI-004, L2-CLI-007 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -78,7 +78,6 @@ through their children, so counting them too would count the same work twice.
 | L2-CLI-002 | L1-CLI-001 | L3-CLI-002 | _(none)_ | Implemented |
 | L2-CLI-003 | L1-CLI-001 | L3-CLI-003 | _(none)_ | Implemented |
 | L2-CLI-004 | L1-CLI-001 | L3-CLI-004 | _(none)_ | Implemented |
-| L2-CLI-005 | L1-CLI-001 | L3-CLI-005, L3-CLI-006 | _(none)_ | Implemented |
 | L2-CLI-006 | L1-SCR-001 | L3-CLI-007 | _(none)_ | Implemented |
 | L2-CLI-007 | L1-CLI-001 | L3-CLI-008, L3-CLI-009, L3-CLI-010 | _(none)_ | Implemented |
 
@@ -90,8 +89,6 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-002 | L2-CLI-002 | `tests/test_cli_validate.py::test_validate_needs_no_github_token` | Implemented |
 | L3-CLI-003 | L2-CLI-003 | `tests/test_cli_validate.py::test_json_output_is_machine_readable`<br>`tests/test_cli_validate.py::test_output_can_be_written_to_a_file` | Implemented |
 | L3-CLI-004 | L2-CLI-004 | `tests/test_cli_validate.py::test_a_clean_file_exits_zero`<br>`tests/test_cli_validate.py::test_an_unreadable_file_produces_its_own_exit_status`<br>`tests/test_cli_validate.py::test_rejected_rows_produce_a_distinct_exit_status`<br>`tests/test_cli_validate.py::test_strict_mode_reports_the_first_bad_row_and_stops` | Implemented |
-| L3-CLI-005 | L2-CLI-005 | `tests/test_cli_closed_issues.py::test_a_disabled_tracker_is_called_out`<br>`tests/test_cli_closed_issues.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_cli_closed_issues.py::test_an_unreadable_repository_exits_four`<br>`tests/test_cli_closed_issues.py::test_explain_appends_the_bands`<br>`tests/test_cli_closed_issues.py::test_it_appears_in_the_command_list`<br>`tests/test_cli_closed_issues.py::test_it_reports_counts_the_tracker_state_and_the_weight`<br>`tests/test_cli_closed_issues.py::test_json_carries_the_same_values`<br>`tests/test_cli_closed_issues.py::test_json_includes_the_bands_only_when_explained` | Implemented |
-| L3-CLI-006 | L2-CLI-005 | `tests/test_releases.py::test_a_malformed_slug_is_a_usage_error`<br>`tests/test_releases.py::test_an_unreadable_repository_exits_four`<br>`tests/test_releases.py::test_the_command_emits_json`<br>`tests/test_releases.py::test_the_command_explains_the_release_bands`<br>`tests/test_releases.py::test_the_command_flags_a_tags_only_project`<br>`tests/test_releases.py::test_the_command_reports_both_counts_and_the_distinct_total`<br>`tests/test_releases.py::test_the_command_shows_the_weight_and_warns_about_saturation` | Implemented |
 | L3-CLI-007 | L2-CLI-006 | `tests/test_cli_bands.py::test_an_unknown_metric_is_a_usage_error`<br>`tests/test_cli_bands.py::test_every_scoring_table_is_reachable`<br>`tests/test_cli_bands.py::test_it_needs_no_token`<br>`tests/test_cli_bands.py::test_no_argument_prints_every_table`<br>`tests/test_cli_bands.py::test_the_tables_carry_their_boundaries` | Implemented |
 | L3-CLI-008 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_csv_is_written_with_one_row_per_reference`<br>`tests/test_cli_scan.py::test_console_format_prints_the_rows_and_still_writes_documents`<br>`tests/test_cli_scan.py::test_fields_selects_columns_in_canonical_order`<br>`tests/test_cli_scan.py::test_json_is_available_for_the_tabular_artifact`<br>`tests/test_cli_scan.py::test_the_csv_carries_no_contributor_columns`<br>`tests/test_cli_scan.py::test_the_sources_are_the_same_ones_validate_takes`<br>`tests/test_cli_scan.py::test_two_runs_are_told_apart` | Implemented |
 | L3-CLI-009 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_bad_destination_fails_before_any_quota_is_spent`<br>`tests/test_cli_scan.py::test_a_rejected_reference_is_a_lesser_status_than_an_unreadable_one`<br>`tests/test_cli_scan.py::test_a_repository_whose_contributors_failed_keeps_its_row_and_loses_its_document`<br>`tests/test_cli_scan.py::test_a_run_that_names_nothing_still_produces_a_well_formed_file`<br>`tests/test_cli_scan.py::test_an_unaffordable_run_spends_nothing`<br>`tests/test_cli_scan.py::test_an_unreadable_repository_gets_a_row_but_no_document` | Implemented |

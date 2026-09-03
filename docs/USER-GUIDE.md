@@ -668,14 +668,13 @@ to stderr, so a pipe stays clean.
 | `--workers` | `github-metrics scan inventory.csv --workers 4` |
 | `--strict` | `github-metrics scan inventory.csv --strict` |
 
-### Probes and diagnostics
+### Diagnostics
 
 | Command | Example |
 |---|---|
-| `closed-issues` | `github-metrics closed-issues pypa/virtualenv --explain` |
-| `closed-issues` | `github-metrics closed-issues cline/cline --format json` |
-| `releases` | `github-metrics releases pypa/virtualenv --explain` |
-| `releases` | `github-metrics releases cline/cline --format json` |
+| `bands` | `github-metrics bands` |
+| `bands METRIC` | `github-metrics bands releases` |
+| `rate-limit` | `github-metrics rate-limit` |
 | `bands` | `github-metrics bands` |
 | `bands METRIC` | `github-metrics bands maturity` |
 | `rate-limit` | `github-metrics rate-limit` |

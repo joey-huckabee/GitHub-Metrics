@@ -8,6 +8,38 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.3.0] - 2026-09-03
+
+Retires the two metric probe commands. **No output changed**: not a column, not
+a key, not a value.
+
+### Removed
+
+- **`github-metrics closed-issues` and `github-metrics releases`.** They
+  existed so a metric definition could be checked against real repositories
+  while it was still being argued about, which `L2-CLI-005` said in as many
+  words. Every definition in `METRICS.md` now reads Settled, so the condition
+  that justified them has gone, and two commands duplicating what `scan`
+  collects are two more surfaces to keep correct.
+
+  The `closed_issues` and `releases` **columns are untouched**. They are
+  Settled metrics, `scan` collects them in the same one-point GraphQL query as
+  everything else, and they appear in both artifacts exactly as before. What
+  went is the per-metric command, not the measurement.
+
+- **`L2-CLI-005`, `L3-CLI-005` and `L3-CLI-006` are retired.** Identifiers are
+  permanent, so each is recorded with its condition in a `Retired` section of
+  `L2.md` and `L3.md` and its number is never reused.
+
+### Kept
+
+- **`github-metrics bands`** — the half of the probes still earning its place.
+  Every scoring table stays printable, for every metric, without a token
+  (`L2-CLI-006`). Retiring the probes does not retire the tables.
+- **`collect.closed_issues` and `collect.releases`** as library API, for a
+  caller that wants one number rather than a whole row. `L2-MET-001` through
+  `L2-MET-007` still describe them and their tests still run.
+
 ## [0.2.0] - 2026-09-03
 
 The contributor dataset. The per-repository JSON in `docs/example.json`
@@ -430,6 +462,7 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/8feb637...v0.1.0

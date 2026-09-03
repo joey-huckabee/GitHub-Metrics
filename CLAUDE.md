@@ -63,6 +63,7 @@ poetry run github-metrics validate inventory.csv --format json --output out.json
 poetry run github-metrics scan inventory.csv --output ./results/
 poetry run github-metrics scan pypa/virtualenv github.com/psf/requests
 poetry run github-metrics bands
+poetry run github-metrics bands releases
 poetry run github-metrics rate-limit
 LOG_LEVEL=DEBUG poetry run github-metrics validate inventory.csv
 ```

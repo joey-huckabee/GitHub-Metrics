@@ -5,9 +5,11 @@ Every metric this tool scores comes from a single GraphQL document costing
 including the counts that REST cannot answer correctly at all. Five thousand
 repositories an hour, whatever the size of the inventory.
 
-The per-metric collectors alongside this one are not redundant. They back the
-probe commands, where the point is to ask about one metric in isolation while
-its definition is being agreed. This module is what a batch run uses.
+The per-metric collectors alongside this one - `collect.closed_issues` and
+`collect.releases` - ask about one metric in isolation. They backed the probe
+commands until v0.3.0 retired those, and remain as library API for a caller
+that wants one number rather than a row. This module is what a batch run
+uses, and it is the only route a scan takes.
 
 Owner, and what it means for `organization`
 -------------------------------------------

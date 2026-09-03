@@ -17,12 +17,17 @@ this codebase:
 2. **Collection** turns those references into metrics by calling the GitHub
    API. It needs a token and it spends rate limit.
 
-v0.1.0 shipped `githubmetrics.csv`. The current target is v0.2.0, where one
-`scan` produces **two artifacts under one scan identity**: that CSV, and one
-JSON document per repository carrying the same row followed by its
-contributors. There is no flag selecting between them - see
-`docs/adr/0005-one-scan-command-and-per-repository-json.md` for why. `docs/ROADMAP.md`
-covers each version and `CHANGELOG.md` the release history.
+v0.1.0 shipped `githubmetrics.csv`. v0.2.0 shipped the contributor dataset:
+one `scan` produces **two artifacts under one scan identity** - that CSV, and
+one JSON document per repository carrying the same row followed by its
+contributor block. There is no flag selecting between them; see
+`docs/adr/0005-one-scan-command-and-per-repository-json.md` for why.
+
+`foreign` and `adversarial` are emitted as `null` and nothing computes them,
+along with the four aggregates derived from them. They are defined in neither
+`METRICS.md` nor code, which is the rule holding rather than an oversight.
+
+`docs/ROADMAP.md` covers each version and `CHANGELOG.md` the release history.
 
 **Metric definitions and scoring bands are still being agreed.** `docs/METRICS.md`
 is the working document, and entries marked **TBD** are not settled. Nothing is

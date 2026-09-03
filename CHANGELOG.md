@@ -6,9 +6,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-v0.2.0's contributor dataset. The per-repository JSON in `docs/example.json`
+Nothing yet.
+
+## [0.2.0] - 2026-09-03
+
+The contributor dataset. The per-repository JSON in `docs/example.json`
 turned out to be the metrics row plus a contributor block, not a second
 dataset, so one `scan` now collects and writes both under one scan identity.
+
+Three things ship knowingly incomplete, and all three are visible in the
+output rather than hidden behind it:
+
+- **`foreign` and `adversarial` are `null`**, along with the four aggregates
+  derived from them. Neither has a definition in `METRICS.md`, and nothing is
+  computed before it does. The keys are present so the shape does not change
+  when the definitions land; a `null` publishes no number and makes no claim.
+- **The contributor-detail query's cost is calculated, not measured.**
+  `POINTS_PER_REPOSITORY` is 2 on the strength of GitHub's documented cost
+  formula. The metrics query's point was measured against the live API; this
+  one has not been, which is a departure from this project's own rule.
+- **`GEOCODER_USER_AGENT` defaults to a generic string.** Nominatim's usage
+  policy asks for an agent that identifies the application and its operator,
+  and the penalty for a generic one is a block that fails every later run.
+  Set it before scanning anything large.
+
+Every run also now pays for contributor pages and geocodes, which the v0.1.0
+command split existed to avoid. That is the accepted price of one scan
+identity per run, and geocoding rather than the GitHub API sets the pace: a
+first run over a few hundred repositories takes hours.
 
 ### Added
 
@@ -405,5 +430,6 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/8feb637...v0.1.0

@@ -158,8 +158,15 @@ the program embedding it.
 
 ## v0.2.0 — contributor collection, and rate-limit tuning
 
-Two bodies of work. The contributor dataset is the one being built now; the
-rate-limit knobs were already scheduled here and keep their place.
+**Released 2026-09-03.** The contributor dataset shipped. The rate-limit knobs
+did not and move to v0.3.0, where the conditional-request work they depend
+on also lives.
+
+Two things ship deliberately incomplete, and both are visible in the output
+rather than hidden: `foreign` and `adversarial` are emitted as `null`, along
+with the four aggregates derived from them, because neither has a definition
+in `METRICS.md` and nothing is computed before it does. The shape is fixed so
+that it does not change when the definitions land.
 
 ### Contributor collection
 

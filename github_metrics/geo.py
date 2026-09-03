@@ -23,6 +23,32 @@ Coordinates are `None` unless a match supplied them. Never `0.0`: 0,0 is a
 real position in the Gulf of Guinea, so a zeroed pair plots as Null Island and
 reads as data rather than as a failure.
 
+Two APIs that do not agree, and how they are joined
+---------------------------------------------------
+GitHub hands over one free-text string with no schema. Nominatim answers with
+a component map whose *keys vary by country*, and neither side guarantees the
+other anything. Three things bridge them, and each fixes a way the naive
+mapping is wrong:
+
+**Names are pinned to English.** Nominatim returns place names in the local
+language unless asked otherwise, so the same rule applied to two contributors
+would see `Germany` for one and `Deutschland` for another, and `country`
+would silently become unusable as a key. `LANGUAGE` forces one spelling.
+`country_code` is better still - it is ISO 3166-1 alpha-2 and has no language
+at all - which is why it is the field a residency rule should key on.
+
+**A settlement is named by its kind, not by a fixed key.** Nominatim reports
+`city` only for places it classes as cities; a town is `town`, a village is
+`village`, and elsewhere it is `municipality`. Reading only `city` leaves the
+field empty for most of the world. The fallback chains below take the first
+key present, in decreasing specificity.
+
+**The ISO 3166-2 level is not fixed either.** A US state arrives as
+`ISO3166-2-lvl4`, but the first-level subdivision sits at a different admin
+level in other countries, so a hard-coded `lvl4` finds nothing for them. The
+code scans for every `ISO3166-2-lvl*` key and takes the **coarsest**, which is
+the subdivision the `state` field names.
+
 Cost, and why this is the slow part of a run
 --------------------------------------------
 Nominatim's usage policy permits **one request per second**, and that is
@@ -31,15 +57,21 @@ is the service blocking the user agent, which fails every later run rather
 than the one that misbehaved. One second per distinct location means the
 geocoder, not the GitHub API, sets the pace of a large scan.
 
-The cache is what makes that survivable. Contributor locations repeat heavily
-across a portfolio - `San Francisco, CA` appears once per hundred contributors
-- and only distinct strings reach the network, so the cost is the number of
-distinct locations rather than the number of contributors.
+The cache is what makes that survivable, and it is keyed on a **normalised,
+case-folded** form of the location. Contributor locations repeat heavily
+across a portfolio but rarely byte-for-byte: `San Francisco, CA`,
+`san francisco, ca` and `San  Francisco,  CA` are one place typed three ways,
+and Nominatim would answer them identically. Folding them into one cache entry
+turns three seconds into one, and the `query` each contributor records is
+still the string that contributor's own location produced.
 """
 
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
+from dataclasses import replace
 from functools import lru_cache
 from typing import Any, Final
 
@@ -57,9 +89,6 @@ DEFAULT_TIMEOUT_SECONDS: Final = 10
 MIN_SECONDS_BETWEEN_REQUESTS: Final = 1.0
 """Nominatim's published limit. Exceeding it gets the user agent blocked."""
 
-CACHE_SIZE: Final = 4096
-"""Distinct locations held per run. Well above what an inventory produces."""
-
 MAX_RETRIES: Final = 2
 """Attempts after the first, for a lookup the service failed to answer.
 
@@ -72,14 +101,41 @@ ERROR_WAIT_SECONDS: Final = 5.0
 """Pause before a retry. Long enough to be worth making, short enough to bound
 the cost of a location that will never resolve at `MAX_RETRIES` times this."""
 
-CITY_KEYS: Final = ("city", "town", "village", "municipality")
+CACHE_SIZE: Final = 4096
+"""Distinct locations held per run. Well above what an inventory produces."""
+
+LANGUAGE: Final = "en"
+"""Forces one spelling per place. See the module docstring."""
+
+CITY_KEYS: Final = ("city", "town", "village", "municipality", "hamlet")
 """Nominatim names a settlement by its kind, so the first present one wins."""
 
-SUBURB_KEYS: Final = ("suburb", "neighbourhood", "quarter")
+SUBURB_KEYS: Final = ("suburb", "neighbourhood", "quarter", "city_district")
 """As above, for the division below a settlement."""
 
-STATE_CODE_KEYS: Final = ("ISO3166-2-lvl4", "ISO3166-2-lvl3", "ISO3166-2-lvl6")
+STATE_CODE_PREFIX: Final = "ISO3166-2-lvl"
 """Nominatim reports an ISO 3166-2 code at whichever level the country uses."""
+
+_COLLAPSIBLE = re.compile(r"\s+")
+"""Any run of whitespace, including the tabs and newlines a bio can carry."""
+
+
+def _normalise(location: str) -> str:
+    """Reduce a free-text location to the form that is actually asked.
+
+    Args:
+        location: The account's self-reported location, verbatim.
+
+    Returns:
+        The same string with format characters removed and every run of
+        whitespace collapsed to one space, trimmed. Not a parse and not a
+        correction - two spellings of one place stay two spellings unless they
+        differed only in whitespace.
+    """
+    # Zero-width joiners and direction marks travel with copied text and are
+    # invisible, so two locations that look identical can differ by one.
+    stripped = "".join(char for char in location if unicodedata.category(char) != "Cf")
+    return _COLLAPSIBLE.sub(" ", stripped).strip()
 
 
 def _first(components: dict[str, Any], keys: tuple[str, ...]) -> str:
@@ -99,6 +155,36 @@ def _first(components: dict[str, Any], keys: tuple[str, ...]) -> str:
         if value:
             return str(value)
     return ""
+
+
+def _state_code(components: dict[str, Any]) -> str:
+    """Return the ISO 3166-2 code of the first-level subdivision.
+
+    Nominatim keys this by administrative level, and the level a country uses
+    for its first-level subdivision varies - 4 for a US state, but not
+    everywhere. A hard-coded `ISO3166-2-lvl4` therefore finds nothing outside
+    the countries that happen to use it.
+
+    Args:
+        components: Nominatim's `address` mapping.
+
+    Returns:
+        The code at the coarsest level present, which is the subdivision
+        `state` names; `""` when the match carries none.
+    """
+    levels: list[tuple[int, str]] = []
+    for key, value in components.items():
+        if not key.startswith(STATE_CODE_PREFIX) or not value:
+            continue
+        suffix = key[len(STATE_CODE_PREFIX) :]
+        if suffix.isdigit():
+            levels.append((int(suffix), str(value)))
+
+    if not levels:
+        return ""
+    # Lowest admin level is the largest area, which is the first-level
+    # subdivision rather than a county inside it.
+    return min(levels)[1]
 
 
 class Geocoder:
@@ -124,7 +210,6 @@ class Geocoder:
             swallow_exceptions=False,
         )
 
-    @lru_cache(maxsize=CACHE_SIZE)  # noqa: B019 - one geocoder per run; cache dies with it
     def locate(self, location: str) -> Address:
         """Resolve one location string.
 
@@ -136,21 +221,40 @@ class Geocoder:
             `Address`; a location that resolved to nothing returns one
             carrying only `query`, so the two remain distinguishable.
         """
-        query = location.strip()
-        if not query:
+        cleaned = _normalise(location)
+        if not cleaned:
             return Address()
 
+        # The cache is keyed case-insensitively because Nominatim is, but the
+        # address handed back records the spelling this contributor used.
+        resolved = self._resolve(cleaned.casefold())
+        return replace(resolved, query=cleaned)
+
+    @lru_cache(maxsize=CACHE_SIZE)  # noqa: B019 - one geocoder per run; cache dies with it
+    def _resolve(self, key: str) -> Address:
+        """Ask the gazetteer once per distinct location.
+
+        Args:
+            key: A normalised, case-folded location.
+
+        Returns:
+            The address, with `query` set to `key`; callers replace it with the
+            spelling they asked about.
+        """
         try:
-            match = self._geocode(query, addressdetails=True)
+            match = self._geocode(key, addressdetails=True, language=LANGUAGE)
         except GeocoderServiceError:
-            LOGGER.warning("Geocoding failed for %r", query)
-            return Address(query=query)
+            # The normalised form, because that is what was asked and because
+            # one line per distinct location is the useful cardinality - a
+            # cache hit does not repeat it.
+            LOGGER.warning("Geocoding failed for the normalised location %r", key)
+            return Address(query=key)
 
         if match is None:
-            LOGGER.debug("No match for location %r", query)
-            return Address(query=query)
+            LOGGER.debug("No match for the normalised location %r", key)
+            return Address(query=key)
 
-        return _address(query, match)
+        return _address(key, match)
 
 
 def _address(query: str, match: Any) -> Address:
@@ -173,12 +277,14 @@ def _address(query: str, match: Any) -> Address:
         house_number=_first(components, ("house_number",)),
         suburb=_first(components, SUBURB_KEYS),
         post_code=_first(components, ("postcode",)),
-        state=_first(components, ("state",)),
-        state_code=_first(components, STATE_CODE_KEYS),
+        state=_first(components, ("state", "province", "region")),
+        state_code=_state_code(components),
         state_district=_first(components, ("state_district",)),
         county=_first(components, ("county",)),
         country=_first(components, ("country",)),
-        country_code=_first(components, ("country_code",)),
+        # Lower-cased explicitly: ISO 3166-1 alpha-2 is conventionally lower
+        # here and a rule keyed on it must not have to case-fold first.
+        country_code=_first(components, ("country_code",)).lower(),
         city=_first(components, CITY_KEYS),
         internal_location=Coordinates(
             latitude=float(match.latitude),

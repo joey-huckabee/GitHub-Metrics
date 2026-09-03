@@ -38,6 +38,19 @@ dataset, so one `scan` now collects and writes both under one scan identity.
   component the match genuinely lacks). Without the middle state an account
   publishing nothing is indistinguishable from one publishing `she/her`, and
   those are different facts about that account.
+
+  Three details of the GitHub-to-Nominatim mapping are not obvious and each
+  fixes a way the naive version is wrong. **Place names are pinned to
+  English**, because Nominatim answers in the local language by default — so
+  `country` would read `Germany` for one contributor and `Deutschland` for
+  another, and a rule keyed on it would apply to some accounts and not others
+  without failing. **A settlement is found under whichever key names its
+  kind** — `city`, `town`, `village`, `municipality` or `hamlet` — because
+  reading only `city` leaves the field empty for most of the world. **The
+  ISO 3166-2 subdivision code is taken from the coarsest `ISO3166-2-lvl*`
+  present**, because a hard-coded `lvl4` is the US level and finds nothing
+  elsewhere. A residency rule should key on `country_code`, which has no
+  language at all.
 - **`GM-COL-005`**, for a repository that was read but whose contributor list
   was not, and **`GM-OUT-003`**, for a document directory that cannot be used.
 - **`GM-COL-004`, `GM-OUT-001` and `GM-OUT-002` documented** in the error
@@ -109,6 +122,12 @@ dataset, so one `scan` now collects and writes both under one scan identity.
   rather than the one that misbehaved. Locations are cached per run, so the
   cost is the number of distinct locations rather than of contributors — but a
   first run over a large inventory takes hours.
+- **Geocoding is cached case-insensitively**, on a whitespace-normalised form
+  of the location with invisible format characters removed. `San Francisco, CA`,
+  `san francisco, ca` and `San  Francisco,  CA` are one place typed three ways
+  and Nominatim answers them identically, so they are one lookup rather than
+  three — which at one request per second is the pace of a whole run. Each
+  contributor still records the spelling it published.
 - **`--contributors N` is gone**; the limit is a fixed 25.
   `contribution_total` counts what was collected rather than what exists, and
   `METRICS.md` says so, because a total that silently means something narrower

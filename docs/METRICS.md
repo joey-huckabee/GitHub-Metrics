@@ -378,20 +378,61 @@ looked.
 
 | Field | Type | Nominatim source |
 |---|---|---|
-| `query` | `str` | the location string, verbatim |
+| `query` | `str` | the location as this contributor published it, whitespace-normalised |
 | `formatted_address` | `str` | the single-line rendering of the match |
 | `street` | `str` | `road` |
 | `house_number` | `str` | `house_number` |
-| `suburb` | `str` | `suburb`, else `neighbourhood`, else `quarter` |
+| `suburb` | `str` | `suburb`, else `neighbourhood`, `quarter`, `city_district` |
 | `post_code` | `str` | `postcode` |
-| `state` | `str` | `state` |
-| `state_code` | `str` | `ISO3166-2-lvl4`, else `-lvl3`, else `-lvl6` |
+| `state` | `str` | `state`, else `province`, `region` |
+| `state_code` | `str` | the **coarsest** `ISO3166-2-lvl*` present |
 | `state_district` | `str` | `state_district` |
 | `county` | `str` | `county` |
-| `country` | `str` | `country` |
+| `country` | `str` | `country`, in English |
 | `country_code` | `str` | `country_code`, lower case |
-| `city` | `str` | `city`, else `town`, else `village`, else `municipality` |
+| `city` | `str` | `city`, else `town`, `village`, `municipality`, `hamlet` |
 | `internal_location` | `object` | `{ latitude, longitude }` |
+
+#### Joining two APIs that do not agree
+
+GitHub hands over one free-text string with no schema; Nominatim answers with a
+component map whose **keys vary by country**. Three rules bridge them, and each
+fixes a way the obvious mapping is wrong.
+
+**Names are pinned to English.** Nominatim returns place names in the local
+language unless asked otherwise, so without this `country` would read `Germany`
+for one contributor and `Deutschland` for another, and any rule keyed on it
+would apply to some accounts and not others — silently, since both values are
+correct. **A residency rule should key on `country_code` regardless:** it is
+ISO 3166-1 alpha-2, it has no language, and it does not change when a country
+is renamed in one dataset and not another.
+
+**A settlement is named by its kind.** Nominatim reports `city` only for places
+it classes as cities. A town is `town`, a village is `village`, and elsewhere
+it is `municipality` or `hamlet`. Reading only `city` leaves the field empty
+for most of the world, so the first key present wins.
+
+**The ISO 3166-2 level is not fixed.** A US state arrives as `ISO3166-2-lvl4`,
+but the first-level subdivision sits at a different administrative level in
+other countries, so a hard-coded `lvl4` finds nothing for them. Every
+`ISO3166-2-lvl*` key is collected and the **coarsest** taken, because a lower
+administrative level is a larger area — a finer one would be a county inside
+the subdivision rather than the subdivision `state` names.
+
+#### What is asked, and what is recorded
+
+The location is whitespace-normalised and stripped of invisible format
+characters before it is looked up, and the **cache is keyed case-insensitively**.
+`San Francisco, CA`, `san francisco, ca` and `San  Francisco,  CA` are one
+place typed three ways; Nominatim answers them identically, so folding them
+into one lookup turns three seconds into one. At one request per second over a
+few hundred repositories that is the difference between a run of hours and a
+much longer one.
+
+`query` still records the spelling **this** contributor published, so a record
+continues to describe the account it belongs to. What appears in the logs is
+the normalised form, because that is what was asked and one line per distinct
+location is the useful cardinality.
 
 **Coordinates are `null` when unresolved, never `0.0`.** 0,0 is a real
 position in the Gulf of Guinea, so a zeroed pair plots as Null Island and

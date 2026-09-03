@@ -55,11 +55,12 @@ class _Nominatim:
         self.result = result
         self.fails = fails
         self.asked: list[str] = []
+        self.options: list[dict[str, Any]] = []
 
     def geocode(self, query: str, **kwargs: Any) -> Any:
-        """Mimic Nominatim.geocode, recording what it was asked."""
-        del kwargs
+        """Mimic Nominatim.geocode, recording what it was asked and how."""
         self.asked.append(query)
+        self.options.append(kwargs)
         if self.fails:
             raise GeocoderServiceError("upstream is unwell")
         return self.result
@@ -188,9 +189,12 @@ def test_a_service_failure_is_a_warning_not_a_crash(
     with caplog.at_level(logging.WARNING, logger=GEO_LOGGER):
         address = geocoder.locate("Austin, TX")
 
+    # The address still records the spelling this contributor used.
     assert address.query == "Austin, TX"
     assert address.country is None
-    assert "Austin, TX" in caplog.text
+    # The log names the normalised form, because that is what was asked and
+    # because one line per distinct location is the useful cardinality.
+    assert "austin, tx" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +216,7 @@ def test_a_repeated_location_is_asked_once(monkeypatch: pytest.MonkeyPatch) -> N
     first = geocoder.locate("Austin, TX")
     second = geocoder.locate("Austin, TX")
 
-    assert locator.asked == ["Austin, TX"]
+    assert locator.asked == ["austin, tx"]
     assert first == second
 
 
@@ -228,3 +232,150 @@ def test_a_cached_address_cannot_be_mutated_by_a_caller(
 
     with pytest.raises(AttributeError):
         address.country = "Elsewhere"  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Joining two APIs that do not agree
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_place_names_are_pinned_to_one_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nominatim answers in the local language unless told otherwise.
+
+    Left alone, `country` would be `Germany` for one contributor and
+    `Deutschland` for another, and any rule keyed on it would silently apply
+    to some accounts and not others.
+    """
+    locator = _Nominatim(_Match("Austin", 30.2711, -97.7437, AUSTIN))
+    geocoder = build(monkeypatch, locator)
+
+    geocoder.locate("Austin, TX")
+
+    assert locator.options[0]["language"] == geo.LANGUAGE
+    assert locator.options[0]["addressdetails"] is True
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+@pytest.mark.parametrize(
+    ("key", "expected"),
+    [("city", "Austin"), ("town", "Ware"), ("village", "Grantchester"), ("municipality", "Oeiras")],
+)
+def test_a_settlement_is_found_whatever_kind_it_is(
+    monkeypatch: pytest.MonkeyPatch, key: str, expected: str
+) -> None:
+    """Nominatim names a settlement by its kind, not under a fixed `city` key.
+
+    Reading only `city` leaves the field empty for most of the world.
+    """
+    raw = {"address": {key: expected, "country": "Somewhere", "country_code": "xx"}}
+    geocoder = build(monkeypatch, _Nominatim(_Match(expected, 1.0, 2.0, raw)))
+
+    assert geocoder.locate("anywhere").city == expected
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_the_subdivision_code_is_found_at_whatever_level_a_country_uses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A hard-coded `ISO3166-2-lvl4` finds nothing outside the countries using it.
+
+    The coarsest level present is the first-level subdivision; a finer one is a
+    county inside it, which is not what `state_code` names.
+    """
+    raw = {
+        "address": {
+            "ISO3166-2-lvl6": "GB-CAM",
+            "ISO3166-2-lvl4": "GB-ENG",
+            "state": "England",
+            "country_code": "gb",
+        }
+    }
+    geocoder = build(monkeypatch, _Nominatim(_Match("England", 52.2, 0.1, raw)))
+
+    assert geocoder.locate("Cambridge, UK").state_code == "GB-ENG"
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_a_country_code_is_lower_cased(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A residency rule keys on this, and must not have to case-fold first."""
+    raw = {"address": {"country": "United States", "country_code": "US"}}
+    geocoder = build(monkeypatch, _Nominatim(_Match("United States", 39.0, -100.0, raw)))
+
+    assert geocoder.locate("USA").country_code == "us"
+
+
+# ---------------------------------------------------------------------------
+# Normalisation, which is what the cache is keyed on
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_capitalisation_and_spacing_are_one_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One place typed three ways costs one second, not three.
+
+    Nominatim is case-insensitive and would answer all three identically, so
+    merging them loses nothing and the geocoder is the pace of a large run.
+    """
+    locator = _Nominatim(_Match("Austin", 30.2711, -97.7437, AUSTIN))
+    geocoder = build(monkeypatch, locator)
+
+    geocoder.locate("San Francisco, CA")
+    geocoder.locate("san francisco, ca")
+    geocoder.locate("San  Francisco,   CA")
+    geocoder.locate("  San Francisco, CA  ")
+
+    assert locator.asked == ["san francisco, ca"]
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_each_contributor_records_its_own_spelling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The cache is shared; `query` is not.
+
+    Two accounts that wrote a place differently should each see what they
+    wrote, or the record stops describing the account it belongs to.
+    """
+    geocoder = build(monkeypatch, _Nominatim(_Match("Austin", 30.2711, -97.7437, AUSTIN)))
+
+    first = geocoder.locate("Austin, TX")
+    second = geocoder.locate("austin, tx")
+
+    assert first.query == "Austin, TX"
+    assert second.query == "austin, tx"
+    assert first.city == second.city == "Austin"
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_invisible_characters_do_not_split_a_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Zero-width characters travel with copied text and cannot be seen.
+
+    Two locations that look identical would otherwise be two cache entries and
+    two seconds.
+    """
+    locator = _Nominatim(_Match("Austin", 30.2711, -97.7437, AUSTIN))
+    geocoder = build(monkeypatch, locator)
+
+    geocoder.locate("Austin, TX")
+    geocoder.locate("Austin,\u200b TX")
+
+    assert locator.asked == ["austin, tx"]
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_a_location_of_only_whitespace_is_never_asked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nothing publishable was published, so nothing is looked up."""
+    locator = _Nominatim()
+    geocoder = build(monkeypatch, locator)
+
+    assert geocoder.locate("\t\n  ") == Address()
+    assert not locator.asked

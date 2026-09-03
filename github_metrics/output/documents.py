@@ -1,10 +1,17 @@
 """Writing one JSON document per repository.
 
-The document is `SoftwareRow` plus a `contributors` array, in that order, and
-nothing else. That is not a convenience: it is what makes the two artifacts of
-a run joinable. Every key in `githubmetrics.csv` is a key here, spelled the
-same way, so moving between them needs no translation table - and both carry
-the `scan_id` and `scan_date` of the one run that produced them.
+The document is `SoftwareRow` followed by the contributor block, in that order,
+and nothing else. That is not a convenience: it is what makes the two artifacts
+of a run joinable. **Every column of `githubmetrics.csv` is a key here,
+spelled the same way and in the same order**, so moving between them needs no
+translation table - and both carry the `scan_id` and `scan_date` of the one
+run that produced them.
+
+The block is the part only the document has: the contributor records, and the
+five aggregates over them. They are not CSV columns because they exist only
+where a contributor list was read, and a repository whose list failed produces
+a row and no document - so the columns would be empty in the CSV for exactly
+the rows with no document to explain them.
 
 Where the files go
 ------------------
@@ -49,12 +56,11 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Final
 
 from github_metrics.errors import DocumentDirectoryError
-from github_metrics.model.contributor import Contributor
+from github_metrics.model.contributor import ContributorBlock
 from github_metrics.model.software import SoftwareRow
 
 LOGGER = logging.getLogger(__name__)
@@ -62,29 +68,25 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_DOCUMENT_ROOT: Final = "githubmetrics"
 """Directory holding the per-repository documents when none is named."""
 
-CONTRIBUTORS_KEY: Final = "contributors"
-"""The one key in a document that is not a column of `SoftwareRow`."""
-
 INDENT: Final = 2
 """Documents are read by people as well as parsed, so they are indented."""
 
 
-def build_document(row: SoftwareRow, contributors: Sequence[Contributor]) -> dict[str, Any]:
+def build_document(row: SoftwareRow, block: ContributorBlock) -> dict[str, Any]:
     """Assemble one repository's document.
 
     Args:
         row: The row this repository produced, already scored and stamped.
-        contributors: Its contributors, most commits first.
+        block: Its contributors and the aggregates over them.
 
     Returns:
-        Every column of `SoftwareRow` in canonical order, then `contributors`.
-        The array is last rather than in the middle so that the document's key
-        order is the CSV's header followed by one addition, which is a rule a
-        test can state in one sentence.
+        Every column of `SoftwareRow` in canonical order, then the block's
+        keys. The columns come first and complete, so the document's key order
+        is the CSV's header followed by a fixed suffix - a rule a test can
+        state in one line, which "the first twenty must not collide with the
+        rest" could not.
     """
-    document = row.to_mapping()
-    document[CONTRIBUTORS_KEY] = [entry.to_mapping() for entry in contributors]
-    return document
+    return row.to_mapping() | block.to_mapping()
 
 
 def document_path(root: Path, owner: str, repoid: str) -> Path:
@@ -136,17 +138,13 @@ def prepare_root(root: Path | None) -> Path:
     return resolved
 
 
-def write_document(
-    root: Path,
-    row: SoftwareRow,
-    contributors: Sequence[Contributor],
-) -> Path:
+def write_document(root: Path, row: SoftwareRow, block: ContributorBlock) -> Path:
     """Write one repository's document.
 
     Args:
         root: The directory holding the tree, already prepared.
         row: The row this repository produced.
-        contributors: Its contributors, most commits first.
+        block: Its contributors and the aggregates over them.
 
     Returns:
         The path written.
@@ -155,7 +153,7 @@ def write_document(
         DocumentDirectoryError: The file could not be written.
     """
     path = document_path(root, row.owner, row.name)
-    payload = json.dumps(build_document(row, contributors), indent=INDENT)
+    payload = json.dumps(build_document(row, block), indent=INDENT)
 
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

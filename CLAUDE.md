@@ -264,22 +264,27 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   budget. A scan therefore costs 2 GraphQL points and 1 REST request per
   repository, and `check_budget` checks **both**.
 
-- **The CSV and the per-repository JSON carry the same fields.** A document is
-  `SoftwareRow`'s twenty-five columns in canonical order, then `contributors`,
-  and nothing else. That is what lets the two artifacts join without a
-  translation table, and it is why the five contribution aggregates are columns
-  rather than document-only keys - their grain is the repository. `--fields`
-  filters the tabular artifact only; a document with columns missing would stop
+- **A document is the CSV row, complete, then the contributor block.**
+  `SoftwareRow`'s twenty columns in canonical order, then `contributors` and
+  the five aggregates over it. Every CSV column is a document key spelled the
+  same way, which is what lets the two artifacts join without a translation
+  table; the block is the part only the document has. `--fields` filters the
+  tabular artifact only, because a document with columns missing would stop
   being the row it joins with.
+
+  **The aggregates are deliberately not columns.** They exist only where a
+  contributor list was read, and that is exactly the set of repositories that
+  produce a document - so as columns they would be empty for precisely the rows
+  with no document to explain the gap, and `contribution_total` would have to
+  be optional to tell "no contributors" from "not collected". As a document key
+  it is never in doubt. `githubmetrics.csv` stays at twenty columns.
 
 - **A repository that was not fully collected gets a row and no document.** A
   CSV row is positional, so omitting one shifts what every later row means; a
   directory has no positions, so an absent file says "named, not measured" on
   its own. Writing it anyway would publish an empty contributor array and a
   `contribution_total` of zero, which nothing reading a directory of documents
-  could tell from a repository that genuinely has none. This is also why
-  `contribution_total` is `None` rather than `0` when the contributor list
-  could not be read.
+  could tell from a repository that genuinely has none.
 
 - **Geocoding is paced at one request per second, and that is not politeness.**
   Nominatim's policy penalty is blocking the user agent, which fails every

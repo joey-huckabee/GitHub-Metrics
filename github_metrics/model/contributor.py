@@ -1,11 +1,17 @@
-"""One contributor, and the address a location resolves to.
+"""The contributor block of a per-repository document.
 
-These types exist for the per-repository JSON document. Nothing here reaches
-`githubmetrics.csv`: the CSV's grain is one row per repository, and a
-contributor list has no representation at that grain that would not either
-break the one-row-per-input-row contract or bury a nested structure in a cell.
-What the CSV carries instead are the five aggregates on `SoftwareRow`, which
-are per repository and so belong there.
+Everything here belongs to the document and **nothing here reaches
+`githubmetrics.csv`**. A contributor list has no representation at the CSV's
+grain that would not either break the one-row-per-input-row contract or bury a
+nested structure in a cell, and the five aggregates over that list share its
+fate: they exist only where a contributor list was read, so putting them in
+the CSV would add five columns that are empty for every repository whose
+contributors could not be collected.
+
+The CSV therefore stays at twenty columns and the document is those twenty
+followed by this block. Every CSV column is still a document key, spelled the
+same way, which is what lets the two artifacts join; the block is the part
+only one of them has.
 
 Empty against null
 ------------------
@@ -171,3 +177,64 @@ class Contributor:
             "foreign": self.foreign,
             "adversarial": self.adversarial,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class ContributorBlock:
+    """One repository's contributors, and the aggregates over them.
+
+    The block exists only for a repository whose contributor list was read, so
+    every aggregate here is a real measurement rather than a placeholder. That
+    is the reason these five are not columns of `SoftwareRow`: a repository
+    whose contributors could not be collected produces a CSV row and no
+    document, so the columns would be empty in the CSV for exactly the rows
+    that have no document to explain them.
+
+    Attributes:
+        contributors: The records, most commits first.
+        contribution_total: Sum of `contribution` over `contributors`. Counts
+            what was collected rather than what exists — the list is truncated
+            at `DEFAULT_CONTRIBUTOR_LIMIT` — and `docs/METRICS.md` says so.
+            `0` for a repository that genuinely has none.
+        foreign_contribution: Commits by contributors foreign to the United
+            States. **Undefined**; always `None` until `docs/METRICS.md`
+            settles the rule.
+        adversarial_contribution: Commits by adversarial contributors.
+            **Undefined**, as above.
+        foreign_percent: `foreign_contribution` as a percentage of
+            `contribution_total`. **Undefined**, as its numerator is.
+        adversarial_percent: `adversarial_contribution` as a percentage of
+            `contribution_total`. **Undefined**, as its numerator is.
+    """
+
+    contributors: tuple[Contributor, ...] = ()
+    contribution_total: int = 0
+    foreign_contribution: int | None = None
+    adversarial_contribution: int | None = None
+    foreign_percent: float | None = None
+    adversarial_percent: float | None = None
+
+    def to_mapping(self) -> dict[str, Any]:
+        """Render as JSON-ready keys, contributors before the aggregates.
+
+        The order is `docs/example.json`'s: the list first, then what is
+        summed over it, which is the order someone reads them in.
+        """
+        return {
+            "contributors": [entry.to_mapping() for entry in self.contributors],
+            "contribution_total": self.contribution_total,
+            "foreign_contribution": self.foreign_contribution,
+            "adversarial_contribution": self.adversarial_contribution,
+            "foreign_percent": self.foreign_percent,
+            "adversarial_percent": self.adversarial_percent,
+        }
+
+    @classmethod
+    def keys(cls) -> tuple[str, ...]:
+        """The document keys this block contributes, in order.
+
+        Derived from `to_mapping` rather than restated, so a key cannot be
+        added in one place and missed in the other — the same rule
+        `SoftwareRow.to_header` follows.
+        """
+        return tuple(cls().to_mapping())

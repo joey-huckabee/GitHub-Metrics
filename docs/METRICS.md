@@ -3,11 +3,17 @@
 The authoritative definition of every column a scan produces: where the value
 comes from, how it is calculated, and how it is scored.
 
-A run writes two artifacts and they carry the same fields. `githubmetrics.csv`
-is one row per accepted reference; `<owner>/<repoid>.json` is that same row
-followed by the repository's contributors. Everything under *Output shape*
-through *Contribution aggregates* defines both; the *Contributor block*
-defines the one key the document adds.
+A run writes two artifacts. `githubmetrics.csv` is one row per accepted
+reference, twenty columns. `<owner>/<repoid>.json` is **that same row, in the
+same order, under the same names**, followed by a contributor block.
+
+Every CSV column is therefore a document key, which is what lets the two join
+without a translation table. The block is the part only the document has:
+the contributor records and the five aggregates over them. They are not
+columns because they exist only where a contributor list was read, and a
+repository whose list failed produces a row and no document — so as columns
+they would be empty for exactly the rows that have no document to explain
+them.
 
 **Every metric and score column is Settled.** Six fields are not: the four
 contribution aggregates that depend on `foreign` and `adversarial`, and those
@@ -28,19 +34,18 @@ One row per accepted input row, in input order. Column order is fixed and is
 the order below.
 
 ```csv
-name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org,contribution_total,foreign_contribution,adversarial_contribution,foreign_percent,adversarial_percent
+name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org
 ```
 
-Reference row (the worked example this document is calibrated against). The
-last four fields are empty because their definitions are still **TBD**:
+Reference row (the worked example this document is calibrated against):
 
 ```csv
-cline,cline,cline,https://github.com/cline/cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false,3026,,,,
+cline,cline,cline,https://github.com/cline/cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false
 ```
 
-A document is these twenty-five keys, in this order, then `contributors`. That
-is the whole difference between the two artifacts, and it is what lets a row
-and a document be joined without a translation table.
+A document is these twenty keys, in this order, then the six keys of the
+contributor block. The columns come first and complete, which is the whole
+relationship between the two artifacts.
 
 ---
 
@@ -261,28 +266,32 @@ genuinely inactive one in the same bucket, and every average over the file
 would absorb the difference. See *Unfetchable repositories* below for what the
 row contains and what the run does about it.
 
-## Contribution aggregates
+## Contributor block
 
-Five columns, one per repository, derived from the contributor block rather
-than reported by the API. They live in the CSV as well as the document because
-their grain is the repository: answering "which repositories carry the most
-foreign contribution" should be a spreadsheet sort, not a walk over four
-hundred JSON files.
+The part of a document that has no CSV equivalent. Six keys, after the twenty
+columns: the contributor array, then five aggregates over it.
 
-| Column | Type | Source | Definition | Status |
+| Key | Type | Source | Definition | Status |
 |---|---|---|---|---|
+| `contributors` | `array` | API | One entry per collected contributor, most commits first. See [Contributor records](#contributor-records). | **Settled** |
 | `contribution_total` | `int` | derived | Sum of `contribution` over every contributor **collected** for this repository. See [What the total counts](#what-the-total-counts). | **Settled** |
 | `foreign_contribution` | `int` | derived | Commits by contributors where `foreign` is true. | **TBD** |
 | `adversarial_contribution` | `int` | derived | Commits by contributors where `adversarial` is true. | **TBD** |
 | `foreign_percent` | `float` | derived | `foreign_contribution` as a percentage of `contribution_total`. | **TBD** |
 | `adversarial_percent` | `float` | derived | `adversarial_contribution` as a percentage of `contribution_total`. | **TBD** |
 
-The four **TBD** columns are emitted as empty in CSV and `null` in JSON, for
-every repository, and no code computes them. They are present in the column
-set so that the shape does not change when the definitions land — but a
-`null` publishes no number and makes no claim, whereas a `0` would assert that
-a repository has no foreign contribution, which is an assertion about named
-people that nothing has measured.
+**These are not CSV columns.** They exist only for a repository whose
+contributor list was read, and such a repository is exactly the one that gets a
+document; a repository whose list failed gets a row and no document. Putting
+them in the CSV would add five columns that are empty for precisely the rows
+with nothing to explain them, and would change a twenty-column contract for
+data the CSV has no grain for.
+
+The four **TBD** keys are emitted as `null`, for every repository, and no code
+computes them. They are present so the shape does not change when the
+definitions land — a `null` publishes no number and makes no claim, whereas a
+`0` would assert that a repository has no foreign contribution, which is an
+assertion about named people that nothing has measured.
 
 ### What the total counts
 
@@ -300,14 +309,14 @@ repository's commits, while the tail is long enough that collecting all of it
 would let one very large repository set the cost of an entire run.
 
 `contribution_total` is `0` for a repository that genuinely has no
-contributors, and **empty** for one whose contributor list could not be read
-(`GM-COL-005`). Those are different facts and a zero can only express the
-first.
+contributors. It is never "unknown": a repository whose contributor list could
+not be read (`GM-COL-005`) produces no document at all, so a zero in a
+document always means the list was read and was empty. That is why this one is
+a plain number while every metric column is optional.
 
-## Contributor block
+### Contributor records
 
-The one key a document has that a CSV row does not: `contributors`, an array
-ordered by commits descending. Each entry:
+`contributors` is an array ordered by commits descending. Each entry:
 
 | Field | Type | Source | Definition | Status |
 |---|---|---|---|---|
@@ -382,7 +391,7 @@ say "nothing here".
 | `scan_date` | Python `str(datetime)`, UTC, microsecond precision | **Settled** |
 | Floats | Full precision, no rounding (`736.5466017006597`) | **Settled** |
 | Score columns | All six components are `float` and render with a decimal point | **Settled** |
-| Undefined columns | The four TBD aggregates render empty in CSV and `null` in JSON, always | **Settled** |
+| Undefined keys | The four TBD aggregates render as `null` in every document | **Settled** |
 | Coordinates | `null` when unresolved, never `0.0` — 0,0 is a real place | **Settled** |
 | Unfetchable repositories | Input and scan columns filled, everything else empty, run exits 4 | **Settled** |
 | Unknown vs. zero | Empty field in CSV, `null` in JSON — never `0` | **Settled** |
@@ -404,7 +413,7 @@ can report it, and the API reported nothing. It is the one identity-looking
 column a failed read cannot fill.
 
 ```csv
-cpython,python,,https://github.com/python/cpython,<scan_date>,<scan_id>,,,,,,,,,,,,,,,,,,,
+cpython,python,,https://github.com/python/cpython,<scan_date>,<scan_id>,,,,,,,,,,,,,,
 ```
 
 **And it produces no document.** A CSV row is positional — one row per
@@ -416,8 +425,9 @@ documents could tell from a repository that genuinely has no contributors.
 
 The same applies, one step later, to a repository that was read successfully
 but whose contributor list was not (`GM-COL-005`): the row keeps every
-measurement it collected, `contribution_total` is empty rather than zero, and
-no document is written.
+measurement it collected — it is a complete row, because no column of it is
+derived from contributors — and no document is written. The absent file is the
+only record that the contributor half failed, which is why the run also warns.
 
 **The run reports which repositories failed and exits non-zero.** A row of
 empty measurements is not a result, and a file that contains some of those
@@ -441,7 +451,11 @@ column, is a separate question deferred to that design.
 The caller may choose which columns the **tabular** artifact emits; selecting
 none emits all of them.
 
-It is a rendering filter and nothing more. Selection was specified as a
+The tabular artifact has twenty columns and that number does not vary: the
+contributor block is a document key set, not a set of columns, so no run
+produces a different header from another.
+
+Selection is a rendering filter and nothing more. It was specified as a
 rate-limit lever as well — a column nobody asked for would need no data, so
 the selection would decide which API calls a run must make. That promise is
 withdrawn rather than carried forward: every column a row needs comes from one
@@ -462,9 +476,9 @@ per row, using the same field names as the CSV columns. `scan_date` and
 `scan_id` repeat in every object, exactly as they repeat in every CSV row.
 
 The **documents** are always JSON and always written, one per repository, at
-`<owner>/<repoid>.json`. Each is the twenty-five columns in canonical order
-followed by `contributors`. `--format` does not affect them: there is no CSV
-form of a nested contributor array, and no console rendering of four hundred
+`<owner>/<repoid>.json`. Each is the twenty columns in canonical order followed
+by the contributor block. `--format` does not affect them: there is no CSV form
+of a nested contributor array, and no console rendering of four hundred
 documents.
 
 ## Rate-limit cost per repository

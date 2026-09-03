@@ -269,11 +269,16 @@ statistics GitHub is still computing - a 202 while a cache warms.
 the CSV; only its document is missing.
 
 Separate from `GM-COL-001` because the reference is good and only the second
-half of the collection failed. The row keeps every measurement, and
-`contribution_total` is **empty rather than zero** - nothing was counted, so
-nothing is claimed. No document is written, for the reason `METRICS.md` gives:
-a document carrying an empty contributor array and a zero total cannot be told
-from a repository that genuinely has no contributors.
+half of the collection failed. The CSV row is **complete** - no column of it is
+derived from contributors - so nothing in the tabular artifact records that
+this happened. No document is written, for the reason `METRICS.md` gives: a
+document carrying an empty contributor array and a `contribution_total` of zero
+cannot be told from a repository that genuinely has no contributors.
+
+The absent file and the warning are therefore the only record. That is the
+trade the twenty-column CSV makes: the contributor aggregates never appear as
+empty columns, and in exchange the CSV alone cannot tell you which
+repositories lost their documents.
 
 ---
 

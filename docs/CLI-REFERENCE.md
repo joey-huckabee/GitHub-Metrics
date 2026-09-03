@@ -334,9 +334,12 @@ and a folder of documents collected minutes apart cannot be joined or grouped
 by the run that made them. See
 [ADR-0005](adr/0005-one-scan-command-and-per-repository-json.md).
 
-**The two carry the same fields.** A document is the twenty-five CSV columns,
-in canonical order, followed by `contributors`. Nothing else. So a consumer
-that can read one needs no mapping to read the other.
+**Every CSV column is a document key.** A document is the twenty columns, in
+canonical order and complete, followed by the contributor block: `contributors`
+and the five aggregates over it. So a consumer that can read one needs no
+mapping to read the other. The aggregates are not CSV columns — they exist
+only where a contributor list was read, which is exactly when a document is
+written.
 
 `--format` and `--fields` govern the **tabular** artifact only. `--format
 console` prints it instead of writing it, and the documents are still written
@@ -419,8 +422,10 @@ something went wrong and only this says what:
 ```
 
 A repository whose *contributors* could not be read is a lesser case
-(`GM-COL-005`): the row keeps every measurement it collected,
-`contribution_total` is empty rather than zero, and no document is written.
+(`GM-COL-005`): the row keeps every measurement it collected — it is a
+complete row, because no column of it is derived from contributors — and no
+document is written. The absent file is the only record that the contributor
+half failed, which is why the run also warns.
 
 ### Exit status
 

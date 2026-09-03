@@ -91,9 +91,10 @@ githubmetrics/
   pypa/virtualenv.json     that row, then its contributors
 ```
 
-They carry the same twenty-five fields under the same names, so they join
-without a translation table — which is why one command produces both rather
-than two commands producing half each.
+The document is the CSV row — the same twenty fields, same names, same order
+— followed by the contributor block, so the two join without a translation
+table. That is why one command produces both rather than two commands producing
+half each.
 
 Collection costs **two GraphQL points and one REST request per repository**,
 and the run confirms the token can cover both budgets before collecting

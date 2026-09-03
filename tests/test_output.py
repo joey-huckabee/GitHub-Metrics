@@ -12,6 +12,7 @@ import pytest
 
 from github_metrics.errors import OutputDestinationError, UnknownFieldError
 from github_metrics.model import ScanIdentifier, SoftwareRow
+from github_metrics.model.contributor import ContributorBlock
 from github_metrics.output import (
     ALL_FIELDS,
     render_console,
@@ -27,8 +28,7 @@ EXPECTED_HEADER = (
     "name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,"
     "last_update_hours,closed_issues,releases,prevalence_score,stars_score,"
     "forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,"
-    "is_trusted_org,contribution_total,foreign_contribution,"
-    "adversarial_contribution,foreign_percent,adversarial_percent"
+    "is_trusted_org"
 )
 
 SCAN_DATE = datetime(2026, 7, 12, 20, 33, 7, 254804, tzinfo=timezone.utc)
@@ -59,7 +59,6 @@ def reference_row() -> SoftwareRow:
         trusted_org_bonus=0.0,
         total_score=72.0,
         is_trusted_org=False,
-        contribution_total=3026,
     )
 
 
@@ -97,20 +96,21 @@ def json_text(rows: list[SoftwareRow], **kwargs: object) -> str:
 @pytest.mark.requirement("L3-OUT-001")
 def test_the_header_is_the_agreed_column_set_in_the_agreed_order() -> None:
     assert ",".join(ALL_FIELDS) == EXPECTED_HEADER
-    assert len(ALL_FIELDS) == 25
+    assert len(ALL_FIELDS) == 20
 
 
 EXAMPLE_JSON = Path(__file__).resolve().parents[1] / "docs" / "example.json"
 
 
 @pytest.mark.requirement("L3-OUT-001")
-def test_the_documented_json_example_is_the_row_plus_contributors() -> None:
+def test_the_documented_json_example_is_the_row_then_the_block() -> None:
     """`docs/example.json` is the agreed shape for the per-repository JSON.
 
-    The document is every CSV column in canonical order and then exactly one
-    more key. That is the strongest form of the rule the two artifacts have to
-    keep: same fields, same spelling, same order, so a CSV row and a document
-    join without a translation table.
+    The document is every CSV column in canonical order, complete, and then the
+    contributor block. Stating it as a prefix and a fixed suffix is the
+    strongest form of the rule the two artifacts have to keep: every CSV column
+    is a document key, spelled the same way and in the same order, so a row and
+    a document join without a translation table.
 
     The example drifted once already, carrying `prevalance_score` and a
     `trusted_org` string against a `prevalence_score` and an `is_trusted_org`
@@ -119,7 +119,10 @@ def test_the_documented_json_example_is_the_row_plus_contributors() -> None:
     example = json.loads(EXAMPLE_JSON.read_text(encoding="utf-8"))
 
     assert tuple(example)[: len(ALL_FIELDS)] == ALL_FIELDS
-    assert tuple(example)[len(ALL_FIELDS) :] == ("contributors",)
+    assert tuple(example)[len(ALL_FIELDS) :] == ContributorBlock.keys()
+    # The block's keys are the document's alone. A name in both would mean two
+    # different things depending on which artifact was being read.
+    assert not set(ContributorBlock.keys()) & set(ALL_FIELDS)
 
 
 @pytest.mark.requirement("L3-OUT-001")
@@ -158,7 +161,7 @@ def test_the_reference_row_renders_exactly_as_documented(reference_row: Software
         "cline,cline,cline,https://github.com/cline/cline,"
         "2026-07-12 20:33:07.254804+00:00,"
         "ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,"
-        "8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false,3026,,,,"
+        "8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false"
     )
 
 

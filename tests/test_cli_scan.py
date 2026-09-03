@@ -2,9 +2,10 @@
 
 One run, one scan identity, two artifacts. Most of what is checked here is the
 relationship between the two rather than either on its own: they carry the same
-`scan_id`, the same field names, and they disagree about which repositories
-appear only in the one way the design intends - a repository that could not be
-read keeps its CSV row and gets no document.
+`scan_id`, every CSV column is a document key spelled the same way, and they
+disagree about which repositories appear only in the one way the design intends
+- a repository that could not be fully collected keeps its CSV row and gets no
+document.
 """
 
 from __future__ import annotations
@@ -29,7 +30,12 @@ from github_metrics.errors import (
     RateLimitExhaustedError,
     RepositoryNotFoundError,
 )
-from github_metrics.model.contributor import Address, Contributor, Coordinates
+from github_metrics.model.contributor import (
+    Address,
+    Contributor,
+    ContributorBlock,
+    Coordinates,
+)
 from github_metrics.sources import RepositoryRef
 
 DATA = Path(__file__).parent / "data"
@@ -38,8 +44,7 @@ EXPECTED_HEADER = (
     "name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,"
     "last_update_hours,closed_issues,releases,prevalence_score,stars_score,"
     "forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,"
-    "is_trusted_org,contribution_total,foreign_contribution,"
-    "adversarial_contribution,foreign_percent,adversarial_percent"
+    "is_trusted_org"
 )
 
 
@@ -197,21 +202,43 @@ def test_a_document_is_written_for_every_repository_that_was_read(tmp_path: Path
 
 @pytest.mark.requirement("L3-OUT-012")
 @pytest.mark.usefixtures("offline")
-def test_a_document_is_its_csv_row_plus_contributors(tmp_path: Path) -> None:
-    """The two artifacts are the same row, so they must join on identical keys."""
+def test_a_document_is_its_csv_row_then_the_contributor_block(tmp_path: Path) -> None:
+    """Every CSV column is a document key, in the same order, spelled the same.
+
+    That is what makes the two artifacts joinable. The block is the part only
+    the document has.
+    """
     run("pypa/virtualenv", "--output", str(tmp_path))
 
     payload = document(tmp_path, "pypa", "virtualenv")
     row = rows_of(tmp_path)[0]
 
-    assert tuple(payload)[:-1] == tuple(row)
-    assert tuple(payload)[-1:] == ("contributors",)
+    assert tuple(payload)[: len(row)] == tuple(row)
+    assert tuple(payload)[len(row) :] == ContributorBlock.keys()
     # Same values too, not merely the same names. The CSV renders everything as
     # a string; the document keeps JSON types, which is the documented
     # difference and the only one.
     assert payload["name"] == row["name"]
     assert str(payload["stars"]) == row["stars"]
     assert payload["scan_id"] == row["scan_id"]
+
+
+@pytest.mark.requirement("L3-CLI-008")
+@pytest.mark.usefixtures("offline")
+def test_the_csv_carries_no_contributor_columns(tmp_path: Path) -> None:
+    """Twenty columns, whatever the contributors turn out to be.
+
+    The aggregates exist only where a contributor list was read, and a
+    repository whose list failed produces a row and no document - so as
+    columns they would be empty for exactly the rows with nothing to explain
+    them.
+    """
+    run("pypa/virtualenv", "--output", str(tmp_path))
+
+    header = (tmp_path / "githubmetrics.csv").read_text(encoding="utf-8").splitlines()[0]
+
+    assert header == EXPECTED_HEADER
+    assert "contribution_total" not in header
 
 
 @pytest.mark.requirement("L3-OUT-012")
@@ -429,9 +456,12 @@ def test_a_repository_whose_contributors_failed_keeps_its_row_and_loses_its_docu
     result = run("pypa/virtualenv", "--output", str(tmp_path))
 
     rows = rows_of(tmp_path)
+    # Every measurement survives; the row is complete and says nothing about
+    # contributors, because no column of it ever does.
     assert rows[0]["stars"] == "5041"
-    # Not zero: nothing was counted, so nothing is claimed.
-    assert rows[0]["contribution_total"] == ""
+    assert rows[0]["total_score"] == "75.0"
+    # The document is the only place a contribution total would have appeared,
+    # and it is absent rather than zeroed.
     assert not (tmp_path / "pypa").exists()
     assert "Wrote 0 documents" in result.output
 

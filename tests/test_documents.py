@@ -1,9 +1,9 @@
 """Tests for :mod:`github_metrics.output.documents`.
 
-The per-repository document is the CSV row plus a contributor array, and its
-path is a function of *which repository this is* rather than of how someone
-happened to spell it. Both of those are checked here; the CLI tests check that
-a run produces them together.
+The per-repository document is the CSV row followed by the contributor block,
+and its path is a function of *which repository this is* rather than of how
+someone happened to spell it. Both of those are checked here; the CLI tests
+check that a run produces the two artifacts together.
 """
 
 from __future__ import annotations
@@ -14,7 +14,12 @@ from pathlib import Path
 import pytest
 
 from github_metrics.errors import DocumentDirectoryError
-from github_metrics.model.contributor import Address, Contributor, Coordinates
+from github_metrics.model.contributor import (
+    Address,
+    Contributor,
+    ContributorBlock,
+    Coordinates,
+)
 from github_metrics.model.software import SoftwareRow
 from github_metrics.output.documents import (
     DEFAULT_DOCUMENT_ROOT,
@@ -33,7 +38,14 @@ def row(owner: str = "pypa", name: str = "virtualenv") -> SoftwareRow:
         organization=owner,
         url=f"https://github.com/{owner}/{name}",
         stars=5041,
-        contribution_total=3026,
+    )
+
+
+def block(*people: Contributor) -> ContributorBlock:
+    """A block over the given contributors, totalled as the builder would."""
+    return ContributorBlock(
+        contributors=people,
+        contribution_total=sum(entry.contribution or 0 for entry in people),
     )
 
 
@@ -56,43 +68,59 @@ def contributor() -> Contributor:
 
 
 # ---------------------------------------------------------------------------
-# The document is the row plus one key
+# The document is the row, then the block
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.requirement("L3-OUT-012")
-def test_a_document_is_the_row_then_the_contributors() -> None:
-    """Same fields, same spelling, same order, plus exactly one addition.
+def test_a_document_is_the_row_then_the_block() -> None:
+    """Every CSV column, in order, then the keys only the document has.
 
     That is what lets a `githubmetrics.csv` row and a document join without a
     translation table.
     """
-    document = build_document(row(), [contributor()])
+    document = build_document(row(), block(contributor()))
+    columns = SoftwareRow.to_header()
 
-    assert tuple(document)[:-1] == SoftwareRow.to_header()
-    assert tuple(document)[-1:] == ("contributors",)
+    assert tuple(document)[: len(columns)] == columns
+    assert tuple(document)[len(columns) :] == ContributorBlock.keys()
+
+
+@pytest.mark.requirement("L3-OUT-012")
+def test_the_aggregates_are_document_keys_and_not_csv_columns() -> None:
+    """They exist only where a contributor list was read.
+
+    A repository whose list failed produces a row and no document, so as
+    columns they would be empty in the CSV for exactly the rows that have no
+    document to explain them.
+    """
+    assert "contribution_total" not in SoftwareRow.to_header()
+    assert not set(ContributorBlock.keys()) & set(SoftwareRow.to_header())
 
 
 @pytest.mark.requirement("L3-OUT-012")
 def test_a_document_keeps_json_types() -> None:
-    document = build_document(row(), [contributor()])
+    document = build_document(row(), block(contributor()))
 
     assert document["stars"] == 5041
-    assert document["contribution_total"] == 3026
-    # Not collected is null, never zero, in the document as in the CSV.
+    assert document["contribution_total"] == 2192
+    # Undefined is null, never zero: a zero would assert that this repository
+    # has no foreign contribution, which nothing has measured.
     assert document["foreign_percent"] is None
+    assert document["foreign_contribution"] is None
 
 
 @pytest.mark.requirement("L3-OUT-012")
-def test_a_repository_with_no_contributors_gets_an_empty_array() -> None:
-    """Different from a repository whose contributors were not read.
+def test_a_repository_with_no_contributors_totals_zero() -> None:
+    """Zero is the honest answer here, and only here.
 
-    That one gets no document at all, which is the runner's decision rather
-    than this module's - here the empty array is the honest answer.
+    A repository whose contributors could not be *read* gets no document at
+    all, so a zero in a document always means the list was read and was empty.
     """
-    document = build_document(row(), [])
+    document = build_document(row(), ContributorBlock())
 
     assert document["contributors"] == []
+    assert document["contribution_total"] == 0
 
 
 @pytest.mark.requirement("L3-OUT-012")
@@ -101,7 +129,7 @@ def test_the_contributor_block_matches_the_documented_example() -> None:
     example = json.loads(
         (Path(__file__).parents[1] / "docs" / "example.json").read_text(encoding="utf-8")
     )
-    built = build_document(row(), [contributor()])
+    built = build_document(row(), block(contributor()))
 
     assert tuple(built["contributors"][0]) == tuple(example["contributors"][0])
     address = built["contributors"][0]["internal_address"]
@@ -156,7 +184,7 @@ def test_a_windows_reserved_name_needs_no_sanitising(tmp_path: Path) -> None:
     Checked rather than assumed: `con.json` creates, lists and reads back.
     """
     root = prepare_root(tmp_path)
-    path = write_document(root, row(owner="acme", name="con"), [])
+    path = write_document(root, row(owner="acme", name="con"), ContributorBlock())
 
     assert path.is_file()
     assert json.loads(path.read_text(encoding="utf-8"))["name"] == "con"
@@ -205,7 +233,7 @@ def test_a_document_is_written_with_lf_endings(tmp_path: Path) -> None:
     Windows than on Linux.
     """
     root = prepare_root(tmp_path)
-    path = write_document(root, row(), [contributor()])
+    path = write_document(root, row(), block(contributor()))
 
     raw = path.read_bytes()
     assert b"\r\n" not in raw

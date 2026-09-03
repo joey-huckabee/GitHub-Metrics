@@ -19,11 +19,6 @@
   "trusted_org_bonus": 0.0,
   "total_score": 72.0,
   "is_trusted_org": false,
-  "contribution_total": 3026,
-  "foreign_contribution": null,
-  "adversarial_contribution": null,
-  "foreign_percent": null,
-  "adversarial_percent": null,
   "contributors": [
     {
       "scan_id": "ca219015-79a4-4bd6-b37e-272fa74bd8c2",
@@ -85,5 +80,10 @@
       "foreign": null,
       "adversarial": null
     }
-  ]
+  ],
+  "contribution_total": 3026,
+  "foreign_contribution": null,
+  "adversarial_contribution": null,
+  "foreign_percent": null,
+  "adversarial_percent": null
 }

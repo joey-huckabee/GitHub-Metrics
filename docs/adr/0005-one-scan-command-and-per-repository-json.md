@@ -21,13 +21,12 @@ cost: `metrics` must never pay for contributor pages.
 
 `docs/example.json` is the agreed shape for the per-repository document, and
 reading it against `model/software.py` shows the split does not hold. Strip the
-`contributors` array, and what remains is **exactly the columns `SoftwareRow`
-defines** - the same identity, the same measurements, the same six score
-components, the same total, and the five contribution aggregates that are
-themselves per repository.
+contributor block - the `contributors` array and the five aggregates over it -
+and what remains is **exactly the columns `SoftwareRow` defines**: the same
+identity, the same measurements, the same six score components, the same total.
 
 The document is therefore not a second dataset. It is the row plus a
-contributor array.
+contributor block.
 
 That creates the problem this ADR exists to solve. Both artifacts carry
 `scan_id` and `scan_date`, and those are **per run, assigned before any
@@ -118,7 +117,7 @@ Both, always, into one directory:
 | Artifact | Path | Contents |
 |---|---|---|
 | Tabular | `<root>/githubmetrics.csv` | one row per accepted reference, in input order |
-| Documents | `<root>/<owner>/<repoid>.json` | that repository's row, then its contributors |
+| Documents | `<root>/<owner>/<repoid>.json` | that repository's row, then its contributor block |
 
 `<root>` is `--output`, or `githubmetrics` when none is given. Keeping both in
 one directory is not tidiness: they share a `scan_id`, and separating them by
@@ -133,24 +132,38 @@ would stop being the row it has to join with.
 
 ### The column set
 
-**The two artifacts carry the same fields.** `SoftwareRow` gained the five
-per-repository contribution aggregates - `contribution_total`,
+**`githubmetrics.csv` stays at twenty columns.** A document is those twenty
+keys, in canonical order and complete, followed by the six keys of the
+contributor block: `contributors`, `contribution_total`,
 `foreign_contribution`, `adversarial_contribution`, `foreign_percent`,
-`adversarial_percent` - so the CSV header is twenty-five columns and a document
-is those twenty-five keys in canonical order followed by `contributors`.
+`adversarial_percent`.
 
-The aggregates are columns rather than document-only keys because they are per
-repository, which is the CSV's grain. Leaving them out would mean answering
-"which repositories have the most foreign contribution" by parsing four hundred
-JSON files, and it would make the two artifacts disagree about what a
-repository record contains.
+Every CSV column is a document key, spelled the same way and in the same order.
+That prefix relationship is the join, and it is a rule a test states in one
+line - which the earlier formulation, "the first twenty keys must not collide
+with the rest", could not.
 
-`foreign_contribution`, `adversarial_contribution`, `foreign_percent`,
-`adversarial_percent` and the per-contributor `foreign` and `adversarial` are
-**collected as `null`** until `METRICS.md` defines them. Reserving the columns
-is not the same as implementing the metric: a `null` publishes no number and
-makes no claim, whereas a `0` would assert that a repository has no foreign
-contribution - an assertion about named people that nothing has measured.
+**The aggregates are document keys rather than columns.** Promoting them to
+`SoftwareRow` was considered: their grain is the repository, which is the CSV's
+grain, and it would put "which repositories carry the most foreign
+contribution" one spreadsheet sort away instead of behind a walk over four
+hundred files.
+
+It was rejected because the aggregates exist only where a contributor list was
+read, and that is exactly the set of repositories that get a document. A
+repository whose list failed produces a row and no document, so as columns they
+would be empty for precisely the rows with no document to explain the gap - and
+`contribution_total` would need to be optional in order to distinguish "no
+contributors" from "not collected", when as a document key it is never in
+doubt. Changing a twenty-column contract to carry data the CSV cannot always
+have is the wrong trade.
+
+The per-contributor `foreign` and `adversarial`, and the four aggregates that
+depend on them, are **collected as `null`** until `METRICS.md` defines them.
+Reserving the key is not the same as implementing the metric: a `null`
+publishes no number and makes no claim, whereas a `0` would assert that a
+repository has no foreign contribution - an assertion about named people that
+nothing has measured.
 
 ### Where the JSON files go
 
@@ -251,8 +264,9 @@ Good:
 - One run, one scan identity, joinable artifacts, and a shape v0.3.0's store
   can group without a fourth key
 - What a run produced is readable from the command alone
-- The CSV and the documents carry identical fields, so a consumer that has one
-  needs no mapping to read the other
+- Every CSV column is a document key, in the same order, so a consumer that can
+  read one needs no mapping to read the other
+- `githubmetrics.csv` keeps the twenty-column contract v0.1.0 shipped
 - `contributors`' unsettled JSON output stops being a separate contract
 
 Bad:
@@ -278,8 +292,11 @@ Bad:
   changes in two releases is churn. It is taken now rather than later because
   the alternative is `scan_id` and a command called `metrics` disagreeing about
   what a run is called for the life of the tool.
-- Four columns and two contributor fields ship as permanently `null` until
-  their definitions land.
+- Four aggregate keys and two contributor fields ship as permanently `null`
+  until their definitions land.
+- The contribution aggregates are reachable only by reading the documents. An
+  analyst who wants them across a portfolio has to walk the directory rather
+  than sort a column.
 
 Neutral:
 

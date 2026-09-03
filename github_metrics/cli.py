@@ -24,7 +24,7 @@ from github_metrics.analysis.popularity import describe_bands as describe_popula
 from github_metrics.analysis.releases import RELEASE_BANDS, SATURATION_COUNT
 from github_metrics.analysis.releases import describe_bands as describe_release_bands
 from github_metrics.analysis.releases import score_releases
-from github_metrics.analysis.row import build_empty_row, build_row, stamp
+from github_metrics.analysis.row import build_block, build_empty_row, build_row
 from github_metrics.client import GitHubClient
 from github_metrics.collect.budget import check_budget
 from github_metrics.collect.closed_issues import ClosedIssueCounts, get_closed_issues
@@ -304,14 +304,7 @@ def scan_command(
     outcomes = _collect(context, resolved.repositories, workers=workers)
     rows = [
         (
-            build_row(
-                outcome.reference,
-                outcome.metadata,
-                scan,
-                # None, not the empty tuple: a repository whose contributor
-                # list could not be read has not been measured as zero.
-                contributors=outcome.contributors if outcome.documented else None,
-            )
+            build_row(outcome.reference, outcome.metadata, scan)
             if outcome.metadata is not None
             else build_empty_row(outcome.reference, scan)
         )
@@ -439,7 +432,7 @@ def _write_documents(
         if not outcome.documented:
             continue
         try:
-            write_document(root, row, stamp(outcome.contributors, scan))
+            write_document(root, row, build_block(outcome.contributors, scan))
         except DocumentDirectoryError as exc:
             # One unwritable file does not abandon the rest; the CSV is
             # already written and the other documents are still worth having.

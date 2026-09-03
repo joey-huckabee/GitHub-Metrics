@@ -35,7 +35,7 @@ from github_metrics.analysis.trusted_orgs import (
     score_org_bonus,
 )
 from github_metrics.collect.repository import RepoMetaData
-from github_metrics.model.contributor import Contributor
+from github_metrics.model.contributor import Contributor, ContributorBlock
 from github_metrics.model.scan import ScanIdentifier
 from github_metrics.model.software import SoftwareRow
 from github_metrics.sources import RepositoryRef
@@ -43,46 +43,41 @@ from github_metrics.sources import RepositoryRef
 LOGGER = logging.getLogger(__name__)
 
 
-def stamp(contributors: Sequence[Contributor], scan: ScanIdentifier) -> list[Contributor]:
-    """Attach the run identity to every contributor record.
+def build_block(
+    contributors: Sequence[Contributor],
+    scan: ScanIdentifier,
+) -> ContributorBlock:
+    """Assemble the contributor block of one repository's document.
 
-    Applied here rather than in `collect` for the same reason a row's identity
-    is: the scan is a property of the run, and collection should not have to
-    know which run it is part of.
+    Called only for a repository whose contributor list was read. A repository
+    whose list failed produces a CSV row and no document at all, so there is no
+    block to build and no aggregate to leave unset - which is why
+    `contribution_total` is a plain `int` here rather than an optional one.
+
+    The run identity is stamped here rather than in `collect` for the same
+    reason a row's is: the scan is a property of the run, and collection should
+    not have to know which run it is part of.
 
     Args:
-        contributors: The records as collected.
+        contributors: The records as collected, most commits first.
         scan: Identity of this run.
 
     Returns:
-        The same records, stamped.
+        The block, stamped and totalled. The four judgement-dependent
+        aggregates are left `None`: nothing has measured them, and a `0` would
+        assert that a repository has no foreign contribution rather than say
+        that no rule has been applied.
     """
-    return [
+    stamped = tuple(
         replace(entry, scan_id=scan.scan_id, scan_date=scan.scan_date) for entry in contributors
-    ]
+    )
+    # Counts what was collected, not what exists: the list is truncated at
+    # DEFAULT_CONTRIBUTOR_LIMIT, ranked by commits descending. METRICS.md says
+    # so, because a total that silently means something narrower than its name
+    # is the kind of number that survives review.
+    total = sum(entry.contribution or 0 for entry in stamped)
 
-
-def contribution_total(contributors: Sequence[Contributor] | None) -> int | None:
-    """Sum the commits of every contributor collected for one repository.
-
-    This counts what was collected, not what exists: the list is truncated at
-    `DEFAULT_CONTRIBUTOR_LIMIT`, ranked by commits descending. `METRICS.md`
-    documents that, because a total that silently means something narrower
-    than its name is the kind of number that survives review.
-
-    Args:
-        contributors: The records for one repository, or `None` when the
-            list could not be read.
-
-    Returns:
-        The sum; `0` for a repository that genuinely has no contributors,
-        and `None` when none were collected. The two are different facts and
-        a zero cannot express the second - which is the same reason every
-        other metric column defaults to `None`.
-    """
-    if contributors is None:
-        return None
-    return sum(entry.contribution or 0 for entry in contributors)
+    return ContributorBlock(contributors=stamped, contribution_total=total)
 
 
 def build_row(
@@ -90,20 +85,19 @@ def build_row(
     metadata: RepoMetaData,
     scan: ScanIdentifier,
     *,
-    contributors: Sequence[Contributor] | None = None,
     registry: TrustedOrganizations | None = None,
 ) -> SoftwareRow:
     """Score one collected repository into an output row.
+
+    Contributors are deliberately not an argument. The row is the twenty
+    columns `githubmetrics.csv` publishes, and none of them is derived from a
+    contributor list; what is derived from one lives in `ContributorBlock` and
+    reaches only the document.
 
     Args:
         reference: The reference as the input named it.
         metadata: What GitHub reported.
         scan: Identity of this run, stamped on every row.
-        contributors: The repository's contributors, used for the five
-            contribution aggregates. An empty sequence sets
-            `contribution_total` to zero, which is the correct measurement
-            for a repository that has none; `None` leaves it unset, which is
-            what a failed contributor read means.
         registry: Trusted-organisation registry. Defaults to the built-in list.
 
     Returns:
@@ -149,16 +143,6 @@ def build_row(
         trusted_org_bonus=bonus,
         total_score=score_total(prevalence, stars, forks, maturity, last_update, bonus),
         is_trusted_org=is_trusted_org(owner, registry),
-        contribution_total=contribution_total(contributors),
-        # Four columns with no definition yet. `None` rather than 0 because a
-        # zero here would be an assertion - "no foreign contribution" - that
-        # nothing in this repository has measured, and it would read as data
-        # in every aggregate downstream. They stay None until METRICS.md
-        # settles `foreign` and `adversarial`.
-        foreign_contribution=None,
-        adversarial_contribution=None,
-        foreign_percent=None,
-        adversarial_percent=None,
     )
 
 

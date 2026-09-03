@@ -163,8 +163,8 @@ rate-limit knobs were already scheduled here and keep their place.
 
 ### Contributor collection
 
-**Built.** The shape is [`example.json`](example.json): the twenty-five
-`SoftwareRow` columns, then a `contributors` array. One JSON document per
+**Built.** The shape is [`example.json`](example.json): the twenty
+`SoftwareRow` columns, then the contributor block. One JSON document per
 repository, at `githubmetrics/<owner>/<repoid>.json` unless `--output` says
 otherwise, lower-cased throughout, and written only for a repository that was
 fully collected. See
@@ -182,9 +182,11 @@ of those is what it is.
   artifacts a run writes** - it writes both, always. The flagged design was
   considered and rejected: it buys one state nothing else expresses, and in
   exchange what a run produced stops being readable from the command
-- The five contribution aggregates added as columns 21-25, so the CSV and the
-  documents carry the same fields. Their grain is the repository, which is the
-  CSV's grain
+- The five contribution aggregates added to the document, not to the CSV,
+  which stays at twenty columns. Promoting them was considered and rejected:
+  they exist only for a repository whose contributor list was read, which is
+  exactly the set that produces a document, so as columns they would be empty
+  for precisely the rows with no document to explain the gap
 - Contributor collection itself: the ranked list from REST, every account's
   detail from one aliased GraphQL document, and locations resolved to a
   fourteen-field address through Nominatim

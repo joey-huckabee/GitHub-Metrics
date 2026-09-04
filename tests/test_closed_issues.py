@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 import os
 from typing import Any, cast
@@ -121,20 +122,20 @@ def test_no_count_is_left_unmapped() -> None:
     # error, so sweeping the whole domain is what makes that class of defect
     # impossible to reintroduce quietly.
     top = CLOSED_ISSUE_BANDS[-1][0]
-    weights = {score_closed_issues(count) for count in range(0, top + 50)}
+    weights = {score_closed_issues(count) for count in range(top + 50)}
 
     assert weights == {0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 0.9, 1.0}
     assert all(
         MIN_CLOSED_ISSUE_WEIGHT <= score_closed_issues(count) <= MAX_CLOSED_ISSUE_WEIGHT
-        for count in range(0, top + 50)
+        for count in range(top + 50)
     )
 
 
 @pytest.mark.requirement("L3-SCR-001")
 def test_the_score_never_decreases_as_the_count_rises() -> None:
-    scores = [score_closed_issues(count) for count in range(0, 600)]
+    scores = [score_closed_issues(count) for count in range(600)]
 
-    pairs = zip(scores[:-1], scores[1:], strict=True)
+    pairs = itertools.pairwise(scores)
     assert all(earlier <= later for earlier, later in pairs)
 
 

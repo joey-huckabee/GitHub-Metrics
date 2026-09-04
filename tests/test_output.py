@@ -456,7 +456,10 @@ def test_a_scan_identifier_is_timezone_aware_and_unique() -> None:
 @pytest.mark.requirement("L3-OUT-010")
 def test_a_naive_scan_date_is_rejected() -> None:
     with pytest.raises(ValueError, match="timezone-aware"):
-        ScanIdentifier(scan_date=datetime(2026, 7, 12, 20, 33, 7))
+        # Naive on purpose: this is the value the constructor exists to
+        # refuse. Suppressed at the line rather than for the file, so an
+        # accidental naive datetime elsewhere still fails.
+        ScanIdentifier(scan_date=datetime(2026, 7, 12, 20, 33, 7))  # noqa: DTZ001
 
 
 @pytest.mark.requirement("L3-OUT-010")

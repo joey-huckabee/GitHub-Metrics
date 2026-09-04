@@ -21,17 +21,17 @@ from github_metrics.analysis.trusted_orgs import (
 
 __all__ = [
     "MAX_TOTAL_SCORE",
-    "age_days",
-    "last_update_hours",
     "TrustedOrganizations",
+    "age_days",
     "is_trusted_org",
+    "last_update_hours",
     "score_closed_issues",
     "score_forks",
-    "score_maturity",
     "score_last_update",
+    "score_maturity",
+    "score_org_bonus",
     "score_prevalence",
     "score_releases",
     "score_stars",
     "score_total",
-    "score_org_bonus",
 ]

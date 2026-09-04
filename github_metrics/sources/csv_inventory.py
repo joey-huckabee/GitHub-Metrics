@@ -266,6 +266,62 @@ def _is_blank(row: Sequence[str]) -> bool:
     return all(not cell.strip() for cell in row)
 
 
+def _check_row(
+    row: list[str],
+    line: int,
+    *,
+    columns: tuple[int, int],
+    widest: int,
+) -> RepositoryRef | tuple[str, str]:
+    """Validate one data row, stopping at its first failure.
+
+    The order is the contract, not an implementation detail: field count, then
+    emptiness, then grammar. A row stops at its first failure so that **each
+    rejected row carries exactly one code** - a row with a blank owner and a
+    malformed repoid is one problem to fix first, not two to read past.
+
+    Duplication is deliberately *not* checked here. It is the one condition
+    that depends on the rows around this one rather than on the row itself, so
+    it belongs to the caller that holds them.
+
+    Args:
+        row: The row's fields, as the CSV reader produced them.
+        line: The physical line number, for the message.
+        columns: Where `owner` and `repoid` were found in the header.
+        widest: The rightmost required column index.
+
+    Returns:
+        A `RepositoryRef` when the row is acceptable, or an
+        `(issue code, message)` pair naming the first thing wrong with it.
+    """
+    owner_at, repoid_at = columns
+    echo = truncate(",".join(row))
+
+    if len(row) <= widest:
+        return (
+            ISSUE_FIELD_COUNT,
+            f"expected at least {widest + 1} fields but found {len(row)}: {echo!r}",
+        )
+
+    owner = row[owner_at].strip()
+    repoid = row[repoid_at].strip()
+
+    if not owner:
+        return ISSUE_EMPTY_OWNER, f"owner is empty in {echo!r}"
+    if not repoid:
+        return ISSUE_EMPTY_REPOID, f"repoid is empty in {echo!r}"
+
+    owner_problem = validate_owner(owner)
+    if owner_problem is not None:
+        return ISSUE_INVALID_OWNER, f"invalid owner {truncate(owner)!r}: {owner_problem}"
+
+    repoid_problem = validate_repoid(repoid)
+    if repoid_problem is not None:
+        return ISSUE_INVALID_REPOID, f"invalid repoid {truncate(repoid)!r}: {repoid_problem}"
+
+    return RepositoryRef(owner=owner, repoid=repoid, source_line=line)
+
+
 def read_repository_csv(source: Path | str, *, strict: bool = False) -> IngestResult:
     """Read one CSV of `owner,repoid` rows.
 
@@ -323,58 +379,26 @@ def read_repository_csv(source: Path | str, *, strict: bool = False) -> IngestRe
             continue
 
         result.rows_read += 1
-        echo = truncate(",".join(row))
 
-        if len(row) <= widest_required:
-            record(
-                ISSUE_FIELD_COUNT,
-                line,
-                f"expected at least {widest_required + 1} fields but found "
-                f"{len(row)}: {echo!r}",
-            )
+        outcome = _check_row(row, line, columns=(owner_at, repoid_at), widest=widest_required)
+        if isinstance(outcome, tuple):
+            record(outcome[0], line, outcome[1])
             continue
 
-        owner = row[owner_at].strip()
-        repoid = row[repoid_at].strip()
-
-        if not owner:
-            record(ISSUE_EMPTY_OWNER, line, f"owner is empty in {echo!r}")
-            continue
-        if not repoid:
-            record(ISSUE_EMPTY_REPOID, line, f"repoid is empty in {echo!r}")
-            continue
-
-        owner_problem = validate_owner(owner)
-        if owner_problem is not None:
-            record(
-                ISSUE_INVALID_OWNER,
-                line,
-                f"invalid owner {truncate(owner)!r}: {owner_problem}",
-            )
-            continue
-
-        repoid_problem = validate_repoid(repoid)
-        if repoid_problem is not None:
-            record(
-                ISSUE_INVALID_REPOID,
-                line,
-                f"invalid repoid {truncate(repoid)!r}: {repoid_problem}",
-            )
-            continue
-
-        reference = RepositoryRef(owner=owner, repoid=repoid, source_line=line)
-        first_seen = seen.get(reference.key)
+        first_seen = seen.get(outcome.key)
         if first_seen is not None:
+            # Reported against the line it duplicates, not merely as "seen
+            # before" - which is why every row is held in memory.
             record(
                 ISSUE_DUPLICATE,
                 line,
-                f"{reference.full_name} already appears on line {first_seen}; "
+                f"{outcome.full_name} already appears on line {first_seen}; "
                 "keeping the first occurrence",
             )
             continue
 
-        seen[reference.key] = line
-        result.repositories.append(reference)
+        seen[outcome.key] = line
+        result.repositories.append(outcome)
 
     LOGGER.info(
         "Read %d repositories from %s (%d data rows, %d rejected)",

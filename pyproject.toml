@@ -78,20 +78,57 @@ extend-exclude = [".venv", "build", "dist"]
 
 [tool.ruff.lint]
 # `I` (isort) is intentionally omitted: isort owns import ordering here.
-select = ["E", "F", "W", "B", "C4", "UP", "SIM", "RET", "ARG", "PTH", "N", "D"]
+#
+# The second row exists to cover the ground SonarCloud's Python rules cover, so
+# that a finding surfaces here - on a developer's machine, in seconds - rather
+# than on a dashboard after a push. `S` is flake8-bandit (Sonar's security
+# hotspots), `C90` is cyclomatic complexity, `PL` the pylint port, `DTZ`
+# timezone-naive datetimes, `T20` stray prints, `LOG`/`G` logging misuse.
+select = [
+    "E", "F", "W", "B", "C4", "UP", "SIM", "RET", "ARG", "PTH", "N", "D",
+    "S", "C90", "PL", "PERF", "RUF", "A", "DTZ", "T20", "PIE", "LOG", "G",
+]
 ignore = [
-    "D107", # missing docstring in __init__
-    "D203", # conflicts with D211
-    "D213", # conflicts with D212
+    "D107",    # missing docstring in __init__
+    "D203",    # conflicts with D211
+    "D213",    # conflicts with D212
+    # Ambiguous-unicode. The prose in this repository uses en and em dashes
+    # deliberately and CLAUDE.md forbids reshaping it to avoid them; these
+    # rules would do exactly that, in docstrings and comments where no parser
+    # is involved.
+    "RUF002",
+    "RUF003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D", "ARG"]
+# A test asserts; a test needs fixture credentials; a test compares against the
+# literal values under test. S101/S105/S106 and PLR2004 are all correct about
+# the code and wrong about test code specifically. PLR0913 likewise: a test
+# taking several fixtures is a test, not a design problem.
+"tests/*" = ["D", "ARG", "S101", "S105", "S106", "PLR2004", "PLR0913", "PLR0917"]
 # This module transcribes a supplied function verbatim in order to test what it
 # actually did. That function has no return statement, so every assignment in
 # it is genuinely unused - which is the defect being demonstrated, not one to
-# tidy away. F841 is correct about the code and wrong about the intent.
-"tests/test_popularity.py" = ["D", "ARG", "F841"]
+# tidy away. F841 is correct about the code and wrong about the intent, and
+# C901 is correct that the original was tangled, which is also the point.
+"tests/test_popularity.py" = [
+    "D", "ARG", "S101", "S105", "S106", "PLR2004", "PLR0913", "PLR0917", "F841", "C901",
+]
+# A build script's standard output *is* its interface; there is no logger to
+# route it through and nothing downstream parsing a data stream.
+"scripts/*" = ["T201"]
+
+[tool.ruff.lint.mccabe]
+# Ruff's default is 10. Twelve is where the ingestion reader sits once its
+# per-row ladder is extracted, and it is well inside SonarCloud's own default
+# cognitive-complexity threshold of 15.
+max-complexity = 12
+
+[tool.ruff.lint.pylint]
+# SonarCloud's default maximum is 7. Matching it here means a function that
+# passes locally passes there, rather than being reported after the fact.
+max-args = 7
+max-positional-args = 7
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -113,7 +150,7 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "-ra",
-    "--cov=github_metrics",
+    "--cov=.",
     "--cov-report=term-missing",
     "--cov-report=xml",
 ]
@@ -123,8 +160,15 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["github_metrics"]
+source = ["."]
+omit = ["tests/*", "scripts/*", ".venv/*"]
 branch = true
+# Paths in coverage.xml are written relative to the repository root rather than
+# to `source`. Without this, coverage.py emits `cli.py` against a <source> of
+# `.../github_metrics`, and any consumer that resolves paths from the project
+# root - SonarCloud among them - matches nothing and reports 0% coverage
+# without erroring. `github_metrics/cli.py` resolves.
+relative_files = true
 
 [tool.coverage.report]
 show_missing = true

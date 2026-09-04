@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 from typing import Any, cast
 
@@ -247,7 +248,7 @@ def test_zero_versions_scores_zero_not_the_floor_closed_issues_uses() -> None:
 
 @pytest.mark.requirement("L3-SCR-003")
 def test_no_version_count_is_left_unmapped() -> None:
-    weights = {score_releases(n) for n in range(0, SATURATION_COUNT + 50)}
+    weights = {score_releases(n) for n in range(SATURATION_COUNT + 50)}
 
     assert weights == {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0}
 
@@ -257,14 +258,14 @@ def test_the_table_never_produces_nine_tenths() -> None:
     # The step from 0.8 to 1.0 is double every other step. Asserted so the
     # asymmetry is a recorded decision rather than something a later reader
     # "fixes" without knowing it was intended.
-    assert 0.9 not in {score_releases(n) for n in range(0, 500)}
+    assert 0.9 not in {score_releases(n) for n in range(500)}
 
 
 @pytest.mark.requirement("L3-SCR-003")
 def test_the_release_score_never_decreases_as_versions_rise() -> None:
-    scores = [score_releases(n) for n in range(0, 200)]
+    scores = [score_releases(n) for n in range(200)]
 
-    pairs = zip(scores[:-1], scores[1:], strict=True)
+    pairs = itertools.pairwise(scores)
     assert all(earlier <= later for earlier, later in pairs)
 
 

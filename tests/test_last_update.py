@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 
 import pytest
@@ -65,7 +66,7 @@ def test_only_the_restored_band_differs_from_the_original() -> None:
     """
     differing = [
         hours
-        for hours in range(0, 5 * HOURS_PER_YEAR)
+        for hours in range(5 * HOURS_PER_YEAR)
         if last_update_weight(float(hours)) != original_chain(float(hours))
     ]
 
@@ -107,7 +108,7 @@ def test_the_score_never_rises_as_a_repository_goes_stale() -> None:
     # Merit runs the opposite way to the other tables: more hours is worse.
     weights = [last_update_weight(float(h)) for h in range(0, 30_000, 7)]
 
-    pairs = zip(weights[:-1], weights[1:], strict=True)
+    pairs = itertools.pairwise(weights)
     assert all(earlier >= later for earlier, later in pairs)
 
 

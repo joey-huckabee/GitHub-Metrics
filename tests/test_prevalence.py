@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 
 import pytest
@@ -48,13 +49,13 @@ def test_the_score_never_decreases_as_either_input_rises() -> None:
     # The property the original violated. Closing an issue or cutting a
     # release must never lower a project's score.
     for versions in (0, 3, 40, 100):
-        scores = [score_prevalence(closed, versions) for closed in range(0, 600)]
-        pairs = zip(scores[:-1], scores[1:], strict=True)
+        scores = [score_prevalence(closed, versions) for closed in range(600)]
+        pairs = itertools.pairwise(scores)
         assert all(a <= b for a, b in pairs), f"not monotone in closed issues at {versions}"
 
     for closed in (0, 3, 100, 600):
-        scores = [score_prevalence(closed, versions) for versions in range(0, 120)]
-        pairs = zip(scores[:-1], scores[1:], strict=True)
+        scores = [score_prevalence(closed, versions) for versions in range(120)]
+        pairs = itertools.pairwise(scores)
         assert all(a <= b for a, b in pairs), f"not monotone in versions at {closed}"
 
 

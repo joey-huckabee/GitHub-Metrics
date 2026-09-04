@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 
 import pytest
@@ -78,9 +79,9 @@ def test_more_forks_never_scores_lower_than_fewer() -> None:
     # The original's terminal branch assigned 0.1, so had the missing return
     # been added alone, 110 forks would have scored below 109 - more forks
     # meaning a lower score.
-    weights = [forks_weight(n) for n in range(0, 400)]
+    weights = [forks_weight(n) for n in range(400)]
 
-    pairs = zip(weights[:-1], weights[1:], strict=True)
+    pairs = itertools.pairwise(weights)
     assert all(earlier <= later for earlier, later in pairs)
 
     assert forks_weight(109) == 0.8
@@ -110,7 +111,7 @@ def test_the_tables_agree_below_ninety() -> None:
 
     assert [(bound, weight) for bound, weight in FORK_BANDS if bound <= 90] == shared
 
-    for count in range(0, 90):
+    for count in range(90):
         assert stars_weight(count) == forks_weight(count)
 
 
@@ -174,14 +175,14 @@ def test_every_star_boundary_scores_as_documented(stars: int, expected: float) -
 
 @pytest.mark.requirement("L3-SCR-018")
 def test_no_star_count_is_left_unmapped() -> None:
-    produced = {stars_weight(n) for n in range(0, 400)}
+    produced = {stars_weight(n) for n in range(400)}
 
     assert produced == {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}
 
 
 @pytest.mark.requirement("L3-SCR-018")
 def test_no_fork_count_is_left_unmapped() -> None:
-    produced = {forks_weight(n) for n in range(0, 300)}
+    produced = {forks_weight(n) for n in range(300)}
 
     assert produced == {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}
 

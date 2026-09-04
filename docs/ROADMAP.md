@@ -301,16 +301,40 @@ permanent and are recorded with their conditions in `L2.md` and `L3.md`.
 
 ---
 
+## v0.4.0 — The analysis pipeline, and verifying the tests
+
+**Released 2026-09-03.** No behaviour changed for a caller; what changed is
+what the project can prove about itself.
+
+- **SonarCloud analysis**, in a workflow that skips rather than fails when its
+  secrets are absent, waits for the report to be processed before reading the
+  result, and names the branch on every read. Two of those exist because the
+  first versions reported a clean project for a branch that had never been
+  analysed - a 200 carrying nothing reads exactly like good news.
+- **Coverage actually reaches it.** coverage.py wrote paths relative to the
+  package, so Sonar would have resolved none of them and reported 0% without
+  erroring. CI now greps the report for repository-relative paths before
+  scanning.
+- **`make mutants`** breaks one documented behaviour at a time and requires the
+  suite to notice. Three checks could not fail when it was first run, and
+  those are fixed; all thirty are caught now.
+- **Address components ordered for US addresses**, and the components are the
+  match's own rather than a reverse lookup's - which was manufacturing a state
+  and a county for anyone who published a country.
+
+---
+
 ## v0.5.0 — Persistence
 
 Capture results in **SQLite**, behind an interface that allows the store to be
-swapped for **PostgreSQL** later without changing the collection code.
+swapped for **PostgreSQL** later without changing the collection code. One
+schema for both artifacts: a document is the row plus its contributor block, so
+splitting repository and contributor persistence into separate versions - as an
+earlier draft of this roadmap did - would design the same join twice.
 
 The schema has to be designed before it is written, not after. `scan_id` and
 `scan_date` already exist as per-run identifiers precisely so that stored rows
-can be grouped by the run that produced them, and `tool_version` already rides
-on every snapshot so an archived row stays interpretable when the metric
-definitions change.
+can be grouped by the run that produced them.
 
 Points to settle:
 
@@ -319,28 +343,33 @@ Points to settle:
   both
 - How a metric definition change is recorded, so old and new rows are not
   silently compared
+- **How a stored row is attributed to a tool version.** Nothing in the output
+  carries one: `RepositoryMetrics.tool_version` did until v0.2.0 removed that
+  type with the `contributors` command, and `SoftwareRow` has no equivalent. A
+  row is attributable to a *run* and not to the code that made it, which
+  matters more once rows outlive the release that produced them. Adding a
+  column is a change to the output contract and wants an ADR.
 
 ---
 
-## v0.4.0 — Contributor metadata
+## Deferred, and possibly not ours
 
-Collect the contributor information the analysis needs. The metric set and its
-definitions get the same treatment as [`METRICS.md`](METRICS.md): defined
-first, implemented second.
+### `foreign` and `adversarial`
 
-Contributors are substantially more expensive to collect than repository
-metadata — the request cost scales with the number of contributors rather than
-being constant per repository — so the rate-limit work from v0.1.0 and v0.2.0
-is a prerequisite rather than a nicety.
+Emitted as `null`, along with the four aggregates derived from them
+(`foreign_contribution`, `adversarial_contribution`, `foreign_percent`,
+`adversarial_percent`). Nothing in this repository computes them and nothing
+ever has - checked against the whole history, not only the current tree.
 
-The geocoding path already resolves contributor locations to
-coordinates and is the obvious seam to build on.
+**A separate repository processes the documents this tool writes**, and may be
+where those values are filled in. If so they are not deferred here at all, they
+belong to that stage, and this tool's job is to leave an unambiguous marker
+that they have not been computed. `null` is that marker; `0` would be
+indistinguishable from "computed, and none found", which is the reason the
+keys are not simply omitted.
 
----
-
-## v0.5.0 — Contributor persistence
-
-A store for contributor metadata, following whatever pattern v0.3.0 settles on.
+Settling this needs a look at that code. Until then the shape is fixed and
+nothing here asserts anything about a named person.
 
 ---
 

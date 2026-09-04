@@ -71,7 +71,6 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
-from dataclasses import replace
 from functools import lru_cache
 from typing import Any, Final
 
@@ -266,12 +265,7 @@ class Geocoder:
         # The cache is keyed case-insensitively because Nominatim is, but the
         # address handed back records the spelling this contributor used.
         resolved = self._resolve(cleaned.casefold())
-        # Named rather than returned inline: `dataclasses.replace` is typed
-        # loosely enough that a checker cannot see it hands back an `Address`,
-        # and a return annotation nothing can verify is worth less than one
-        # that can.
-        stamped: Address = replace(resolved, query=cleaned)
-        return stamped
+        return resolved.with_query(cleaned)
 
     @lru_cache(maxsize=CACHE_SIZE)  # noqa: B019 - one geocoder per run; cache dies with it
     def _resolve(self, key: str) -> Address:

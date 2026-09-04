@@ -8,6 +8,86 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.4.0] - 2026-09-03
+
+Static analysis, and evidence that the test suite is worth having. **No output
+changed**: not a column, not a key, not a value.
+
+### Added
+
+- **SonarCloud analysis** — `.github/workflows/sonarcloud.yml` and
+  `sonar-project.properties`. The project key, organization and token all come
+  from repository secrets, so nothing in the repository has to be kept in step
+  with an account. The scan **skips rather than fails** when a secret is
+  absent, and on pull requests from forks, which cannot read secrets: a red X
+  on every push trains people to ignore a workflow.
+- **`make mutants`** — `scripts/mutation-check.py` breaks one documented
+  behaviour at a time, thirty of them, and requires the suite to notice. Not
+  part of `make check`: it runs the suite once per mutation, so it costs
+  minutes rather than seconds.
+- **`L2-LOG-003` and `L3-LOG-003`.** `L1-LOG-001` promises diagnostics on a
+  separate stream at a selectable severity, and nothing derived it — the
+  behaviour had tests that named no requirement.
+
+### Fixed
+
+- **Three tests that could not fail.** Found by the mutation check, and each a
+  different shape of the same problem:
+
+  `document_path`'s case-folding was asserted with `Path == Path`, and
+  `WindowsPath.__eq__` folds case — so the test passed on Windows however the
+  code behaved. The rule exists because on Windows and macOS the second
+  spelling silently overwrites the first, and those were exactly the platforms
+  not checking it.
+
+  The byte-order mark had two independent defences, `utf-8-sig` in the decode
+  and an `lstrip` in the header normaliser. Either alone handled Excel's
+  export, so deleting the decode left every test green. The redundant one is
+  gone and the fixture now pins the decode.
+
+  `resolve_destination` raises `GM-OUT-002` from two guards and the test
+  asserted only the code, leaving the missing-directory guard unverified. It
+  now asserts the reason, and the second guard has a test of its own.
+
+- **Coverage would have reported 0% to SonarCloud.** coverage.py wrote file
+  names relative to the package directory — `cli.py` against a `<source>` of
+  `.../github_metrics` — and Sonar resolves coverage paths from the repository
+  root. It would have matched nothing and said nothing about why, which is the
+  failure that gets a quality gate switched off rather than fixed. CI now
+  greps the report for repository-relative paths before scanning.
+
+- **Sonar reported a clean project for a branch that had never been analysed.**
+  Without a `branch` or `pullRequest` parameter these endpoints answer about
+  the project's default branch, and an unanalysed branch answers 200 with
+  nothing — which reads exactly like good news. Every read now names what was
+  analysed, and waits for the report to finish processing first.
+
+- **Addresses acquired a state and a county nobody published.** The components
+  are the match's own, and are never reverse-geocoded. Forward-geocoding
+  `United States` returns the country's centroid; reverse-resolving that point
+  returns a county in Kansas, so every contributor naming a country was
+  recorded as living there. A residency rule keyed on `state` or `county`
+  would have been reading invented values.
+
+### Changed
+
+- **Ruff widened to the ground SonarCloud's Python rules cover** — security
+  (flake8-bandit), cyclomatic complexity, the pylint port, timezone-naive
+  datetimes, stray prints, logging misuse — with thresholds matching
+  SonarCloud's own defaults, so a function that passes locally passes there.
+- **Address components ordered for US addresses.** `town`, `village`, `hamlet`
+  and `locality` lead the settlement chain; `borough` joins the suburb chain
+  for New York, where a Brooklyn address is `city` "City of New York" with
+  `borough` "Brooklyn". The non-US keys stay, last: tuning for US addresses
+  cannot mean only US addresses, because identifying who is *not* American is
+  the point of the rule these components feed.
+- **`read_repository_csv`'s per-row ladder is `_check_row`.** It was over the
+  complexity threshold, and making its documented contract visible — field
+  count, then emptiness, then grammar, stopping at the first failure — beat
+  raising the threshold. Duplication stays with the caller, being the one
+  condition that depends on the rows around a row rather than on the row
+  itself. Behaviour unchanged.
+
 ## [0.3.0] - 2026-09-03
 
 Retires the two metric probe commands. **No output changed**: not a column, not
@@ -462,7 +542,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/8feb637...v0.1.0

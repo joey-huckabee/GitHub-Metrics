@@ -66,15 +66,25 @@ jobs:
             exit 1
           fi
 
-      - name: Is a token configured?
+      # All three, not just the token. The scanner authenticates with the token
+      # but reports into the project the other two name, and a missing key
+      # fails with an authorization error that mentions neither.
+      - name: Is the scan configured?
         id: token
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
         run: |
-          if [ -n "$SONAR_TOKEN" ]; then
+          missing=""
+          [ -n "$SONAR_TOKEN" ] || missing="$missing SONAR_TOKEN"
+          [ -n "$SONAR_ORGANIZATION" ] || missing="$missing SONAR_ORGANIZATION"
+          [ -n "$SONAR_PROJECT_KEY" ] || missing="$missing SONAR_PROJECT_KEY"
+          if [ -z "$missing" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "missing=$missing" >> "$GITHUB_OUTPUT"
           fi
 
       - name: SonarCloud scan
@@ -83,15 +93,22 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          # Passed here rather than written into sonar-project.properties, so
+          # the repository carries no value that has to be kept in step with
+          # an account.
+          args: >
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
 
-      # Not a failure. The repository is analysable the moment the project and
-      # the secret exist, and until then a red X on every push would train
-      # everyone to ignore this workflow.
+      # Not a failure. The repository is analysable the moment the secrets
+      # exist, and until then a red X on every push would train everyone to
+      # ignore this workflow.
       - name: Explain the skip
         if: steps.token.outputs.present == 'false'
+        env:
+          MISSING: ${{ steps.token.outputs.missing }}
         run: |
-          echo "::notice title=SonarCloud scan skipped::No SONAR_TOKEN secret." \
-               "Create the project on sonarcloud.io with the key in" \
-               "sonar-project.properties, then add SONAR_TOKEN under" \
-               "Settings > Secrets and variables > Actions. Coverage is already" \
-               "generated and its paths are verified above."
+          echo "::notice title=SonarCloud scan skipped::Missing secret(s):$MISSING." \
+               "Add them under Settings > Secrets and variables > Actions." \
+               "Coverage is already generated and its paths are verified above."

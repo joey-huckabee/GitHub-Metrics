@@ -121,6 +121,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           PROJECT: ${{ secrets.SONAR_PROJECT_KEY }}
           PR: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ github.ref_name }}
+          BASE: ${{ github.event.pull_request.base.ref || github.ref_name }}
         run: |
           # Every call records its HTTP status next to its body, so a missing
           # section in the summary says "not permitted" rather than nothing.
@@ -132,8 +134,23 @@ jobs:
             echo "  $name -> HTTP $code"
           }
 
-          scope=""
-          if [ -n "$PR" ]; then scope="&pullRequest=$PR"; fi
+          # Every read has to name what was analysed. Without a branch or
+          # pull-request parameter these endpoints answer about the project's
+          # *default* branch on SonarCloud, which need not be this one and may
+          # never have been analysed - and an unanalysed branch answers 200
+          # with nothing, which reads exactly like a clean project. That is how
+          # a main-branch run reported "Quality gate: NONE" and zero issues for
+          # a scan that had just succeeded.
+          if [ -n "$PR" ]; then
+            scope="&pullRequest=$PR"
+          else
+            scope="&branch=$BRANCH"
+          fi
+          # The second list is the state of the branch being merged into, so
+          # a clean pull request against a codebase carrying issues still
+          # reports them. On a push the two scopes are the same branch.
+          broad="&branch=$BASE"
+          echo "Reading results for scope: ${scope#&} (codebase: $BASE)"
           base="https://sonarcloud.io/api"
 
           # The scan uploads a report and returns; the server processes it
@@ -162,7 +179,7 @@ jobs:
 
           echo "Reading SonarCloud:"
           fetch issues "$base/issues/search?componentKeys=$PROJECT$scope&resolved=false&ps=200"
-          fetch all-issues "$base/issues/search?componentKeys=$PROJECT&resolved=false&ps=200"
+          fetch all-issues "$base/issues/search?componentKeys=$PROJECT$broad&resolved=false&ps=200"
           # Scoped like the issues call. Without it this asks about the
           # main branch, which on a pull request is not what was measured
           # and may not have been analysed at all.
@@ -207,7 +224,7 @@ jobs:
                   print(f"Body was: `{json.dumps(body)[:400]}`")
                   print()
 
-          for title, name in (("this change", "issues"), ("whole project", "all-issues")):
+          for title, name in (("this change", "issues"), ("the codebase", "all-issues")):
               status, body = read(name)
               if "issues" not in body:
                   unreadable(status, f"Issues, {title}")

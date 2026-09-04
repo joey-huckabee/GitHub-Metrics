@@ -33,7 +33,7 @@ like data rather than announcing itself.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -98,6 +98,30 @@ class Address:
     country_code: str | None = None
     city: str | None = None
     internal_location: Coordinates = field(default_factory=Coordinates)
+
+    def with_query(self, query: str) -> Address:
+        """Return this address with `query` replaced.
+
+        The geocoder caches one address per distinct location and hands the
+        same object to every contributor who published that place, so the
+        spelling each of them used is applied on the way out rather than
+        stored. `dataclasses.replace` would say this in one line; it is
+        written out because a checker cannot see that `replace` preserves the
+        type, and a return annotation nothing can verify is worth less than
+        one that can.
+
+        Every field is carried across by name rather than listed, so a field
+        added to this class cannot be silently dropped here.
+
+        Args:
+            query: The location string as the contributor published it.
+
+        Returns:
+            A new address, identical but for `query`.
+        """
+        carried = {item.name: getattr(self, item.name) for item in fields(self)}
+        carried["query"] = query
+        return Address(**carried)
 
     def to_mapping(self) -> dict[str, Any]:
         """Render as a JSON-ready mapping, components before coordinates."""

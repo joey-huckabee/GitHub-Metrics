@@ -103,3 +103,38 @@ def test_two_blocks_do_not_share_one_address() -> None:
 
     assert first.internal_address == second.internal_address
     assert first.internal_address is not second.internal_address
+
+
+@pytest.mark.requirement("L3-MET-018")
+def test_with_query_carries_every_other_field() -> None:
+    """The copy is written out rather than delegated to `dataclasses.replace`.
+
+    Writing it out is what a type checker can verify; the risk it introduces
+    is that a field added to `Address` gets forgotten. This is the check, and
+    it compares against the declared fields rather than a list, so it cannot
+    be forgotten in turn.
+    """
+    original = Address(
+        query="asked",
+        formatted_address="Austin, Travis County, Texas, United States",
+        street="Congress Avenue",
+        house_number="100",
+        suburb="Downtown",
+        post_code="78701",
+        state="Texas",
+        state_code="US-TX",
+        state_district="",
+        county="Travis County",
+        country="United States",
+        country_code="us",
+        city="Austin",
+        internal_location=Coordinates(latitude=30.2711, longitude=-97.7437),
+    )
+
+    copied = original.with_query("as this contributor wrote it")
+
+    assert copied.query == "as this contributor wrote it"
+    for item in fields(Address):
+        if item.name == "query":
+            continue
+        assert getattr(copied, item.name) == getattr(original, item.name), item.name

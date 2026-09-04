@@ -263,8 +263,10 @@ def test_an_unreadable_contributor_list_is_its_own_failure() -> None:
     This one was read; only its second half failed, so the row keeps its
     measurements while the document is withheld.
     """
+    stub = _StubClient(rest_fails=True)
+
     with pytest.raises(ContributorCollectionError) as caught:
-        collect(_StubClient(rest_fails=True))
+        collect(stub)
 
     assert caught.value.code == "GM-COL-005"
     assert "pypa/virtualenv" in str(caught.value)

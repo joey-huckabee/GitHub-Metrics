@@ -49,6 +49,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Named because each appears three or four times below, and a typo in one
+# copy would silently skip that mutation rather than fail.
+DESTINATION = "github_metrics/output/destination.py"
+REPOSITORY = "github_metrics/collect/repository.py"
+INVENTORY = "github_metrics/sources/csv_inventory.py"
+ROW = "github_metrics/analysis/row.py"
+RENDER = "github_metrics/output/render.py"
+FIELDS = "github_metrics/output/fields.py"
+
 
 @dataclass(frozen=True)
 class Mutation:
@@ -81,14 +90,14 @@ MUTATIONS: tuple[Mutation, ...] = (
     ),
     Mutation(
         "CSV rows are written in sorted order",
-        "github_metrics/output/render.py",
+        RENDER,
         "    writer.writerow(selected)\n    for row in rows:",
         "    writer.writerow(selected)\n    for row in sorted(rows, key=lambda item: item.name):",
         "two runs of one inventory would stop being diffable",
     ),
     Mutation(
         "CSV stops forcing LF endings",
-        "github_metrics/output/render.py",
+        RENDER,
         'lineterminator="\\n"',
         'lineterminator="\\r\\n"',
         "the artifact would differ byte-for-byte between platforms",
@@ -102,21 +111,21 @@ MUTATIONS: tuple[Mutation, ...] = (
     ),
     Mutation(
         "field selection stops sorting into canonical order",
-        "github_metrics/output/fields.py",
+        FIELDS,
         "    return tuple(name for name in ALL_FIELDS if name in wanted)",
         "    return tuple(wanted)",
         "two runs asking for the same columns would produce different headers",
     ),
     Mutation(
         "an unknown field is accepted instead of rejected",
-        "github_metrics/output/fields.py",
+        FIELDS,
         "        raise UnknownFieldError(",
         "        pass\n        _unused = UnknownFieldError(",
         "output would silently omit a column the caller asked for",
     ),
     Mutation(
         "a directory destination stops gaining the default filename",
-        "github_metrics/output/destination.py",
+        DESTINATION,
         "    if path.is_dir() or looks_like_directory:\n"
         "        path = path / (DEFAULT_JSON_FILENAME if json_format else DEFAULT_FILENAME)",
         "    if False:\n"
@@ -125,14 +134,14 @@ MUTATIONS: tuple[Mutation, ...] = (
     ),
     Mutation(
         "an absent parent directory is no longer refused up front",
-        "github_metrics/output/destination.py",
+        DESTINATION,
         "    if not parent.exists():\n        raise OutputDestinationError(",
         "    if False:\n        raise OutputDestinationError(",
         "the failure would arrive after a run had spent its quota",
     ),
     Mutation(
         "the JSON destination stops differing from the CSV one",
-        "github_metrics/output/destination.py",
+        DESTINATION,
         'DEFAULT_JSON_FILENAME: Final = "githubmetrics.json"',
         'DEFAULT_JSON_FILENAME: Final = "githubmetrics.csv"',
         "a JSON run would overwrite a CSV run's output",
@@ -140,7 +149,7 @@ MUTATIONS: tuple[Mutation, ...] = (
     # ------------------------------------------------------------ contributors
     Mutation(
         "contribution_total counts nothing",
-        "github_metrics/analysis/row.py",
+        ROW,
         "total = sum(entry.contribution or 0 for entry in stamped)",
         "total = 0",
         "the aggregate would read as a repository with no commits",
@@ -169,7 +178,7 @@ MUTATIONS: tuple[Mutation, ...] = (
     # ------------------------------------------------------------- collection
     Mutation(
         "a moved repository is collected rather than refused",
-        "github_metrics/collect/repository.py",
+        REPOSITORY,
         "    if not (metadata.was_renamed or metadata.was_transferred):\n        return",
         "    return\n"
         "    if not (metadata.was_renamed or metadata.was_transferred):\n"
@@ -178,21 +187,21 @@ MUTATIONS: tuple[Mutation, ...] = (
     ),
     Mutation(
         "the metrics query starts asking for nodes",
-        "github_metrics/collect/repository.py",
+        REPOSITORY,
         "    releases { totalCount }",
         "    releases { totalCount nodes { tagName } }",
         "cost would scale with repository size instead of staying at one point",
     ),
     Mutation(
         "a personally owned repository echoes its owner as an organisation",
-        "github_metrics/collect/repository.py",
+        REPOSITORY,
         '        return self.resolved_owner if self.owner_type == ORGANIZATION_TYPE else ""',
         "        return self.resolved_owner",
         "individual maintainers would each become an organisation",
     ),
     Mutation(
         "distinct versions become releases plus tags",
-        "github_metrics/collect/repository.py",
+        REPOSITORY,
         "        return max(self.releases, self.tags)",
         "        return self.releases + self.tags",
         "every version count would be inflated, some nearly doubled",
@@ -226,28 +235,28 @@ MUTATIONS: tuple[Mutation, ...] = (
     # -------------------------------------------------------------- ingestion
     Mutation(
         "a NUL byte is no longer detected",
-        "github_metrics/sources/csv_inventory.py",
+        INVENTORY,
         'nul_at = raw.find(b"\\x00")',
         "nul_at = -1",
         "a renamed binary would produce one bogus issue per row",
     ),
     Mutation(
         "the byte-order mark is no longer stripped",
-        "github_metrics/sources/csv_inventory.py",
+        INVENTORY,
         'text = raw.decode("utf-8-sig")',
         'text = raw.decode("utf-8")',
         "Excel's CSV export would report a missing owner column",
     ),
     Mutation(
         "row validation reports the wrong code for an empty owner",
-        "github_metrics/sources/csv_inventory.py",
+        INVENTORY,
         '    if not owner:\n        return ISSUE_EMPTY_OWNER, f"owner is empty in {echo!r}"',
         '    if not owner:\n        return ISSUE_INVALID_OWNER, f"owner is empty in {echo!r}"',
         "a rejected row would carry the wrong code",
     ),
     Mutation(
         "strict mode stops raising on the first issue",
-        "github_metrics/sources/csv_inventory.py",
+        INVENTORY,
         "        if strict:\n            raise StrictModeError",
         "        if False:\n            raise StrictModeError",
         "a defective inventory would read as merely degraded",
@@ -292,7 +301,7 @@ MUTATIONS: tuple[Mutation, ...] = (
     ),
     Mutation(
         "an unfetchable repository scores zero instead of nothing",
-        "github_metrics/analysis/row.py",
+        ROW,
         "        name=reference.repoid,\n        owner=reference.owner,",
         "        name=reference.repoid,\n        owner=reference.owner,\n        total_score=0.0,",
         "an unreadable repository would be indistinguishable from a bad one",

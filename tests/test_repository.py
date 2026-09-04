@@ -206,19 +206,23 @@ def test_a_renamed_repository_is_refused() -> None:
     Every number would have been correct, collected against a repository the
     inventory no longer names, with nothing in the output to say so.
     """
+    stub = _StubClient(payload(name="pyproject-hooks", owner_login="pypa"))
+
     with pytest.raises(RepositoryMovedError, match="renamed to pypa/pyproject-hooks"):
-        collect(_StubClient(payload(name="pyproject-hooks", owner_login="pypa")), "pypa", "pep517")
+        collect(stub, "pypa", "pep517")
 
 
 @pytest.mark.requirement("L3-MET-016")
 def test_the_new_location_is_reported_so_it_can_be_pasted_in(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    stub = _StubClient(payload(name="pyproject-hooks", owner_login="pypa"))
+
     with (
         caplog.at_level(logging.WARNING, logger=LOGGER_NAME),
         pytest.raises(RepositoryMovedError),
     ):
-        collect(_StubClient(payload(name="pyproject-hooks", owner_login="pypa")), "pypa", "pep517")
+        collect(stub, "pypa", "pep517")
 
     assert "update the inventory to pypa/pyproject-hooks" in caplog.text
     assert "No data collected" in caplog.text
@@ -247,9 +251,11 @@ def test_a_missing_name_falls_back_to_the_inventory() -> None:
 @pytest.mark.requirement("L3-MET-014")
 def test_a_transferred_repository_is_refused() -> None:
     """The inventory said `tiangolo/fastapi`; GitHub says `fastapi/fastapi`."""
+    stub = _StubClient(payload(owner_login="fastapi", owner_type="Organization", name="fastapi"))
+
     with pytest.raises(RepositoryMovedError, match="moved to fastapi/fastapi"):
         collect(
-            _StubClient(payload(owner_login="fastapi", owner_type="Organization", name="fastapi")),
+            stub,
             "tiangolo",
             "fastapi",
         )
@@ -257,11 +263,13 @@ def test_a_transferred_repository_is_refused() -> None:
 
 @pytest.mark.requirement("L3-MET-014")
 def test_a_transfer_names_where_it_went(caplog: pytest.LogCaptureFixture) -> None:
+    stub = _StubClient(payload(owner_login="fastapi", name="fastapi"))
+
     with (
         caplog.at_level(logging.WARNING, logger=LOGGER_NAME),
         pytest.raises(RepositoryMovedError),
     ):
-        collect(_StubClient(payload(owner_login="fastapi", name="fastapi")), "tiangolo", "fastapi")
+        collect(stub, "tiangolo", "fastapi")
 
     assert "update the inventory to fastapi/fastapi" in caplog.text
 
@@ -284,8 +292,10 @@ def test_a_case_difference_is_not_a_transfer() -> None:
 
 @pytest.mark.requirement("L3-MET-012")
 def test_a_null_repository_fails_rather_than_raising_a_key_error() -> None:
+    stub = _StubClient({"data": {"repository": None}})
+
     with pytest.raises(RepositoryNotFoundError):
-        collect(_StubClient({"data": {"repository": None}}))
+        collect(stub)
 
 
 @pytest.mark.requirement("L3-MET-012")
@@ -293,8 +303,10 @@ def test_an_unparseable_timestamp_fails_loudly() -> None:
     broken = payload()
     broken["data"]["repository"]["createdAt"] = "not-a-date"
 
+    stub = _StubClient(broken)
+
     with pytest.raises(GraphQLQueryError, match="could not parse"):
-        collect(_StubClient(broken))
+        collect(stub)
 
 
 @pytest.mark.requirement("L3-MET-012")

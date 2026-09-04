@@ -201,8 +201,10 @@ def test_the_previous_definition_is_reported_so_a_changed_score_is_explainable(
 
 @pytest.mark.requirement("L3-MET-005")
 def test_a_null_repository_fails_rather_than_raising_a_key_error() -> None:
+    stub = _StubClient({"data": {"repository": None}})
+
     with pytest.raises(RepositoryNotFoundError):
-        collect(_StubClient({"data": {"repository": None}}))
+        collect(stub)
 
 
 # ---------------------------------------------------------------------------

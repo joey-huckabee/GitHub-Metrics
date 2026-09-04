@@ -139,7 +139,10 @@ jobs:
           echo "Reading SonarCloud:"
           fetch issues "$base/issues/search?componentKeys=$PROJECT$scope&resolved=false&ps=200"
           fetch all-issues "$base/issues/search?componentKeys=$PROJECT&resolved=false&ps=200"
-          fetch measures "$base/measures/component?component=$PROJECT&metricKeys=coverage,ncloc,duplicated_lines_density,security_hotspots,tests"
+          # Scoped like the issues call. Without it this asks about the
+          # main branch, which on a pull request is not what was measured
+          # and may not have been analysed at all.
+          fetch measures "$base/measures/component?component=$PROJECT$scope&metricKeys=coverage,ncloc,duplicated_lines_density,security_hotspots,tests"
           fetch gate "$base/qualitygates/project_status?projectKey=$PROJECT$scope"
 
           python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
@@ -174,6 +177,11 @@ jobs:
               print()
           else:
               unreadable(status, "Measures")
+              if status == "200":
+                  # A 200 that carried no measures is the one outcome the
+                  # status code cannot explain, so show what did come back.
+                  print(f"Body was: `{json.dumps(body)[:400]}`")
+                  print()
 
           for title, name in (("this change", "issues"), ("whole project", "all-issues")):
               status, body = read(name)

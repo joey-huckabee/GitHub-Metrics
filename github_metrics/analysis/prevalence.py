@@ -134,7 +134,7 @@ def score_prevalence(
             score,
             MAX_PREVALENCE_SCORE,
         )
-    elif weight == 0.0:
+    elif weight <= 0.0:
         LOGGER.debug(
             "Prevalence scored 0.0: no closed issues and no versions, so there is "
             "no evidence this project has shipped or been maintained"

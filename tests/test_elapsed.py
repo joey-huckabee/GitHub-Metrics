@@ -219,14 +219,18 @@ def test_one_query_asks_for_all_three() -> None:
 
 @pytest.mark.requirement("L3-MET-011")
 def test_an_unparseable_timestamp_fails_loudly() -> None:
+    stub = _StubClient(payload(created="not-a-date"))
+
     with pytest.raises(GraphQLQueryError, match="could not parse"):
-        collect(_StubClient(payload(created="not-a-date")))
+        collect(stub)
 
 
 @pytest.mark.requirement("L3-MET-011")
 def test_a_null_repository_fails_rather_than_raising_a_key_error() -> None:
+    stub = _StubClient({"data": {"repository": None}})
+
     with pytest.raises(RepositoryNotFoundError):
-        collect(_StubClient({"data": {"repository": None}}))
+        collect(stub)
 
 
 # ---------------------------------------------------------------------------

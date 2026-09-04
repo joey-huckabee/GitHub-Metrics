@@ -64,7 +64,13 @@ def reset_logger(
     """
     logger = logging.getLogger(PACKAGE_LOGGER_NAME)
 
-    for existing in list(logger.handlers):
+    # Drained rather than iterated. `removeHandler` mutates the very list
+    # being walked, so iterating it directly skips every other handler and
+    # leaves half of them attached - which is how a second `reset_logger`
+    # ends up duplicating every record. The copy this replaces was correct
+    # and read as redundant; a drain cannot be mistaken for either.
+    while logger.handlers:
+        existing = logger.handlers[0]
         logger.removeHandler(existing)
         existing.close()
 
@@ -88,7 +94,7 @@ class Logger:
     """
 
     def __init__(self, min_level: int = LogLevels.INFO) -> None:
-        self.logger = reset_logger(min_level)
+        self._delegate = reset_logger(min_level)
 
     def log(self, log_level: int, message: object) -> None:
         """Log `message` at `log_level`.
@@ -107,4 +113,4 @@ class Logger:
         warnings.warn(warning, DeprecationWarning, stacklevel=2)
 
         # Log the message
-        self.logger.log(log_level, message)
+        self._delegate.log(log_level, message)

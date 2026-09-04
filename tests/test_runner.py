@@ -265,8 +265,10 @@ def test_a_run_that_does_not_fit_is_refused_before_it_starts() -> None:
     Discovering exhaustion halfway produces a file that is part measurement
     and part absence, with nothing to tell the two apart.
     """
+    client = cast(GitHubClient, _StubClient(points=50))
+
     with pytest.raises(RateLimitExhaustedError) as caught:
-        check_budget(cast(GitHubClient, _StubClient(points=50)), 400)
+        check_budget(client, 400)
 
     message = str(caught.value)
     assert "400 repositories need 800 GraphQL points" in message
@@ -285,8 +287,10 @@ def test_the_budget_runs_to_zero() -> None:
     exact = _StubClient(points=200)
 
     assert check_budget(cast(GitHubClient, exact), 100).shortfall == 0
+    client = cast(GitHubClient, exact)
+
     with pytest.raises(RateLimitExhaustedError):
-        check_budget(cast(GitHubClient, exact), 101)
+        check_budget(client, 101)
 
 
 @pytest.mark.requirement("L3-COL-003")
@@ -308,8 +312,10 @@ def test_the_rest_budget_is_checked_as_well_as_the_graphql_one() -> None:
     GraphQL points and still be unable to read a single contributor list.
     Checking only the GraphQL side would start that run.
     """
+    client = cast(GitHubClient, _StubClient(points=5000, requests=10))
+
     with pytest.raises(RateLimitExhaustedError) as caught:
-        check_budget(cast(GitHubClient, _StubClient(points=5000, requests=10)), 400)
+        check_budget(client, 400)
 
     message = str(caught.value)
     assert "400 REST requests" in message

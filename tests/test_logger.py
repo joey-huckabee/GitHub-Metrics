@@ -62,7 +62,11 @@ def test_reset_logger_filters_below_the_minimum_level() -> None:
 def test_wrapper_logs_and_warns_that_it_is_deprecated() -> None:
     wrapper = Logger(LogLevels.INFO)
     stream = io.StringIO()
-    wrapper.logger = reset_logger(LogLevels.INFO, stream=stream, fmt="%(message)s")
+    # Reconfiguring the package logger is enough: the wrapper holds the same
+    # object `reset_logger` returns, so there is nothing to reach in and
+    # replace. Assigning to the wrapper's own attribute was reaching past the
+    # thing under test to set up the thing under test.
+    reset_logger(LogLevels.INFO, stream=stream, fmt="%(message)s")
 
     with pytest.deprecated_call():
         wrapper.log(LogLevels.INFO, "through the wrapper")

@@ -71,9 +71,18 @@ L3_LINE = re.compile(
     re.MULTILINE,
 )
 PARENT_LINE = re.compile(r"^\*\*Parent\*\*:\s*(L1-[A-Z]+-\d+)\s*$", re.MULTILINE)
-METHOD_LINE = re.compile(r"^\*\*Verification Method\*\*:\s*([^\n]+)$", re.MULTILINE)
-EVIDENCE_LINE = re.compile(r"^\*\*Evidence\*\*:\s*([^\n]+)$", re.MULTILINE)
-CATEGORY_ROW = re.compile(r"^\|\s*`([A-Z]+)`\s*\|\s*([^|]+?)\s*\|\s*$", re.MULTILINE)
+# `\s` matches a newline, so `\s*` next to `[^\n]+` under re.MULTILINE
+# lets the two compete for the same characters and backtrack super-
+# linearly on a line that nearly matches. `[^\S\n]` is horizontal
+# whitespace only, which is what these patterns meant.
+HORIZONTAL = r"[^\S\n]*"
+
+METHOD_LINE = re.compile(rf"^\*\*Verification Method\*\*:{HORIZONTAL}([^\n]+)$", re.MULTILINE)
+EVIDENCE_LINE = re.compile(rf"^\*\*Evidence\*\*:{HORIZONTAL}([^\n]+)$", re.MULTILINE)
+CATEGORY_ROW = re.compile(
+    rf"^\|{HORIZONTAL}`([A-Z]+)`{HORIZONTAL}\|{HORIZONTAL}([^|\n]+?){HORIZONTAL}\|{HORIZONTAL}$",
+    re.MULTILINE,
+)
 METHOD_LETTER = re.compile(r"\b([TIAD])\b")
 
 NONE_CELL = "_(none)_"

@@ -8,6 +8,72 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.4.1] - 2026-09-04
+
+The findings v0.4.0's own analysis could not see. **No output changed**: not a
+column, not a key, not a value.
+
+v0.4.0 shipped SonarCloud reporting zero issues. That was not a measurement.
+The project's main branch on SonarCloud was still named `master`, which this
+repository does not have, so every read answered about a branch that had never
+been analysed - and an unanalysed branch reports nothing, which is
+indistinguishable from a clean one. Renaming it surfaced twenty-four issues
+that had been there all along.
+
+That makes three instances in this project of the same failure, and they are
+worth naming together: a check that reports success when it cannot actually
+check. The coverage paths that would have reported 0%, the three tests that
+passed however the code behaved, and now an analysis of a branch that did not
+exist.
+
+### Fixed
+
+- **Fourteen exception tests that could pass for the wrong reason**
+  (`python:S5778`). Each built its stub *inside* the `pytest.raises` block, so
+  the test would pass if **construction** raised rather than the call under
+  test - which is not what any of their names claim. The stub now goes
+  outside, leaving one call that can throw.
+- **Super-linear backtracking in three trace-matrix patterns**
+  (`python:S8786`). `\s*` matches a newline, so beside `[^\n]+` under
+  `re.MULTILINE` the two compete for the same characters. They now use
+  horizontal whitespace, which is what they meant.
+- **A float equality one change away from failing silently**
+  (`python:S1244`). `weight == 0.0` is exact today because every weight is a
+  band-table constant; the moment one is interpolated it starts missing values
+  that are zero to any decimal place that matters. A weight cannot be negative,
+  so `<= 0.0` is the same test now and a correct one later.
+- **A field named `logger` on a class named `Logger`** (`python:S1700`), and
+  **file paths repeated three and four times** in the mutation list
+  (`python:S1192`), where a typo in one copy would have skipped that mutation
+  rather than failed.
+
+### Changed
+
+- **`reset_logger` drains its handlers rather than copying them.** SonarCloud
+  reported the `list()` call as unnecessary; it was not. `removeHandler`
+  mutates the list being iterated, so walking it directly leaves half the
+  handlers attached - four become two, measured - and a second `reset_logger`
+  then duplicates every record. A `while` loop is correct and cannot be
+  mistaken for redundant.
+- **`Address.with_query` replaces `dataclasses.replace` in the geocoder.**
+  mypy resolves `replace` correctly, but SonarCloud models it as returning
+  `DataclassInstance` whatever the annotation says. The copy is written out so
+  both can follow it - carrying fields across by name so a new one cannot be
+  dropped, with a test comparing the copy against the declared fields.
+
+### Documentation
+
+- **`docs/ROADMAP.md` gains "Carried, and known"** - what this project knows
+  about itself and has not done. The contributor-detail query cost that is
+  calculated rather than measured; the single integration test that **neither
+  CI workflow runs**, so nothing has ever exercised the live API; a
+  contributor limit inherited rather than chosen; a generic Nominatim user
+  agent; and a geocoding cache that dies with the process.
+
+  It also records the two SonarCloud rules answered differently than they ask,
+  because both read as tidy-ups and both would reintroduce a measured defect if
+  a later reader helpfully undid them.
+
 ## [0.4.0] - 2026-09-03
 
 Static analysis, and evidence that the test suite is worth having. **No output
@@ -542,7 +608,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.1.0...v0.2.0

@@ -373,6 +373,96 @@ nothing here asserts anything about a named person.
 
 ---
 
+## Carried, and known
+
+Things this project knows about itself and has not done. Recorded here so a
+reader finds them rather than rediscovering them, and so that the ones which
+look like defects are not "fixed" back into defects.
+
+### A cost that is calculated rather than measured
+
+`POINTS_PER_REPOSITORY` is 2. One of those points was measured against the live
+API - `collect.repository` sends one document and the response reports a cost
+of 1. The other, for the aliased contributor-detail query, follows from
+GitHub's documented cost formula and has never been confirmed.
+
+This repository's own convention is that a cost is measured rather than
+assumed, so this is a departure recorded rather than a rule quietly relaxed. It
+matters because the budget pre-flight refuses runs on it: if the real cost is
+higher, a run that `check_budget` accepts can still exhaust the quota halfway,
+which is the exact failure that check exists to prevent.
+
+**Settling it:** one scan of two or three repositories with a real token at
+`LOG_LEVEL=DEBUG`, reading the cost the API reports back.
+
+### Nothing has run against the live API
+
+There are 611 tests. Exactly one is marked `integration`, and **both** CI
+workflows deselect it, so the only test that touches GitHub has never run in
+CI - or anywhere else on record.
+
+The stubs are faithful to what the API is *documented* to return, which is not
+the same as what it returns. Four things in particular are assumed rather than
+observed: that PyGithub's paginated contributor list slices the way the code
+expects, that the aliased GraphQL document comes back keyed as `u0`, `u1`, …,
+that Nominatim's component keys appear as mapped, and what a large repository
+does to the pace of a run.
+
+**Settling it:** either a scheduled workflow holding a token, or a documented
+pre-release check run by hand. The second is cheaper and honest; the first
+catches drift in an API nobody controls.
+
+### `DEFAULT_CONTRIBUTOR_LIMIT` is inherited, not chosen
+
+25, carried over from the `contributors` command v0.2.0 retired. It decides
+what `contribution_total` counts and therefore what every percentage derived
+from it will mean, so it is a measurement decision rather than a tuning knob -
+and nobody has made it deliberately for the current design.
+
+### The geocoder user agent is generic
+
+`GEOCODER_USER_AGENT` defaults to the string `github-metrics`. Nominatim's
+usage policy asks for an agent identifying the application *and* a way to reach
+whoever runs it, and the penalty for a generic one is blocking the agent -
+which fails every later run rather than the one that earned it.
+
+Setting the environment variable is enough; the default is what is wrong.
+
+### Geocoding has no cache beyond a single run
+
+The cache lives on the `Geocoder` and dies with the process, so a re-run over
+the same inventory pays a second per distinct location again for places that
+have not moved. At one request per second that is the difference between a
+re-run taking minutes and taking hours, and it is the single largest
+improvement available to this tool's wall-clock time.
+
+It belongs with [v0.5.0](#v050--persistence): a store that already holds
+addresses is the obvious place for one, and doing it before there is a store
+would mean designing the same cache twice.
+
+### Two SonarCloud rules are deliberately answered differently
+
+Both of these read as tidy-ups that were skipped. They were not: applying
+either as written reintroduces a defect that was measured, so they are recorded
+here rather than left for a future reader to helpfully undo.
+
+- **`python:S7504` on `logger.py`** - "remove this unnecessary `list()` call".
+  The call was not unnecessary: `removeHandler` mutates the list being
+  iterated, so walking it directly leaves half the handlers attached - four
+  become two, measured - and a second `reset_logger` then duplicates every
+  record. The code now drains the list with a `while` loop instead, which is
+  correct and cannot be mistaken for redundant. **Do not restore direct
+  iteration over `logger.handlers`.**
+- **`python:S5886` on `Address.with_query`** - "use `dataclasses.replace`".
+  `replace` is what this method does, and mypy resolves its type correctly, but
+  Sonar models it as returning `DataclassInstance` whatever the annotation
+  says. The copy is written out so both checkers can follow it, carrying fields
+  across by name so a new field cannot be dropped, with a test comparing the
+  copy against the declared fields. **Replacing it with `dataclasses.replace`
+  brings the finding back.**
+
+---
+
 ## Cross-cutting
 
 **Library usage documentation.** Using GitHub-Metrics as a dependency rather

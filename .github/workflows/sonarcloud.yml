@@ -101,6 +101,51 @@ jobs:
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
 
+      # The scan uploads a report and returns; it does not wait to hear what
+      # came of it. Without this the job is green whatever Sonar found, which
+      # is a check that cannot fail - the same defect `make mutants` exists to
+      # catch in the test suite.
+      - name: Quality gate
+        if: steps.token.outputs.present == 'true'
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 10
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+      # Printed whether the gate passed or failed. A private project cannot be
+      # read without the token, so without this the findings exist only on a
+      # dashboard and never reach whoever is looking at the failing build.
+      - name: What Sonar found
+        if: always() && steps.token.outputs.present == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PROJECT: ${{ secrets.SONAR_PROJECT_KEY }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          scope=""
+          if [ -n "$PR" ]; then scope="&pullRequest=$PR"; fi
+          curl -sS -u "$SONAR_TOKEN:" \
+            "https://sonarcloud.io/api/issues/search?componentKeys=$PROJECT$scope&resolved=false&ps=200" \
+            -o issues.json || { echo "could not read the issues API"; exit 0; }
+
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          data = json.loads(pathlib.Path("issues.json").read_text(encoding="utf-8"))
+          issues = data.get("issues", [])
+          print(f"## SonarCloud: {len(issues)} open issue(s)\n")
+          if not issues:
+              print("None.")
+          for issue in issues:
+              where = issue.get("component", "").split(":", 1)[-1]
+              line = issue.get("line", "-")
+              print(
+                  f"- **{issue.get('severity')}** `{issue.get('rule')}` "
+                  f"{where}:{line} - {issue.get('message')}"
+              )
+          PY
+          cat "$GITHUB_STEP_SUMMARY"
+
       # Not a failure. The repository is analysable the moment the secrets
       # exist, and until then a red X on every push would train everyone to
       # ignore this workflow.

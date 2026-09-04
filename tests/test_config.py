@@ -11,6 +11,7 @@ from github_metrics.config import DEFAULT_API_URL, Settings
 from github_metrics.errors import MissingCredentialsError
 
 
+@pytest.mark.requirement("L3-CFG-001")
 def test_from_env_reads_token(monkeypatch: pytest.MonkeyPatch, empty_env_file: Path) -> None:
     monkeypatch.setenv("GITHUB_TOKEN", "  ghp_secret  ")
 
@@ -21,6 +22,7 @@ def test_from_env_reads_token(monkeypatch: pytest.MonkeyPatch, empty_env_file: P
     assert settings.log_level == "INFO"
 
 
+@pytest.mark.requirement("L3-CFG-001")
 def test_from_env_honours_overrides(monkeypatch: pytest.MonkeyPatch, empty_env_file: Path) -> None:
     monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret")
     monkeypatch.setenv("GITHUB_API_URL", "https://ghe.example.com/api/v3")
@@ -33,6 +35,7 @@ def test_from_env_honours_overrides(monkeypatch: pytest.MonkeyPatch, empty_env_f
 
 
 @pytest.mark.parametrize("value", ["", "   "])
+@pytest.mark.requirement("L3-CFG-001")
 def test_missing_token_raises(
     monkeypatch: pytest.MonkeyPatch, empty_env_file: Path, value: str
 ) -> None:

@@ -282,8 +282,13 @@ def test_document_paths_are_nested_and_lower_cased(tmp_path: Path) -> None:
     """
     run("PyPA/VirtualEnv", "--output", str(tmp_path))
 
-    assert (tmp_path / "pypa" / "virtualenv.json").is_file()
-    assert not (tmp_path / "PyPA").exists() or (tmp_path / "pypa").is_dir()
+    # Read back what is actually on disk rather than asking whether a lower-
+    # cased path exists: `Path.is_file()` folds case on Windows and macOS, so
+    # the question answers yes for `PyPA/VirtualEnv.json` too and the check
+    # passes on the platforms this rule exists to protect.
+    written = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*.json"))
+
+    assert written == ["pypa/virtualenv.json"]
 
 
 @pytest.mark.requirement("L3-CLI-010")

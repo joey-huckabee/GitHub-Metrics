@@ -151,8 +151,16 @@ class IngestResult(DataClassJsonMixin):
 
 
 def _normalise_header(raw: Sequence[str]) -> list[str]:
-    """Lower-case and strip header cells so column matching is forgiving."""
-    return [cell.strip().lstrip("\ufeff").casefold() for cell in raw]
+    """Lower-case and strip header cells so column matching is forgiving.
+
+    A byte-order mark is **not** stripped here. It is removed once, in the
+    decode, by `utf-8-sig`. This function used to strip one as well, and the
+    redundancy was invisible in the worst way: either mechanism alone handled
+    the documented case, so no test through this module could tell which was
+    doing the work, and deleting the decode left every test green. One fact,
+    one place - and the BOM fixture now actually pins it.
+    """
+    return [cell.strip().casefold() for cell in raw]
 
 
 def _resolve_columns(header: Sequence[str], source: Path) -> tuple[int, int]:

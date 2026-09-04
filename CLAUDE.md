@@ -51,6 +51,7 @@ make test           # pytest, integration tests deselected
 make dead           # vulture
 make trace          # regenerate docs/TRACE-MATRIX.md
 make trace-check    # fail if the committed matrix is stale
+make mutants        # mutation check; minutes, not seconds, and not in `check`
 
 # Without make
 poetry run pytest -m "not integration"
@@ -336,10 +337,15 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   through. We check explicitly, because without it a binary file renamed
   `.csv` produces one misleading "invalid owner" per row instead of one
   accurate diagnosis.
-- **Input is decoded as `utf-8-sig`.** Excel's "Save as CSV UTF-8" writes a
-  byte-order mark, and without this the first header cell arrives as
-  `<BOM>owner` and the tool reports a missing `owner` column against a file
-  whose first line visibly says `owner`.
+- **Input is decoded as `utf-8-sig`, and that is the only place a BOM is
+  handled.** Excel's "Save as CSV UTF-8" writes a byte-order mark, and without
+  this the first header cell arrives as `<BOM>owner` and the tool reports a
+  missing `owner` column against a file whose first line visibly says `owner`.
+
+  `_normalise_header` used to strip one as well. The redundancy was invisible
+  in the worst way: either mechanism alone handled the documented case, so no
+  test could tell which was working, and deleting the decode left every test
+  green. Found by `make mutants`, which is what that script is for.
 - **Error codes and requirement identifiers are permanent.** A retired code or
   id is retired with its condition and never reused; sequences are monotone and
   gaps are deliberate. Never renumber.

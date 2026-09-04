@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 19
-- L2 requirements: 76
-- L3 requirements: 104
-- Verified L2+L3: 180 of 180 (100.0%)
+- L2 requirements: 77
+- L3 requirements: 105
+- Verified L2+L3: 182 of 182 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -53,7 +53,7 @@ through their children, so counting them too would count the same work twice.
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-CFG-001 | L2-CFG-001 | `tests/test_config.py::test_a_blank_explicit_token_falls_back_to_the_environment`<br>`tests/test_config.py::test_an_explicit_token_beats_the_environment`<br>`tests/test_config.py::test_an_explicit_token_works_with_no_environment_at_all`<br>`tests/test_config.py::test_the_token_source_is_logged_but_never_the_token` | Implemented |
+| L3-CFG-001 | L2-CFG-001 | `tests/test_config.py::test_a_blank_explicit_token_falls_back_to_the_environment`<br>`tests/test_config.py::test_an_explicit_token_beats_the_environment`<br>`tests/test_config.py::test_an_explicit_token_works_with_no_environment_at_all`<br>`tests/test_config.py::test_from_env_honours_overrides`<br>`tests/test_config.py::test_from_env_reads_token`<br>`tests/test_config.py::test_missing_token_raises`<br>`tests/test_config.py::test_the_token_source_is_logged_but_never_the_token` | Implemented |
 | L3-CFG-002 | L2-CFG-004 | `tests/test_credentials.py::test_an_unknown_prefix_is_reported_as_such`<br>`tests/test_credentials.py::test_every_documented_prefix_is_recognised` | Implemented |
 | L3-CFG-003 | L2-CFG-002 | `tests/test_credentials.py::test_a_fine_grained_token_reporting_no_scopes_is_not_a_failure`<br>`tests/test_credentials.py::test_a_good_token_reports_scopes_and_budgets` | Implemented |
 | L3-CFG-004 | L2-CFG-003 | `tests/test_credentials.py::test_a_borrowed_client_is_not_closed_by_the_check`<br>`tests/test_credentials.py::test_a_rejected_token_raises_with_its_code`<br>`tests/test_credentials.py::test_any_other_api_failure_also_raises_rather_than_passing` | Implemented |
@@ -204,7 +204,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-LOG-001 | L2-LOG-001, L2-LOG-002 | _(none)_ | Implemented |
+| L1-LOG-001 | L2-LOG-001, L2-LOG-002, L2-LOG-003 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -212,6 +212,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|-------------|----------------|--------|
 | L2-LOG-001 | L1-LOG-001 | L3-LOG-001 | _(none)_ | Implemented |
 | L2-LOG-002 | L1-LOG-001 | L3-LOG-002 | _(none)_ | Implemented |
+| L2-LOG-003 | L1-LOG-001 | L3-LOG-003 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -219,6 +220,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-LOG-001 | L2-LOG-001 | `tests/test_csv_inventory.py::test_row_issues_are_logged_at_debug` | Implemented |
 | L3-LOG-002 | L2-LOG-002 | `tests/test_repository.py::test_an_unremarkable_repository_is_collected_in_silence`<br>`tests/test_repository.py::test_something_worth_doubting_is_still_a_warning`<br>`tests/test_repository.py::test_the_detail_is_still_there_at_debug`<br>`tests/test_resolve.py::test_the_run_reports_its_outcome_once_at_info` | Implemented |
+| L3-LOG-003 | L2-LOG-003 | `tests/test_logger.py::test_from_name_falls_back_for_unknown_levels`<br>`tests/test_logger.py::test_from_name_resolves_known_levels`<br>`tests/test_logger.py::test_reset_logger_filters_below_the_minimum_level`<br>`tests/test_logger.py::test_reset_logger_is_idempotent`<br>`tests/test_logger.py::test_reset_logger_writes_to_the_given_stream` | Implemented |
 
 ### MET: Metric collection
 
@@ -309,7 +311,7 @@ through their children, so counting them too would count the same work twice.
 | L3-OUT-006 | L2-OUT-005 | `tests/test_output.py::test_a_command_line_field_list_splits_forgivingly`<br>`tests/test_output.py::test_selecting_nothing_selects_everything`<br>`tests/test_output.py::test_selection_applies_to_every_format`<br>`tests/test_output.py::test_selection_is_returned_in_canonical_order_not_the_order_given`<br>`tests/test_output.py::test_selection_tolerates_case_padding_and_duplicates` | Implemented |
 | L3-OUT-007 | L2-OUT-006 | `tests/test_output.py::test_a_near_miss_gets_a_suggestion`<br>`tests/test_output.py::test_an_unknown_field_is_rejected_with_its_code` | Implemented |
 | L3-OUT-008 | L2-OUT-004 | `tests/test_output.py::test_console_marks_an_unknown_value_rather_than_leaving_a_gap`<br>`tests/test_output.py::test_console_renders_vertically_one_label_per_line`<br>`tests/test_output.py::test_console_says_so_when_there_is_nothing_to_show`<br>`tests/test_output.py::test_console_separates_repositories` | Implemented |
-| L3-OUT-009 | L2-OUT-008 | `tests/test_output.py::test_a_directory_gets_the_default_filename`<br>`tests/test_output.py::test_a_missing_parent_directory_fails_early`<br>`tests/test_output.py::test_a_named_file_is_used_as_given`<br>`tests/test_output.py::test_a_trailing_separator_reads_as_a_directory_even_if_absent`<br>`tests/test_output.py::test_no_destination_means_the_console` | Implemented |
+| L3-OUT-009 | L2-OUT-008 | `tests/test_output.py::test_a_directory_gets_the_default_filename`<br>`tests/test_output.py::test_a_missing_parent_directory_fails_early`<br>`tests/test_output.py::test_a_named_file_is_used_as_given`<br>`tests/test_output.py::test_a_parent_that_is_a_file_is_refused_with_its_own_reason`<br>`tests/test_output.py::test_a_trailing_separator_reads_as_a_directory_even_if_absent`<br>`tests/test_output.py::test_no_destination_means_the_console` | Implemented |
 | L3-OUT-010 | L2-OUT-009 | `tests/test_output.py::test_a_naive_scan_date_is_rejected`<br>`tests/test_output.py::test_a_scan_identifier_is_timezone_aware_and_unique`<br>`tests/test_output.py::test_one_identity_stamps_every_row_of_a_run` | Implemented |
 | L3-OUT-011 | L2-OUT-010 | `tests/test_cli_scan.py::test_document_paths_are_nested_and_lower_cased`<br>`tests/test_documents.py::test_a_document_is_written_with_lf_endings`<br>`tests/test_documents.py::test_a_missing_root_is_created`<br>`tests/test_documents.py::test_a_root_that_is_a_file_is_refused`<br>`tests/test_documents.py::test_a_windows_reserved_name_needs_no_sanitising`<br>`tests/test_documents.py::test_nesting_removes_a_collision_that_flattening_would_create`<br>`tests/test_documents.py::test_the_default_root_is_used_when_none_is_named`<br>`tests/test_documents.py::test_the_path_is_lower_cased`<br>`tests/test_documents.py::test_the_path_is_nested_by_owner` | Implemented |
 | L3-OUT-012 | L2-OUT-011 | `tests/test_cli_scan.py::test_a_document_is_its_csv_row_then_the_contributor_block`<br>`tests/test_cli_scan.py::test_an_unresolved_address_is_null_throughout`<br>`tests/test_cli_scan.py::test_field_selection_does_not_reach_the_documents`<br>`tests/test_cli_scan.py::test_the_contributor_block_carries_the_run_identity`<br>`tests/test_contributor_model.py::test_a_github_id_survives_beyond_the_javascript_safe_integer`<br>`tests/test_contributor_model.py::test_every_declared_field_is_rendered_and_every_rendered_key_declared`<br>`tests/test_contributor_model.py::test_the_address_carries_country_and_country_code`<br>`tests/test_contributor_model.py::test_the_block_keys_are_derived_rather_than_restated`<br>`tests/test_contributor_model.py::test_two_blocks_do_not_share_one_address`<br>`tests/test_documents.py::test_a_document_is_the_row_then_the_block`<br>`tests/test_documents.py::test_a_document_keeps_json_types`<br>`tests/test_documents.py::test_a_repository_with_no_contributors_totals_zero`<br>`tests/test_documents.py::test_the_aggregates_are_document_keys_and_not_csv_columns`<br>`tests/test_documents.py::test_the_contributor_block_matches_the_documented_example` | Implemented |

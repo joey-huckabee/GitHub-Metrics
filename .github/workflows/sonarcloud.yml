@@ -102,77 +102,128 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
 
       # The scan uploads a report and returns; it does not wait to hear what
-      # came of it. Without this the job is green whatever Sonar found, which
-      # is a check that cannot fail - the same defect `make mutants` exists to
-      # catch in the test suite.
-      - name: Quality gate
-        if: steps.token.outputs.present == 'true'
-        uses: SonarSource/sonarqube-quality-gate-action@v1
-        timeout-minutes: 10
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
-
-      # Printed whether the gate passed or failed. A private project cannot be
-      # read without the token, so without this the findings exist only on a
-      # dashboard and never reach whoever is looking at the failing build.
-      - name: What Sonar found
+      # came of it, so without this the job is green whatever Sonar found -
+      # a check that cannot fail, which is the defect `make mutants` exists to
+      # catch in the test suite, in CI configuration instead of tests.
+      #
+      # Done here rather than with sonarqube-quality-gate-action because that
+      # action exits 22 on any HTTP error, so a token without permission to
+      # read the gate fails the build in a way indistinguishable from a gate
+      # that genuinely failed. Which endpoints a token may read depends on how
+      # it was issued: a *project analysis* token can submit an analysis and
+      # search issues but cannot read `api/qualitygates` or `api/measures`,
+      # while a *user* token can read all three. Both are legitimate; the
+      # build must not turn red over the difference, and must not go quiet
+      # about it either.
+      - name: Quality gate and findings
         if: always() && steps.token.outputs.present == 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           PROJECT: ${{ secrets.SONAR_PROJECT_KEY }}
           PR: ${{ github.event.pull_request.number }}
         run: |
+          # Every call records its HTTP status next to its body, so a missing
+          # section in the summary says "not permitted" rather than nothing.
+          fetch() {
+            local name="$1" url="$2"
+            local code
+            code=$(curl -sS -u "$SONAR_TOKEN:" -o "$name.json" -w "%{http_code}" "$url" || echo 000)
+            echo "$code" > "$name.status"
+            echo "  $name -> HTTP $code"
+          }
+
           scope=""
           if [ -n "$PR" ]; then scope="&pullRequest=$PR"; fi
+          base="https://sonarcloud.io/api"
 
-          # Issues in this change, and issues across the whole project. The
-          # first is what the gate judged; the second is what a reader wants
-          # when asking whether the codebase is clean.
-          curl -sS -u "$SONAR_TOKEN:" \
-            "https://sonarcloud.io/api/issues/search?componentKeys=$PROJECT$scope&resolved=false&ps=200" \
-            -o issues.json || echo '{}' > issues.json
-          curl -sS -u "$SONAR_TOKEN:" \
-            "https://sonarcloud.io/api/issues/search?componentKeys=$PROJECT&resolved=false&ps=200" \
-            -o all-issues.json || echo '{}' > all-issues.json
-          # Coverage specifically: the path trap this workflow guards against
-          # reports 0% without erroring, so the number has to be looked at.
-          curl -sS -u "$SONAR_TOKEN:" \
-            "https://sonarcloud.io/api/measures/component?component=$PROJECT&metricKeys=coverage,ncloc,duplicated_lines_density,security_hotspots" \
-            -o measures.json || echo '{}' > measures.json
+          echo "Reading SonarCloud:"
+          fetch issues "$base/issues/search?componentKeys=$PROJECT$scope&resolved=false&ps=200"
+          fetch all-issues "$base/issues/search?componentKeys=$PROJECT&resolved=false&ps=200"
+          fetch measures "$base/measures/component?component=$PROJECT&metricKeys=coverage,ncloc,duplicated_lines_density,security_hotspots,tests"
+          fetch gate "$base/qualitygates/project_status?projectKey=$PROJECT$scope"
 
-          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import json, pathlib
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          import pathlib
 
 
-          def load(name):
+          def read(name: str) -> tuple[str, dict]:
+              """Return one call's HTTP status and parsed body."""
+              status = pathlib.Path(f"{name}.status").read_text(encoding="utf-8").strip()
               try:
-                  return json.loads(pathlib.Path(name).read_text(encoding="utf-8"))
+                  return status, json.loads(pathlib.Path(f"{name}.json").read_text(encoding="utf-8"))
               except (OSError, ValueError):
-                  return {}
+                  return status, {}
 
 
-          measures = load("measures.json").get("component", {}).get("measures", [])
+          def unreadable(status: str, what: str) -> None:
+              print(
+                  f"## {what}: not available (HTTP {status})\n\n"
+                  "The token cannot read this endpoint. A project analysis token "
+                  "submits analyses and searches issues; reading the gate and the "
+                  "measures needs a user token.\n"
+              )
+
+
+          status, body = read("measures")
+          measures = body.get("component", {}).get("measures", [])
           if measures:
-              print("## SonarCloud measures\n")
+              print("## Measures\n")
               for measure in sorted(measures, key=lambda item: item["metric"]):
                   print(f"- `{measure['metric']}`: {measure.get('value', '-')}")
               print()
+          else:
+              unreadable(status, "Measures")
 
-          for title, name in (("this change", "issues.json"), ("whole project", "all-issues.json")):
-              issues = load(name).get("issues", [])
-              print(f"## SonarCloud issues, {title}: {len(issues)}\n")
-              for issue in issues:
+          for title, name in (("this change", "issues"), ("whole project", "all-issues")):
+              status, body = read(name)
+              if "issues" not in body:
+                  unreadable(status, f"Issues, {title}")
+                  continue
+              found = body["issues"]
+              print(f"## Issues, {title}: {len(found)}\n")
+              for issue in found:
                   where = issue.get("component", "").split(":", 1)[-1]
                   print(
                       f"- **{issue.get('severity')}** `{issue.get('rule')}` "
                       f"{where}:{issue.get('line', '-')} - {issue.get('message')}"
                   )
-              if not issues:
+              if not found:
                   print("None.")
               print()
+
+          status, body = read("gate")
+          state = body.get("projectStatus", {}).get("status")
+          if state is None:
+              unreadable(status, "Quality gate")
+              # Not a build failure: nothing was judged, and saying so beats
+              # both a false green and a red that blames the wrong thing.
+              pathlib.Path("gate-verdict").write_text("unknown", encoding="utf-8")
+          else:
+              print(f"## Quality gate: {state}\n")
+              for condition in body["projectStatus"].get("conditions", []):
+                  print(
+                      f"- {condition.get('status')} `{condition.get('metricKey')}` "
+                      f"{condition.get('actualValue')} vs {condition.get('errorThreshold')}"
+                  )
+              pathlib.Path("gate-verdict").write_text(state, encoding="utf-8")
           PY
-          cat "$GITHUB_STEP_SUMMARY"
+
+          verdict=$(cat gate-verdict 2>/dev/null || echo unknown)
+          case "$verdict" in
+            ERROR)
+              echo "::error title=SonarCloud quality gate::The gate failed; see the summary."
+              exit 1
+              ;;
+            unknown)
+              echo "::warning title=SonarCloud quality gate not read::The token cannot" \
+                   "read api/qualitygates. Issues are listed above; the gate is not" \
+                   "being enforced. A user token would let this fail the build."
+              ;;
+            *)
+              echo "Quality gate: $verdict"
+              ;;
+          esac
 
       # Not a failure. The repository is analysable the moment the secrets
       # exist, and until then a red X on every push would train everyone to

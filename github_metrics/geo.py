@@ -107,11 +107,49 @@ CACHE_SIZE: Final = 4096
 LANGUAGE: Final = "en"
 """Forces one spelling per place. See the module docstring."""
 
-CITY_KEYS: Final = ("city", "town", "village", "municipality", "hamlet")
-"""Nominatim names a settlement by its kind, so the first present one wins."""
+CITY_KEYS: Final = (
+    "city",
+    "town",
+    "village",
+    "hamlet",
+    "locality",
+    "municipality",
+)
+"""Settlement, most to least specific to a US address.
 
-SUBURB_KEYS: Final = ("suburb", "neighbourhood", "quarter", "city_district")
-"""As above, for the division below a settlement."""
+Nominatim names a settlement by the kind of thing it is rather than under a
+fixed key, so the first present one wins. The order is US-first because that
+is the residency question the contributor block is collected to answer:
+`city` covers most incorporated places, `town` is ubiquitous in New England
+and the Mid-Atlantic, `village` and `hamlet` cover New York's tiers, and
+`locality` catches the unincorporated places that carry a name and no
+government.
+
+`municipality` is last rather than absent. It is rare in the United States and
+common elsewhere - Brazil, the Nordics, the Philippines - and dropping it would
+break exactly the contributors a foreign-residency rule exists to identify.
+Tuning for US addresses cannot mean only US addresses.
+"""
+
+SUBURB_KEYS: Final = (
+    "neighbourhood",
+    "suburb",
+    "borough",
+    "city_district",
+    "quarter",
+)
+"""The division below a settlement, same rule and same reasoning.
+
+`neighbourhood` leads because it is what Nominatim returns for most named
+areas inside a US city. `borough` is here for New York, where an address in
+Brooklyn comes back as `city` "City of New York" with `borough` "Brooklyn" -
+without it the borough, which is how anyone would actually name the place, is
+dropped. It belongs in this chain rather than the settlement one for the same
+reason: the city is still New York.
+
+`quarter` and `city_district` are the non-US equivalents, kept for the reason
+`municipality` is.
+"""
 
 STATE_CODE_PREFIX: Final = "ISO3166-2-lvl"
 """Nominatim reports an ISO 3166-2 code at whichever level the country uses."""
@@ -273,7 +311,7 @@ def _address(query: str, match: Any) -> Address:
     return Address(
         query=query,
         formatted_address=str(match.address) if match.address else "",
-        street=_first(components, ("road",)),
+        street=_first(components, ("road", "pedestrian", "residential")),
         house_number=_first(components, ("house_number",)),
         suburb=_first(components, SUBURB_KEYS),
         post_code=_first(components, ("postcode",)),

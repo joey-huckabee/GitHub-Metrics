@@ -261,19 +261,107 @@ def test_place_names_are_pinned_to_one_language(monkeypatch: pytest.MonkeyPatch)
 @pytest.mark.usefixtures("instant")
 @pytest.mark.parametrize(
     ("key", "expected"),
-    [("city", "Austin"), ("town", "Ware"), ("village", "Grantchester"), ("municipality", "Oeiras")],
+    [
+        # US first: the residency question is what this block is collected for.
+        ("city", "Austin"),
+        ("town", "Ware"),
+        ("village", "Croton-on-Hudson"),
+        ("hamlet", "Wainscott"),
+        ("locality", "Bandera Falls"),
+        # And not only the US, because identifying who is *not* American is
+        # the point of the rule these components feed.
+        ("municipality", "Oeiras"),
+    ],
 )
 def test_a_settlement_is_found_whatever_kind_it_is(
     monkeypatch: pytest.MonkeyPatch, key: str, expected: str
 ) -> None:
     """Nominatim names a settlement by its kind, not under a fixed `city` key.
 
-    Reading only `city` leaves the field empty for most of the world.
+    Reading only `city` leaves the field empty for most US addresses outside a
+    large incorporated place, and for most of the world.
     """
     raw = {"address": {key: expected, "country": "Somewhere", "country_code": "xx"}}
     geocoder = build(monkeypatch, _Nominatim(_Match(expected, 1.0, 2.0, raw)))
 
     assert geocoder.locate("anywhere").city == expected
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_a_new_york_borough_is_kept_without_displacing_the_city(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An address in Brooklyn is in the City of New York, and in Brooklyn.
+
+    Nominatim reports both, and dropping the borough loses how anyone would
+    actually name the place. It belongs below the settlement, not instead of
+    it - the city is still New York.
+    """
+    raw = {
+        "address": {
+            "borough": "Brooklyn",
+            "city": "City of New York",
+            "state": "New York",
+            "ISO3166-2-lvl4": "US-NY",
+            "country": "United States",
+            "country_code": "us",
+        }
+    }
+    geocoder = build(monkeypatch, _Nominatim(_Match("Brooklyn", 40.67, -73.94, raw)))
+
+    address = geocoder.locate("Brooklyn, NY")
+
+    assert address.city == "City of New York"
+    assert address.suburb == "Brooklyn"
+    assert address.state_code == "US-NY"
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_a_country_level_match_invents_no_state_or_county(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The components are the match's own, never the nearest place to its centre.
+
+    A contributor who publishes "United States" has said nothing about a state,
+    and the record must not acquire one. Forward-geocoding then *reverse*-
+    geocoding the result does exactly that: the centroid of the contiguous US
+    reverse-resolves to a county in Kansas, and every contributor naming a
+    country would be recorded as living there.
+    """
+    raw = {"address": {"country": "United States", "country_code": "us"}}
+    geocoder = build(monkeypatch, _Nominatim(_Match("United States", 39.78, -100.44, raw)))
+
+    address = geocoder.locate("United States")
+
+    assert address.country == "United States"
+    assert address.country_code == "us"
+    # Empty means "the match carries no such component", which is the truth.
+    assert address.state == ""
+    assert address.county == ""
+    assert address.city == ""
+
+
+@pytest.mark.requirement("L3-MET-018")
+@pytest.mark.usefixtures("instant")
+def test_coordinates_are_floats_rather_than_the_strings_the_api_sends(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nominatim's raw `lat`/`lon` are strings.
+
+    Reading them from `raw` and assigning them straight through puts strings
+    in a field typed `float`, which JSON then publishes as `"39.78"`. Every
+    consumer has to re-parse, and a comparison against 0 quietly stops working
+    - which is how `"latitude": "0"` reached the documented example.
+    """
+    raw = {"lat": "39.784824", "lon": "-100.4458771", "address": {"country_code": "us"}}
+    geocoder = build(monkeypatch, _Nominatim(_Match("somewhere", 39.784824, -100.4458771, raw)))
+
+    coordinates = geocoder.locate("somewhere").internal_location
+
+    assert isinstance(coordinates.latitude, float)
+    assert isinstance(coordinates.longitude, float)
 
 
 @pytest.mark.requirement("L3-MET-018")

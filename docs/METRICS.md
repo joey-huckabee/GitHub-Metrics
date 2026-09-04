@@ -372,6 +372,16 @@ The middle state is why `query` exists. Without it, an account publishing
 `she/her` would be indistinguishable from one publishing nothing, and those
 are different facts about that account.
 
+**The components are the match's own, and are never reverse-geocoded.** A
+forward lookup with `addressdetails` returns the components of the place that
+matched. Looking the coordinates back up instead - forward geocode, then
+reverse geocode the result - manufactures precision that was never in the
+data: `United States` resolves to the country's centroid, and reverse-resolving
+that point returns a county in Kansas, so every contributor who names a country
+acquires a state and a county they have nothing to do with. A residency rule
+keyed on `state` or `county` would then be reading invented values. It also
+doubles the request count on the slowest part of a run.
+
 The `""` in the third state is a measurement too: a country-level match
 genuinely has no city, and recording that is not the same as never having
 looked.
@@ -380,9 +390,9 @@ looked.
 |---|---|---|
 | `query` | `str` | the location as this contributor published it, whitespace-normalised |
 | `formatted_address` | `str` | the single-line rendering of the match |
-| `street` | `str` | `road` |
+| `street` | `str` | `road`, else `pedestrian`, `residential` |
 | `house_number` | `str` | `house_number` |
-| `suburb` | `str` | `suburb`, else `neighbourhood`, `quarter`, `city_district` |
+| `suburb` | `str` | `neighbourhood`, else `suburb`, `borough`, `city_district`, `quarter` |
 | `post_code` | `str` | `postcode` |
 | `state` | `str` | `state`, else `province`, `region` |
 | `state_code` | `str` | the **coarsest** `ISO3166-2-lvl*` present |
@@ -390,7 +400,7 @@ looked.
 | `county` | `str` | `county` |
 | `country` | `str` | `country`, in English |
 | `country_code` | `str` | `country_code`, lower case |
-| `city` | `str` | `city`, else `town`, `village`, `municipality`, `hamlet` |
+| `city` | `str` | `city`, else `town`, `village`, `hamlet`, `locality`, `municipality` |
 | `internal_location` | `object` | `{ latitude, longitude }` |
 
 #### Joining two APIs that do not agree
@@ -408,9 +418,19 @@ ISO 3166-1 alpha-2, it has no language, and it does not change when a country
 is renamed in one dataset and not another.
 
 **A settlement is named by its kind.** Nominatim reports `city` only for places
-it classes as cities. A town is `town`, a village is `village`, and elsewhere
-it is `municipality` or `hamlet`. Reading only `city` leaves the field empty
-for most of the world, so the first key present wins.
+it classes as cities, so the first key present wins. The chains are ordered
+US-first, because residency against the United States is the question the
+contributor block is collected to answer: `town` is ubiquitous in New England
+and the Mid-Atlantic, `village` and `hamlet` cover New York's tiers, and
+`locality` catches unincorporated places that have a name and no government.
+`borough` is in the *suburb* chain for New York, where an address in Brooklyn
+comes back as `city` "City of New York" with `borough` "Brooklyn" - the city is
+still New York, so the borough sits below it rather than replacing it.
+
+The non-US keys - `municipality`, `quarter`, `city_district` - are last rather
+than absent. Tuning for US addresses cannot mean only US addresses: dropping
+them would leave the field empty for exactly the contributors a foreign
+residency rule exists to identify.
 
 **The ISO 3166-2 level is not fixed.** A US state arrives as `ISO3166-2-lvl4`,
 but the first-level subdivision sits at a different administrative level in

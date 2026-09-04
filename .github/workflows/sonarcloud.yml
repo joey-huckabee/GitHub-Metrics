@@ -66,15 +66,25 @@ jobs:
             exit 1
           fi
 
-      - name: Is a token configured?
+      # All three, not just the token. The scanner authenticates with the token
+      # but reports into the project the other two name, and a missing key
+      # fails with an authorization error that mentions neither.
+      - name: Is the scan configured?
         id: token
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
         run: |
-          if [ -n "$SONAR_TOKEN" ]; then
+          missing=""
+          [ -n "$SONAR_TOKEN" ] || missing="$missing SONAR_TOKEN"
+          [ -n "$SONAR_ORGANIZATION" ] || missing="$missing SONAR_ORGANIZATION"
+          [ -n "$SONAR_PROJECT_KEY" ] || missing="$missing SONAR_PROJECT_KEY"
+          if [ -z "$missing" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "missing=$missing" >> "$GITHUB_OUTPUT"
           fi
 
       - name: SonarCloud scan
@@ -83,15 +93,95 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          # Passed here rather than written into sonar-project.properties, so
+          # the repository carries no value that has to be kept in step with
+          # an account.
+          args: >
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
 
-      # Not a failure. The repository is analysable the moment the project and
-      # the secret exist, and until then a red X on every push would train
-      # everyone to ignore this workflow.
+      # The scan uploads a report and returns; it does not wait to hear what
+      # came of it. Without this the job is green whatever Sonar found, which
+      # is a check that cannot fail - the same defect `make mutants` exists to
+      # catch in the test suite.
+      - name: Quality gate
+        if: steps.token.outputs.present == 'true'
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 10
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+      # Printed whether the gate passed or failed. A private project cannot be
+      # read without the token, so without this the findings exist only on a
+      # dashboard and never reach whoever is looking at the failing build.
+      - name: What Sonar found
+        if: always() && steps.token.outputs.present == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PROJECT: ${{ secrets.SONAR_PROJECT_KEY }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          scope=""
+          if [ -n "$PR" ]; then scope="&pullRequest=$PR"; fi
+
+          # Issues in this change, and issues across the whole project. The
+          # first is what the gate judged; the second is what a reader wants
+          # when asking whether the codebase is clean.
+          curl -sS -u "$SONAR_TOKEN:" \
+            "https://sonarcloud.io/api/issues/search?componentKeys=$PROJECT$scope&resolved=false&ps=200" \
+            -o issues.json || echo '{}' > issues.json
+          curl -sS -u "$SONAR_TOKEN:" \
+            "https://sonarcloud.io/api/issues/search?componentKeys=$PROJECT&resolved=false&ps=200" \
+            -o all-issues.json || echo '{}' > all-issues.json
+          # Coverage specifically: the path trap this workflow guards against
+          # reports 0% without erroring, so the number has to be looked at.
+          curl -sS -u "$SONAR_TOKEN:" \
+            "https://sonarcloud.io/api/measures/component?component=$PROJECT&metricKeys=coverage,ncloc,duplicated_lines_density,security_hotspots" \
+            -o measures.json || echo '{}' > measures.json
+
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+
+
+          def load(name):
+              try:
+                  return json.loads(pathlib.Path(name).read_text(encoding="utf-8"))
+              except (OSError, ValueError):
+                  return {}
+
+
+          measures = load("measures.json").get("component", {}).get("measures", [])
+          if measures:
+              print("## SonarCloud measures\n")
+              for measure in sorted(measures, key=lambda item: item["metric"]):
+                  print(f"- `{measure['metric']}`: {measure.get('value', '-')}")
+              print()
+
+          for title, name in (("this change", "issues.json"), ("whole project", "all-issues.json")):
+              issues = load(name).get("issues", [])
+              print(f"## SonarCloud issues, {title}: {len(issues)}\n")
+              for issue in issues:
+                  where = issue.get("component", "").split(":", 1)[-1]
+                  print(
+                      f"- **{issue.get('severity')}** `{issue.get('rule')}` "
+                      f"{where}:{issue.get('line', '-')} - {issue.get('message')}"
+                  )
+              if not issues:
+                  print("None.")
+              print()
+          PY
+          cat "$GITHUB_STEP_SUMMARY"
+
+      # Not a failure. The repository is analysable the moment the secrets
+      # exist, and until then a red X on every push would train everyone to
+      # ignore this workflow.
       - name: Explain the skip
         if: steps.token.outputs.present == 'false'
+        env:
+          MISSING: ${{ steps.token.outputs.missing }}
         run: |
-          echo "::notice title=SonarCloud scan skipped::No SONAR_TOKEN secret." \
-               "Create the project on sonarcloud.io with the key in" \
-               "sonar-project.properties, then add SONAR_TOKEN under" \
-               "Settings > Secrets and variables > Actions. Coverage is already" \
-               "generated and its paths are verified above."
+          echo "::notice title=SonarCloud scan skipped::Missing secret(s):$MISSING." \
+               "Add them under Settings > Secrets and variables > Actions." \
+               "Coverage is already generated and its paths are verified above."

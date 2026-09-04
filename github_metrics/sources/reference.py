@@ -105,10 +105,19 @@ def parse_reference(text: str, *, source: str = "<argument>") -> RepositoryRef |
     return RepositoryRef(owner=owner, repoid=repoid)
 
 
+SLUG_PARTS: Final = 2
+"""A reference names exactly two things: an owner and a repository.
+
+The number appears in three comparisons - the slug split, the minimum a URL
+path must carry, and the point past which a URL is carrying browsing debris -
+and they are the same fact each time.
+"""
+
+
 def _split_slug(text: str) -> tuple[str, str, str | None, str]:
     """Split `owner/repoid`, reporting the shape rather than just rejecting it."""
     parts = text.split("/")
-    if len(parts) != 2:
+    if len(parts) != SLUG_PARTS:
         described = "no '/'" if len(parts) == 1 else f"{len(parts) - 1} '/' separators"
         return (
             "",
@@ -140,7 +149,7 @@ def _split_url(text: str) -> tuple[str, str, str | None, str]:
         )
 
     segments = [segment for segment in path.split("/") if segment]
-    if len(segments) < 2:
+    if len(segments) < SLUG_PARTS:
         return (
             "",
             "",
@@ -154,7 +163,7 @@ def _split_url(text: str) -> tuple[str, str, str | None, str]:
         # the clone button produced and refusing it over four characters.
         repoid = repoid[: -len(".git")]
 
-    if len(segments) > 2:
+    if len(segments) > SLUG_PARTS:
         # `/tree/main`, `/issues/42`, `/blob/...`: browsing debris, not part of
         # the reference, and dropping it silently would be the wrong kind of
         # quiet - a URL naming a file still names the repository.

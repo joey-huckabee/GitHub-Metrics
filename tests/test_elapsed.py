@@ -153,8 +153,13 @@ def test_a_timestamp_after_the_scan_is_reported_and_clamped(
 @pytest.mark.parametrize(
     ("moment", "scan"),
     [
-        (datetime(2024, 1, 1), datetime(2026, 1, 1, tzinfo=timezone.utc)),
-        (datetime(2024, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 1)),
+        # Naive on purpose, once on each side: these are the values the
+        # code under test exists to refuse, so DTZ001 is right about them
+        # and wrong about the intent. Suppressed here rather than for the
+        # whole file, so an *accidental* naive datetime elsewhere in the
+        # suite still fails.
+        (datetime(2024, 1, 1), datetime(2026, 1, 1, tzinfo=timezone.utc)),  # noqa: DTZ001
+        (datetime(2024, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 1)),  # noqa: DTZ001
     ],
 )
 def test_a_naive_timestamp_is_refused_with_a_reason(moment: datetime, scan: datetime) -> None:

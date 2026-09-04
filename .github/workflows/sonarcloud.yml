@@ -1,0 +1,97 @@
+name: SonarCloud
+
+# Static analysis and coverage reporting, kept separate from ci.yml for the
+# same reason codeql.yml is: it needs a credential and a third-party service,
+# so a failure here means something different from a failing test.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  POETRY_VERSION: "2.3.4"
+
+permissions:
+  contents: read
+
+jobs:
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    # A pull request from a fork cannot read repository secrets, so the scan
+    # would fail for a reason the contributor cannot fix. Skip it there; the
+    # push to main after merge covers the code.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Sonar reads blame to decide what counts as new code, and a shallow
+          # clone has none - every line looks new, and the new-code quality
+          # gate becomes meaningless.
+          fetch-depth: 0
+
+      - name: Install Poetry
+        run: pipx install poetry==${{ env.POETRY_VERSION }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install --with dev --no-interaction
+
+      # Coverage is produced here rather than downloaded from ci.yml: artifacts
+      # do not cross workflows without a second API call, and the run is a few
+      # seconds. Integration tests stay deselected, as everywhere else.
+      - name: pytest with coverage
+        run: poetry run pytest -m "not integration"
+
+      - name: Confirm the coverage report is resolvable
+        run: |
+          test -f coverage.xml
+          # The paths Sonar will try to resolve. If these are bare file names
+          # rather than package-qualified ones, coverage silently reports 0%.
+          if ! grep -q 'filename="github_metrics/' coverage.xml; then
+            echo "::error::coverage.xml paths are not repository-relative;" \
+                 "check relative_files and --cov=. in pyproject.toml"
+            exit 1
+          fi
+
+      - name: Is a token configured?
+        id: token
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: SonarCloud scan
+        if: steps.token.outputs.present == 'true'
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+      # Not a failure. The repository is analysable the moment the project and
+      # the secret exist, and until then a red X on every push would train
+      # everyone to ignore this workflow.
+      - name: Explain the skip
+        if: steps.token.outputs.present == 'false'
+        run: |
+          echo "::notice title=SonarCloud scan skipped::No SONAR_TOKEN secret." \
+               "Create the project on sonarcloud.io with the key in" \
+               "sonar-project.properties, then add SONAR_TOKEN under" \
+               "Settings > Secrets and variables > Actions. Coverage is already" \
+               "generated and its paths are verified above."

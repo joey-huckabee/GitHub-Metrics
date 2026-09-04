@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 
 import pytest
@@ -76,7 +77,7 @@ def test_the_correction_applies_to_exactly_the_affected_range() -> None:
     # Six hours to three months. Outside it, nothing changes.
     differing = [
         days
-        for days in range(0, 6 * int(DAYS_PER_YEAR))
+        for days in range(6 * int(DAYS_PER_YEAR))
         if maturity_weight(float(days)) != original_chain(float(days))
     ]
 
@@ -126,13 +127,13 @@ def test_every_band_boundary_scores_as_documented(years: float, expected: float)
 def test_the_score_never_decreases_as_a_repository_ages() -> None:
     weights = [maturity_weight(float(d)) for d in range(0, 3000, 3)]
 
-    pairs = zip(weights[:-1], weights[1:], strict=True)
+    pairs = itertools.pairwise(weights)
     assert all(earlier <= later for earlier, later in pairs)
 
 
 @pytest.mark.requirement("L3-SCR-013")
 def test_no_age_is_left_unmapped() -> None:
-    produced = {maturity_weight(float(d)) for d in range(0, 3000)}
+    produced = {maturity_weight(float(d)) for d in range(3000)}
 
     assert produced == {0.0, 0.2, 0.4, 0.6, 0.8, 0.9, 1.0}
 

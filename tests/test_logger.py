@@ -18,15 +18,18 @@ from github_metrics.logger import Logger, LogLevels, reset_logger
         ("CRITICAL", LogLevels.CRITICAL),
     ],
 )
+@pytest.mark.requirement("L3-LOG-003")
 def test_from_name_resolves_known_levels(name: str, expected: int) -> None:
     assert LogLevels.from_name(name) == expected
 
 
+@pytest.mark.requirement("L3-LOG-003")
 def test_from_name_falls_back_for_unknown_levels() -> None:
     assert LogLevels.from_name("not-a-level") == LogLevels.INFO
     assert LogLevels.from_name("not-a-level", default=LogLevels.ERROR) == LogLevels.ERROR
 
 
+@pytest.mark.requirement("L3-LOG-003")
 def test_reset_logger_writes_to_the_given_stream() -> None:
     stream = io.StringIO()
 
@@ -36,6 +39,7 @@ def test_reset_logger_writes_to_the_given_stream() -> None:
     assert stream.getvalue().strip() == "DEBUG|hello"
 
 
+@pytest.mark.requirement("L3-LOG-003")
 def test_reset_logger_is_idempotent() -> None:
     reset_logger(stream=io.StringIO())
     logger = reset_logger(stream=io.StringIO())
@@ -44,6 +48,7 @@ def test_reset_logger_is_idempotent() -> None:
     assert logger.propagate is False
 
 
+@pytest.mark.requirement("L3-LOG-003")
 def test_reset_logger_filters_below_the_minimum_level() -> None:
     stream = io.StringIO()
 

@@ -432,11 +432,39 @@ def test_a_named_file_is_used_as_given(tmp_path: Path) -> None:
 
 @pytest.mark.requirement("L3-OUT-009")
 def test_a_missing_parent_directory_fails_early(tmp_path: Path) -> None:
+    """Better here than after a run has spent its API budget.
+
+    The *reason* is asserted, not only the code. Both of the guards in
+    `resolve_destination` raise `GM-OUT-002`, so a test that checks the code
+    alone passes when either fires - which left the missing-directory branch
+    unverified: deleting it entirely kept this test green, because the
+    is-not-a-directory branch below caught the same input and said something
+    else.
+    """
     with pytest.raises(OutputDestinationError) as caught:
         resolve_destination(tmp_path / "nope" / "out.csv")
 
-    # Better here than after a run has spent its API budget.
-    assert "GM-OUT-002" in str(caught.value)
+    message = str(caught.value)
+    assert "GM-OUT-002" in message
+    assert "does not exist" in message
+
+
+@pytest.mark.requirement("L3-OUT-009")
+def test_a_parent_that_is_a_file_is_refused_with_its_own_reason(tmp_path: Path) -> None:
+    """The other guard, which had no test of its own.
+
+    A parent that exists but is a file is a different mistake from one that is
+    absent, and the operator fixes it differently.
+    """
+    occupied = tmp_path / "occupied"
+    occupied.write_text("not a directory", encoding="utf-8")
+
+    with pytest.raises(OutputDestinationError) as caught:
+        resolve_destination(occupied / "out.csv")
+
+    message = str(caught.value)
+    assert "GM-OUT-002" in message
+    assert "is not a directory" in message
 
 
 # ---------------------------------------------------------------------------
@@ -456,7 +484,10 @@ def test_a_scan_identifier_is_timezone_aware_and_unique() -> None:
 @pytest.mark.requirement("L3-OUT-010")
 def test_a_naive_scan_date_is_rejected() -> None:
     with pytest.raises(ValueError, match="timezone-aware"):
-        ScanIdentifier(scan_date=datetime(2026, 7, 12, 20, 33, 7))
+        # Naive on purpose: this is the value the constructor exists to
+        # refuse. Suppressed at the line rather than for the file, so an
+        # accidental naive datetime elsewhere still fails.
+        ScanIdentifier(scan_date=datetime(2026, 7, 12, 20, 33, 7))  # noqa: DTZ001
 
 
 @pytest.mark.requirement("L3-OUT-010")

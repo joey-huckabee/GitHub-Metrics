@@ -154,10 +154,18 @@ def test_the_path_is_lower_cased(tmp_path: Path) -> None:
     A case-sensitive filename would produce two files for one repository on
     Linux, and on Windows or macOS would let the second silently overwrite the
     first while the run reported two successes.
+
+    Compared as **strings**, not as `Path` objects. `WindowsPath.__eq__` folds
+    case, so `Path("PyPA") == Path("pypa")` is True on Windows whatever the
+    code did - which passed this test for a version of `document_path` that
+    had no `.lower()` in it at all. The assertion has to be case-sensitive on
+    every platform, or it only tests Linux.
     """
-    assert document_path(tmp_path, "PyPA", "VirtualEnv") == document_path(
-        tmp_path, "pypa", "virtualenv"
-    )
+    mixed = document_path(tmp_path, "PyPA", "VirtualEnv")
+    lower = document_path(tmp_path, "pypa", "virtualenv")
+
+    assert mixed.as_posix() == lower.as_posix()
+    assert mixed.parts[-2:] == ("pypa", "virtualenv.json")
 
 
 @pytest.mark.requirement("L3-OUT-011")

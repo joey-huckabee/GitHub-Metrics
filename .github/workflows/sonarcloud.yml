@@ -136,6 +136,30 @@ jobs:
           if [ -n "$PR" ]; then scope="&pullRequest=$PR"; fi
           base="https://sonarcloud.io/api"
 
+          # The scan uploads a report and returns; the server processes it
+          # afterwards. Asking for results before that finishes gets a 200
+          # carrying nothing - which is how the first main-branch run reported
+          # "Quality gate: NONE" and no measures for an analysis that was
+          # entirely successful. Wait for the task the scan actually queued.
+          task_id=$(sed -n 's/^ceTaskId=//p' .scannerwork/report-task.txt 2>/dev/null || true)
+          if [ -n "$task_id" ]; then
+            echo "Waiting for analysis $task_id to be processed:"
+            for _ in $(seq 1 60); do
+              state=$(curl -sS -u "$SONAR_TOKEN:" "$base/ce/task?id=$task_id"                       | python3 -c 'import json,sys; print(json.load(sys.stdin).get("task",{}).get("status",""))'                       2>/dev/null || echo "")
+              echo "  $state"
+              case "$state" in
+                SUCCESS) break ;;
+                FAILED|CANCELED)
+                  echo "::error title=SonarCloud::Report processing $state."
+                  exit 1
+                  ;;
+              esac
+              sleep 5
+            done
+          else
+            echo "No ceTaskId in .scannerwork/report-task.txt; reading results immediately."
+          fi
+
           echo "Reading SonarCloud:"
           fetch issues "$base/issues/search?componentKeys=$PROJECT$scope&resolved=false&ps=200"
           fetch all-issues "$base/issues/search?componentKeys=$PROJECT&resolved=false&ps=200"

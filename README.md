@@ -172,6 +172,9 @@ Full documentation is in [`docs/`](docs/README.md):
 - [User guide](docs/USER-GUIDE.md) — task-oriented introduction
 - [CLI reference](docs/CLI-REFERENCE.md) — every flag and exit code
 - [Error catalog](docs/ERROR-CATALOG.md) — every `GM-*` code explained
+- [Scan process](docs/SCAN-PROCESS.md) — the run end to end, its corner cases,
+  and its known deficiencies
+- [API limits](docs/API-LIMITS.md) — every ceiling, measured, and the ways round them
 - [Architecture](docs/ARCHITECTURE.md) — how the pieces fit, and why
 - [Maintainer guide](docs/MAINTAINER-GUIDE.md) — working on the code
 - [Roadmap](docs/ROADMAP.md) — what is deferred, and why

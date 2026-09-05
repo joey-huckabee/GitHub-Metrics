@@ -6,7 +6,39 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+Planning for v0.6.0. **No code changed**; this is the design for the next
+release, written up before it is built, per the rule that nothing is
+implemented before it is defined.
+
+### Added
+
+- **[`docs/API-LIMITS.md`](docs/API-LIMITS.md)** — every GitHub and Nominatim
+  ceiling, what it costs, and the ways around it. Figures are marked measured
+  or documented. Includes the workarounds that do **not** work, recorded so
+  they are not retried.
+- **[`docs/SCAN-PROCESS.md`](docs/SCAN-PROCESS.md)** — the run end to end,
+  written to be read adversarially: every place a value can be wrong, absent,
+  or mean something other than it appears to, and a numbered list of ten known
+  deficiencies.
+- **[ADR-0008](docs/adr/0008-statistics-json.md)** — `statistics.json`, a third
+  artifact carrying completeness, exclusion reasons, bot impact, concentration
+  and geographic bounds. `contribution_total` is deliberately **not** adjusted
+  for bots; both figures are published and the analysis chooses.
+- **[ADR-0009](docs/adr/0009-rate-limit-exhaustion-policy.md)** —
+  `--on-exhaustion {fail,wait,partial}`, defaulting to `fail`. The important
+  half is that a partial run says so in the data: exit 9,
+  `budget.incomplete_because_exhausted`, and a row for every named repository
+  including those never attempted.
+- The no-reply email recovery route, verified against the API:
+  `275304381+hakanpak@users.noreply.github.com` embeds GitHub's own account id
+  and login. Measured, it takes coverage from 396 people / 87.0% of commits to
+  1,163 / 90.3%.
+
+### Changed
+
+- `ROADMAP.md`: v0.6.0 is now "Knowing how good the data is"; Persistence moves
+  to v0.7.0.
+- The docs index lists ADRs 0005 through 0009, which had fallen behind.
 
 ## [0.5.0] - 2026-09-05
 

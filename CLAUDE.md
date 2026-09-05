@@ -172,6 +172,10 @@ result, and the matrix reports it as Draft.
 
 - `docs/METRICS.md` — field definitions and scoring bands (the working document)
 - `docs/ERROR-CATALOG.md` — every `GM-*` code, its cause and its resolution
+- `docs/SCAN-PROCESS.md` — the run end to end, every corner case, and a
+  numbered list of known deficiencies. Read before changing collection
+- `docs/API-LIMITS.md` — GitHub and Nominatim ceilings, measured costs, and
+  the workarounds that do and do not work
 - `docs/ARCHITECTURE.md` — how the pieces fit and why
 - `docs/CLI-REFERENCE.md` — every flag and exit code
 - `docs/USER-GUIDE.md` — task-oriented introduction

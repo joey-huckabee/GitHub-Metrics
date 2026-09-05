@@ -20,7 +20,7 @@ one or two thousand distinct locations to something closer to ten thousand.
 At one second each, an unbounded scan without a persistent cache is an
 overnight job **every time it runs**, not just the first time.
 
-`ROADMAP.md` had this queued behind v0.6.0's store, on the reasoning that a
+`ROADMAP.md` had this queued behind v0.7.0's store, on the reasoning that a
 store which already holds addresses is the obvious home for one and doing it
 first would design the same cache twice. ADR-0006 makes that ordering
 untenable: unbounded collection is not usable without it.
@@ -30,7 +30,7 @@ untenable: unbounded collection is not usable without it.
 * A re-run over a stable inventory must pay only for locations never seen
 * A transient outage must not permanently poison a cached answer
 * The cache must not become a second persistence mechanism competing with
-  v0.6.0's store
+  v0.7.0's store
 * Cache state must never be mistaken for measurement — a cached miss and a
   fresh miss must produce identical output
 
@@ -39,7 +39,7 @@ untenable: unbounded collection is not usable without it.
 Chosen: **an on-disk JSON cache, keyed on the normalised case-folded location,
 with expiry that differs by outcome.**
 
-JSON rather than SQLite for now, because the store v0.6.0 brings is where this
+JSON rather than SQLite for now, because the store v0.7.0 brings is where this
 belongs permanently, and building a second database first would design the same
 thing twice — the exact argument that deferred this work, now applied to its
 shape rather than its schedule. The threshold at which that stops being true is
@@ -117,7 +117,7 @@ file.
 * Good: an outage costs one run's resolution rather than every future run's
 * Bad: a cache file is new state on disk that a user may need to know about;
   `GEOCODE_CACHE_PATH` and a documented default are the mitigation
-* Bad: two persistence mechanisms exist until v0.6.0 folds this into the store
+* Bad: two persistence mechanisms exist until v0.7.0 folds this into the store
 
 ## When this should stop being a JSON file
 
@@ -159,7 +159,7 @@ ADR had it backwards:
    interrupted run cannot truncate the cache, and the cost is paid in full even
    by a run that added three entries.
 
-The move, when it comes, is **into v0.6.0's SQLite store rather than into a
+The move, when it comes, is **into v0.7.0's SQLite store rather than into a
 database of its own**. That store will already hold addresses; a second one
 would be the duplicate design this ADR avoided by not starting with SQLite.
 SQLite answers the first point directly and it is the one that matters: a run
@@ -182,4 +182,4 @@ not been observed against a real run - it belongs with the other things
 * `METRICS.md`, "What geocoding is for", for what the cached data feeds
 * [ADR-0006](0006-collect-every-contributor.md) for the change that made this
   necessary
-* `ROADMAP.md`, v0.6.0, for the store this eventually folds into
+* `ROADMAP.md`, v0.7.0, for the store this eventually folds into

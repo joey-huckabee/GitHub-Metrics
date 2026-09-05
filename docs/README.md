@@ -7,6 +7,8 @@
 | Use the tool | [`USER-GUIDE.md`](USER-GUIDE.md) |
 | Look up a flag or exit code | [`CLI-REFERENCE.md`](CLI-REFERENCE.md) |
 | Understand an error code | [`ERROR-CATALOG.md`](ERROR-CATALOG.md) |
+| Know exactly what a scan does, and where it can mislead you | [`SCAN-PROCESS.md`](SCAN-PROCESS.md) |
+| Know what the API will not give us, and what to do about it | [`API-LIMITS.md`](API-LIMITS.md) |
 | Know how a metric is calculated | [`METRICS.md`](METRICS.md) |
 | Change the code | [`MAINTAINER-GUIDE.md`](MAINTAINER-GUIDE.md) |
 | Understand how it fits together | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
@@ -46,6 +48,11 @@ without its alternatives cannot be reviewed later.
 | [0002](adr/0002-concurrency-across-files-not-within-a-file.md) | Apply concurrency across inventory files, not within a single file |
 | [0003](adr/0003-lenient-ingestion-by-default-with-strict-opt-in.md) | Ingest leniently by default, with strict mode as an opt-in |
 | [0004](adr/0004-exit-code-scheme.md) | Use small ordered exit codes rather than sysexits.h |
+| [0005](adr/0005-one-scan-command-and-per-repository-json.md) | One `scan` command, producing both artifacts |
+| [0006](adr/0006-collect-every-contributor.md) | Collect every contributor, not the top 25 |
+| [0007](adr/0007-persistent-geocode-cache.md) | A geocode cache that survives the run, and what expires in it |
+| [0008](adr/0008-statistics-json.md) | A third artifact, `statistics.json` — **proposed** |
+| [0009](adr/0009-rate-limit-exhaustion-policy.md) | `--on-exhaustion` for runs larger than one hour's quota — **proposed** |
 
 ## The one structural rule
 
@@ -53,3 +60,13 @@ without its alternatives cannot be reviewed later.
 format.** Neither imports the other; they meet only at the CLI. Most of the
 design follows from that, and it is the rule most likely to be broken by a
 well-meaning change — see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+## Before trusting a number
+
+[`SCAN-PROCESS.md`](SCAN-PROCESS.md) is written to be read adversarially: not
+"how does this work" but "where could this dataset already be misleading me".
+It ends with a numbered list of known deficiencies, and the short version is
+that the output is a **sample with bounds that are not yet stated in it** —
+GitHub links only the first 500 author email addresses to accounts, bots are
+counted like people, and fewer than half of contributors publish a location.
+Quantifying those bounds is what v0.6.0's `statistics.json` is for.

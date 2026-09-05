@@ -125,7 +125,8 @@ def test_several_missing_aliases_are_tolerated_together() -> None:
     data = run(stub, tolerate_missing=True)
 
     assert data["u1"]["name"] == "Real"
-    assert data["u0"] is None and data["u2"] is None
+    assert data["u0"] is None
+    assert data["u2"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -150,8 +151,10 @@ def test_an_error_that_is_not_not_found_still_raises_even_when_tolerating() -> N
         "errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}],
     }
 
+    stub = _StubClient(raises=GithubException(403, payload, {}))
+
     with pytest.raises(GraphQLQueryError):
-        run(_StubClient(raises=GithubException(403, payload, {})), tolerate_missing=True)
+        run(stub, tolerate_missing=True)
 
 
 @pytest.mark.requirement("L3-MET-021")
@@ -170,8 +173,10 @@ def test_a_mixed_error_list_is_a_failure_and_never_a_missing_repository() -> Non
         ],
     }
 
+    stub = _StubClient(raises=GithubException(403, payload, {}))
+
     with pytest.raises(GraphQLQueryError):
-        run(_StubClient(raises=GithubException(403, payload, {})), tolerate_missing=True)
+        run(stub, tolerate_missing=True)
 
 
 @pytest.mark.requirement("L3-MET-021")
@@ -179,8 +184,10 @@ def test_a_response_with_no_data_object_is_not_salvaged() -> None:
     """Nothing to tolerate; this is a failed query however it is labelled."""
     payload = {"errors": [{"type": "NOT_FOUND", "message": "Could not resolve to a User"}]}
 
+    stub = _StubClient(raises=UnknownObjectException(404, payload, {}, "gone"))
+
     with pytest.raises(RepositoryNotFoundError):
-        run(_StubClient(raises=UnknownObjectException(404, payload, {}, "gone")))
+        run(stub)
 
 
 # ---------------------------------------------------------------------------
@@ -266,5 +273,7 @@ def test_a_detail_failure_degrades_the_repository_instead_of_killing_the_run() -
     contributor half. Without translation here, a rate limit on the detail
     query takes down every other repository in the inventory too.
     """
+    client = cast(GitHubClient, _BrokenDetailClient())
+
     with pytest.raises(ContributorCollectionError):
-        get_contributors(cast(GitHubClient, _BrokenDetailClient()), "NousResearch", "hermes-agent")
+        get_contributors(client, "NousResearch", "hermes-agent")

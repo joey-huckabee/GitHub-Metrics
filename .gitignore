@@ -230,4 +230,4 @@ githubmetrics.json
 # ...except the conformance golden artifacts, which are deliberately committed.
 # Without this the golden CSV is silently excluded and the suite fails only on
 # a clean checkout - it passed locally, where the untracked file still existed.
-!tests/conformance/expected/**
+!tests/conformance/expected*/**

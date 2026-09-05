@@ -419,17 +419,21 @@ def test_every_fixture_the_suite_needs_is_present() -> None:
     """
     required = [
         INVENTORY,
+        INVENTORY_DEEP,
         RECORDING,
         GEOCODE,
         EXPECTED / "githubmetrics.csv",
         EXPECTED / "statistics.json",
+        EXPECTED_DEEP / "githubmetrics.csv",
+        EXPECTED_DEEP / "statistics.json",
     ]
 
     missing = [path for path in required if not path.is_file()]
 
-    assert not missing, f"conformance fixtures missing: {[p.name for p in missing]}"
-    # At least one document, or the suite would be asserting nothing about them.
-    assert any(path.parent != EXPECTED for path in EXPECTED.rglob("*.json"))
+    assert not missing, f"conformance fixtures missing: {[str(p) for p in missing]}"
+    for root in (EXPECTED, EXPECTED_DEEP):
+        # At least one document, or the suite asserts nothing about them.
+        assert any(path.parent != root for path in root.rglob("*.json")), root
 
 
 # ---------------------------------------------------------------------------

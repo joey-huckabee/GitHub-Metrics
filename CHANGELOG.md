@@ -25,6 +25,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`.gitignore` excluded the second golden CSV too.** The exemption added
+  last time named `tests/conformance/expected/` exactly, so `expected-deep/`
+  fell straight back into the `githubmetrics.csv` rule — the same defect, one
+  directory over, three commits later. The exemption is now a pattern, and the
+  fixture-presence test covers both sets rather than the first.
 - **The conformance suite was reaching Nominatim.** Adding the second inventory
   brought contributors whose locations the shipped cache did not cover, so six
   lookups went over the network at one request per second — the suite's whole

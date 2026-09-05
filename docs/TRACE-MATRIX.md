@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 19
 - L2 requirements: 82
-- L3 requirements: 114
-- Verified L2+L3: 196 of 196 (100.0%)
+- L3 requirements: 115
+- Verified L2+L3: 197 of 197 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -412,7 +412,7 @@ through their children, so counting them too would count the same work twice.
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-STA-001 | L1-STA-001 | L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004 | _(none)_ | Implemented |
+| L2-STA-001 | L1-STA-001 | L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004, L3-STA-007 | _(none)_ | Implemented |
 | L2-STA-002 | L1-STA-001 | L3-STA-005 | _(none)_ | Implemented |
 | L2-STA-003 | L1-STA-001 | L3-STA-006 | _(none)_ | Implemented |
 
@@ -426,6 +426,7 @@ through their children, so counting them too would count the same work twice.
 | L3-STA-004 | L2-STA-001 | `tests/test_statistics.py::test_a_repository_with_no_contributors_reports_no_concentration`<br>`tests/test_statistics.py::test_an_even_distribution_has_a_gini_of_zero_and_a_high_bus_factor`<br>`tests/test_statistics.py::test_concentration_reports_where_the_work_sits`<br>`tests/test_statistics.py::test_concentration_sorts_rather_than_trusting_input_order`<br>`tests/test_statistics.py::test_the_bus_factor_needs_more_than_half_rather_than_exactly_half` | Implemented |
 | L3-STA-005 | L2-STA-002 | `tests/test_statistics.py::test_countries_are_ordered_by_commits_so_the_largest_reads_first`<br>`tests/test_statistics.py::test_the_unknown_location_share_bounds_every_geographic_claim` | Implemented |
 | L3-STA-006 | L2-STA-003 | `tests/test_statistics.py::test_a_run_that_collected_nothing_still_produces_a_document`<br>`tests/test_statistics.py::test_coordinates_do_not_leak_into_the_country_breakdown`<br>`tests/test_statistics.py::test_the_document_records_which_attribution_method_produced_it`<br>`tests/test_statistics.py::test_the_rest_budget_is_null_because_it_cannot_be_measured`<br>`tests/test_statistics.py::test_the_run_counts_are_derived_rather_than_tracked_separately` | Implemented |
+| L3-STA-007 | L2-STA-001 | `tests/test_statistics.py::test_a_repository_inside_the_ceiling_says_it_was_not_truncated`<br>`tests/test_statistics.py::test_anonymous_commits_are_unknown_rather_than_zero`<br>`tests/test_statistics.py::test_coverage_is_no_longer_a_flattering_hundred_percent`<br>`tests/test_statistics.py::test_the_breakdown_accounts_for_every_identity` | Implemented |
 
 ### TRU: Trust policy
 

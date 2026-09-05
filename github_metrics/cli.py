@@ -40,7 +40,10 @@ from github_metrics.model.scan import ScanIdentifier
 from github_metrics.model.software import SoftwareRow
 from github_metrics.model.statistics import (
     BudgetStatistics,
+    Exclusion,
+    ExclusionReason,
     GeocodingStatistics,
+    IdentityGaps,
     ScanStatistics,
 )
 from github_metrics.output import (
@@ -503,6 +506,7 @@ def _write_statistics(
             # Free: the metrics query already carries it, measured at one
             # point whether the repository has 1,250 commits or 32,016.
             commits_total=outcome.metadata.commits if outcome.metadata else None,
+            gaps=_gaps(outcome),
         )
         for row, outcome in zip(rows, run.outcomes, strict=True)
     )
@@ -528,6 +532,27 @@ def _write_statistics(
         click.echo(f"! statistics could not be written: {exc}", err=True)
         return
     click.echo(f"Wrote statistics to {path}")
+
+
+def _gaps(outcome: Outcome) -> IdentityGaps:
+    """Account for the identities that did not reach the document.
+
+    Everything past GitHub's 500-author-email ceiling is anonymous - a name and
+    an email, no account, no location - so it is counted rather than collected.
+    Its **commits** are left unknown rather than zero: the census counts
+    identities, and reading their commits needs the pages themselves. A zero
+    there would claim the anonymous tail contributed nothing.
+    """
+    if outcome.identities is None:
+        return IdentityGaps()
+
+    missing = max(0, outcome.identities - len(outcome.contributors))
+    return IdentityGaps(
+        identities=outcome.identities,
+        unrecoverable=(
+            Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=missing) if missing else None
+        ),
+    )
 
 
 def _warnings(outcomes: Sequence[Outcome]) -> list[str]:

@@ -36,6 +36,25 @@ First half of v0.6.0: the scan now says how good its own data is.
   from it carries an unknown of up to 81 points.
 - `tool_version` in an artifact, an open item since v0.2.0.
 
+- **The identity census**, so contributor coverage has a real denominator.
+  Until now `identities` defaulted to `collected`, making the fraction
+  `395/395` — 100% for a repository whose real coverage is 11.9%. A number that
+  overstates its own completeness is worse than no number.
+
+  It costs **one REST request per repository, whatever its size**. The
+  contributors endpoint paginates by offset and returns a `rel="last"` link, so
+  `per_page=1&anon=1` makes the last page number *be* the total count: 3,310
+  for `hermes-agent`, 161 for `pypa/virtualenv`. Walking the list would have
+  cost 34 pages and made REST the binding budget for a whole inventory.
+- **`contributors.breakdown`**, the four components of that denominator —
+  `linked_by_github`, `recovered_from_noreply`, `anonymous_unrecoverable`,
+  `unresolvable_accounts` — which **sum to `identities`**, so it can be checked
+  rather than trusted. One percentage cannot say whether 12% coverage means
+  GitHub's ceiling bit (expected, unfixable) or that accounts are disappearing
+  between calls (a defect worth chasing).
+- **`contributors.truncated_by_github`**, the one-glance boolean: whether the
+  500-email ceiling affected this repository at all.
+
 ### Fixed
 
 - **`check_budget` was validating runs against a number that never moves.**
@@ -57,9 +76,18 @@ First half of v0.6.0: the scan now says how good its own data is.
   then 4,976 after one GraphQL call, then 4,980 after the next REST call. A scan
   interleaves both across eight threads. GraphQL binds first and *is* measured;
   a plausible REST number would be a guess wearing a measurement's clothes.
+- **`exclusions[].commits` is `null` for the anonymous tail**, not `0`. The
+  census counts people in one request; counting their commits needs every page
+  of the list. Zero would claim the tail contributed nothing, which for a large
+  repository is false by thousands of commits.
+- **Read the two coverage figures together.** For `hermes-agent`, 88% of the
+  *people* are missing and 13% of the *work* is — the tail averages 1.4 commits
+  each. "Where does this project's work come from" is answered well at 87%;
+  "did this person contribute" is not answered at all. `docs/METRICS.md` says
+  so where the fields are defined.
 - Still to come in v0.6.0: no-reply account recovery, `--on-exhaustion` and
   `--deep-attribution`.
-- 683 tests, trace matrix 196 of 196.
+- 687 tests, trace matrix 197 of 197.
 
 ## [0.5.1] - 2026-09-05
 

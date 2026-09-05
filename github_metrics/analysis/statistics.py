@@ -102,6 +102,7 @@ def build_repository_statistics(
             gaps.identities if gaps.identities is not None else collected_count
         ),
         contributors_collected=collected_count,
+        gaps=gaps,
         exclusions=_exclusions(contributors, gaps),
         bots=_bots(contributors, attributed),
         concentration=_concentration(contributors, attributed),

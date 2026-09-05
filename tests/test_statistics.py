@@ -100,6 +100,13 @@ def test_contributor_coverage_reports_the_identities_github_knows_of() -> None:
         "identities": 100,
         "collected": 2,
         "coverage_percent": 2.0,
+        "breakdown": {
+            "linked_by_github": 2,
+            "recovered_from_noreply": 0,
+            "anonymous_unrecoverable": 0,
+            "unresolvable_accounts": 0,
+        },
+        "truncated_by_github": True,
     }
 
 
@@ -390,3 +397,88 @@ def test_coordinates_do_not_leak_into_the_country_breakdown() -> None:
 
     assert found["countries"] == {}
     assert found["commits_with_unknown_location_percent"] == 100.0
+
+
+# ---------------------------------------------------------------------------
+# The components behind contributor coverage
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-STA-007")
+def test_the_breakdown_accounts_for_every_identity() -> None:
+    """It sums to `identities`, so a reader can check it rather than trust it."""
+    gaps = IdentityGaps(
+        identities=3310,
+        unrecoverable=Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=2900),
+        recovered=15,
+        unresolvable=0,
+    )
+
+    found = gaps.breakdown(collected=410)
+
+    assert found == {
+        "linked_by_github": 395,
+        "recovered_from_noreply": 15,
+        "anonymous_unrecoverable": 2900,
+        "unresolvable_accounts": 0,
+    }
+    assert sum(found.values()) == gaps.identities
+
+
+@pytest.mark.requirement("L3-STA-007")
+def test_coverage_is_no_longer_a_flattering_hundred_percent() -> None:
+    """The bug this replaced: `identities` defaulting to `collected`.
+
+    395 of 395 reads as a complete census of a repository whose real coverage
+    is under twelve percent, which overstates its own completeness - worse than
+    reporting nothing.
+    """
+    people = [person(f"p{index}", 10) for index in range(395)]
+    stats = build(
+        *people,
+        gaps=IdentityGaps(
+            identities=3310,
+            unrecoverable=Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=2915),
+        ),
+    )
+
+    mapping = stats.to_mapping()["contributors"]
+
+    assert mapping["coverage_percent"] == 11.93
+    assert mapping["truncated_by_github"] is True
+
+
+@pytest.mark.requirement("L3-STA-007")
+def test_a_repository_inside_the_ceiling_says_it_was_not_truncated() -> None:
+    """The one boolean worth reading first: did the ceiling bite at all?"""
+    stats = build(person("a", 10), person("b", 5), gaps=IdentityGaps(identities=2))
+
+    mapping = stats.to_mapping()["contributors"]
+
+    assert mapping["truncated_by_github"] is False
+    assert mapping["coverage_percent"] == 100.0
+
+
+@pytest.mark.requirement("L3-STA-007")
+def test_anonymous_commits_are_unknown_rather_than_zero() -> None:
+    """The census counts people in one request; their commits need every page.
+
+    Zero would claim the anonymous tail contributed nothing, which for a large
+    repository is false by thousands of commits.
+    """
+    stats = build(
+        person("a", 10),
+        gaps=IdentityGaps(
+            identities=100,
+            unrecoverable=Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=99),
+        ),
+    )
+
+    found = next(
+        item
+        for item in stats.to_mapping()["exclusions"]
+        if item["reason"] == "anonymous_no_account"
+    )
+
+    assert found["people"] == 99
+    assert found["commits"] is None

@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from github_metrics.client import GitHubClient
+from github_metrics.collect.census import count_identities
 from github_metrics.collect.contributors import (
     DEFAULT_CONTRIBUTOR_LIMIT,
     get_contributors,
@@ -62,6 +63,14 @@ class Outcome:
             from a repository that has none.
         error: Why there is no metadata, or `None` on success.
         contributor_error: Why there are no contributors, or `None`.
+        identities: Every contributor identity GitHub reports, anonymous ones
+            included, or `None` when the census was skipped or failed.
+
+            This is the honest denominator for coverage. Without it the
+            fraction is `collected / collected`, which reads 100% for a
+            repository where the real figure is 12% - a number that overstates
+            its own completeness, which is worse than no number. One extra REST
+            request buys it, whatever the repository's size.
     """
 
     reference: RepositoryRef
@@ -69,6 +78,7 @@ class Outcome:
     contributors: tuple[Contributor, ...] = ()
     error: CollectionError | None = None
     contributor_error: CollectionError | None = None
+    identities: int | None = None
 
     @property
     def ok(self) -> bool:
@@ -92,6 +102,7 @@ def collect_all(
     max_workers: int | None = None,
     geocoder: Geocoder | None = None,
     contributor_limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT,
+    census: bool = True,
 ) -> list[Outcome]:
     """Collect every reference, concurrently, in input order.
 
@@ -105,6 +116,9 @@ def collect_all(
             are both properties of the run rather than of a repository.
         contributor_limit: Contributors kept per repository. `None`, the
             default, keeps every one GitHub returns.
+        census: Count every contributor identity GitHub reports, including
+            anonymous ones, at one extra REST request per repository. On by
+            default, because without it coverage cannot be stated honestly.
 
     Returns:
         One outcome per reference, in the order given.
@@ -144,10 +158,16 @@ def collect_all(
             )
             return Outcome(reference=reference, metadata=metadata, contributor_error=exc)
 
+        # The census is deliberately not inside the try above: a repository
+        # whose contributors were read is fully collected, and losing only the
+        # denominator should cost the coverage figure rather than the document.
+        identities = _census(client, reference, enabled=census)
+
         return Outcome(
             reference=reference,
             metadata=metadata,
             contributors=tuple(contributors),
+            identities=identities,
         )
 
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="collect") as pool:
@@ -165,3 +185,32 @@ def collect_all(
         LOGGER.info("Collected %d repositories", len(outcomes))
 
     return outcomes
+
+
+def _census(client: GitHubClient, reference: RepositoryRef, *, enabled: bool) -> int | None:
+    """Count contributor identities, or return `None` and carry on.
+
+    A failure here costs the coverage figure and nothing else, so it is warned
+    about rather than raised: the repository was collected, its measurements
+    are good, and refusing the document over a missing denominator would throw
+    away far more than it protects.
+
+    Args:
+        client: An authenticated client.
+        reference: The repository being collected.
+        enabled: Whether the census was asked for.
+
+    Returns:
+        The identity count, or `None` when skipped or unreadable.
+    """
+    if not enabled:
+        return None
+    try:
+        return count_identities(client, reference.owner, reference.repoid)
+    except CollectionError as exc:
+        LOGGER.warning(
+            "%s: contributor identities could not be counted, so its coverage is unknown: %s",
+            reference.full_name,
+            exc,
+        )
+        return None

@@ -6,7 +6,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-First half of v0.6.0: the scan now says how good its own data is.
+Nothing yet.
+
+## [0.6.0] - 2026-09-05
+
+**Knowing how good the data is.** v0.5.0 made the dataset bigger; this makes it
+auditable, which the first live run showed matters more.
+
+That run reported 396 contributors and a `contribution_total` of 27,828 for a
+repository with 3,310 contributor identities and 32,016 commits. Both numbers
+correct, both implying a census, and nothing in either artifact saying so — a
+repository truncated at GitHub's 500-email ceiling looked identical to a
+complete one.
+
+Every number this tool publishes now carries the bounds within which it is
+true:
+
+| | Contributors | Commits |
+|---|---|---|
+| v0.5.0 | 396, reported as 100% coverage | 27,828, unbounded |
+| **v0.6.0 default** | **1,132 of 3,310 — 34.2%** | **28,904 of 32,016 — 90.3%** |
+| **v0.6.0 `--deep-attribution`** | complete | ~100% |
+
+Four capabilities, in the order they were built.
 
 ### Added
 

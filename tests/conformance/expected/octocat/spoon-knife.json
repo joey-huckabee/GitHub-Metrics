@@ -1,0 +1,60 @@
+{
+  "name": "Spoon-Knife",
+  "owner": "octocat",
+  "organization": "",
+  "url": "https://github.com/octocat/Spoon-Knife",
+  "scan_date": "2026-01-01 00:00:00+00:00",
+  "scan_id": "00000000-0000-4000-8000-000000000001",
+  "stars": 14010,
+  "forks": 159033,
+  "age_days": 5452.187002314815,
+  "last_update_hours": 0.0,
+  "closed_issues": 718,
+  "releases": 0,
+  "prevalence_score": 20.0,
+  "stars_score": 10.0,
+  "forks_score": 15.0,
+  "maturity_score": 15.0,
+  "last_update_score": 15.0,
+  "trusted_org_bonus": 0.0,
+  "total_score": 75.0,
+  "is_trusted_org": false,
+  "contributors": [
+    {
+      "scan_id": "00000000-0000-4000-8000-000000000001",
+      "scan_date": "2026-01-01 00:00:00+00:00",
+      "github_id": "583231",
+      "name": "The Octocat",
+      "organization": "@github",
+      "location": "San Francisco",
+      "internal_address": {
+        "query": "San Francisco",
+        "formatted_address": "San Francisco, California, United States",
+        "street": "",
+        "house_number": "",
+        "suburb": "",
+        "post_code": "",
+        "state": "California",
+        "state_code": "US-CA",
+        "state_district": "",
+        "county": "",
+        "country": "United States",
+        "country_code": "us",
+        "city": "San Francisco",
+        "internal_location": {
+          "latitude": 37.7879363,
+          "longitude": -122.4075201
+        }
+      },
+      "contribution": 3,
+      "is_bot": false,
+      "foreign": null,
+      "adversarial": null
+    }
+  ],
+  "contribution_total": 3,
+  "foreign_contribution": null,
+  "adversarial_contribution": null,
+  "foreign_percent": null,
+  "adversarial_percent": null
+}

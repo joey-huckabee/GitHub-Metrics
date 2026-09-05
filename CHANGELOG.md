@@ -6,7 +6,45 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **A conformance suite**: a real inventory, real API traffic recorded from
+  GitHub, and the three artifacts committed byte for byte. The plan is
+  [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
+
+  Every other test here checks a *decision*. This one checks the **contract** -
+  that a known input keeps producing identical output. A column renamed, a key
+  reordered, a `null` that became a `0`, a percentage whose denominator quietly
+  changed: each passes every focused test in this repository and changes what
+  every downstream consumer reads.
+
+  Four defects in v0.5.0 and v0.6.0 were found by running against the live API
+  and none by the unit suite. The clearest was arithmetic drift in a published
+  number - a breakdown summing to 3,282 against 3,310 - which only a golden
+  file would have shown.
+
+  It replays offline in about two seconds, and the replay **refuses** a request
+  the recording does not cover rather than answering it emptily. The run proves
+  its own isolation: `geocoding.lookups` must be zero.
+- `make conformance` rewrites the golden artifacts. It is the test itself under
+  `CONFORMANCE_REGENERATE=1`, not a separate script, so the replay setup cannot
+  drift between the two.
+- `scripts/record-conformance.py` re-records the API traffic, which is a rarer
+  and more deliberate act.
+
+### Fixed
+
+- **`METRICS.md` named a `statistics.json` key that does not exist.** It
+  documented the per-repository array as `repositories[]`; the artifact emits
+  `repository_statistics`, and `repositories` is a *different* key holding the
+  run-level counts. A consumer following the document would have found an
+  object where it expected an array.
+- **`is_bot` was undocumented**, despite being a key in every contributor
+  record since v0.6.0.
+- **The per-repository identity fields were undocumented** - `owner`, `name`,
+  `url`, `collected` and `documented`. The last is the one that matters:
+  `documented: false` with `collected: true` is the single case where a
+  complete-looking row has no document beside it.
 
 ## [0.6.0] - 2026-09-05
 

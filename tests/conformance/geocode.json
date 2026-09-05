@@ -1,0 +1,51 @@
+{
+  "entries": {
+    "san francisco": {
+      "address": {
+        "city": "San Francisco",
+        "country": "United States",
+        "country_code": "us",
+        "county": "",
+        "formatted_address": "San Francisco, California, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 37.7879363,
+          "longitude": -122.4075201
+        },
+        "post_code": "",
+        "query": "san francisco",
+        "state": "California",
+        "state_code": "US-CA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "utc-8": {
+      "address": {
+        "city": "",
+        "country": "Russia",
+        "country_code": "ru",
+        "county": "",
+        "formatted_address": "Irkutsk Time, Siberian Federal District, Russia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 57.1457616,
+          "longitude": 107.519095
+        },
+        "post_code": "",
+        "query": "utc-8",
+        "state": "Siberian Federal District",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    }
+  },
+  "version": 1
+}

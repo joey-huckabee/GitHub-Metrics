@@ -189,10 +189,12 @@ def test_a_response_with_no_data_object_is_not_salvaged() -> None:
 
 
 class _Account:
-    def __init__(self, login: str, identifier: int, contributions: int) -> None:
+    def __init__(self, login: str, identifier: int, contributions: int, kind: str = "User") -> None:
         self.login = login
         self.id = identifier
         self.contributions = contributions
+        # GitHub reports "Bot" for an App account; the collector reads it.
+        self.type = kind
 
 
 class _Repository:

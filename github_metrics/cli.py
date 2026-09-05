@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import click
@@ -19,6 +20,7 @@ from github_metrics.analysis.maturity import describe_bands as describe_maturity
 from github_metrics.analysis.popularity import describe_bands as describe_popularity_bands
 from github_metrics.analysis.releases import describe_bands as describe_release_bands
 from github_metrics.analysis.row import build_block, build_empty_row, build_row
+from github_metrics.analysis.statistics import build_repository_statistics
 from github_metrics.client import GitHubClient
 from github_metrics.collect.budget import check_budget
 from github_metrics.collect.credentials import verify_credentials
@@ -36,6 +38,11 @@ from github_metrics.geocache import GeocodeCache
 from github_metrics.logger import LogLevels, reset_logger
 from github_metrics.model.scan import ScanIdentifier
 from github_metrics.model.software import SoftwareRow
+from github_metrics.model.statistics import (
+    BudgetStatistics,
+    GeocodingStatistics,
+    ScanStatistics,
+)
 from github_metrics.output import (
     render_console,
     resolve_destination,
@@ -48,6 +55,7 @@ from github_metrics.output.documents import (
     write_document,
 )
 from github_metrics.output.fields import split_selection
+from github_metrics.output.statistics import write_statistics
 from github_metrics.sources import RepositoryRef, ResolvedSources, resolve_sources
 
 # Exit statuses, severity-ordered; the highest applicable one wins. Codes 1 and
@@ -111,6 +119,27 @@ class RepositoryError(click.ClickException):
     """
 
     exit_code = EXIT_REPOSITORY_UNFETCHABLE
+
+
+@dataclass(frozen=True, slots=True)
+class CollectionRun:
+    """Everything one collection produced, including what it cost.
+
+    `_collect` used to return outcomes alone. `statistics.json` reports on the
+    run as well as on the repositories - what was spent, whether the budget
+    held, what the geocoder did - and none of that is recoverable from the
+    outcomes afterwards, so it is carried out of the collection rather than
+    re-derived.
+
+    Attributes:
+        outcomes: What each reference produced, in input order.
+        budget: What the run spent and whether it finished.
+        geocoding: What the geocoder and its cache did.
+    """
+
+    outcomes: list[Outcome]
+    budget: BudgetStatistics = field(default_factory=BudgetStatistics)
+    geocoding: GeocodingStatistics = field(default_factory=GeocodingStatistics)
 
 
 @dataclass
@@ -295,8 +324,10 @@ def scan_command(
 
     scan = ScanIdentifier()
     LOGGER.info("Scan %s started at %s", scan.scan_id, scan.scan_date)
+    started = time.monotonic()
 
-    outcomes = _collect(context, resolved.repositories, workers=workers)
+    run = _collect(context, resolved.repositories, workers=workers)
+    outcomes = run.outcomes
     rows = [
         (
             build_row(outcome.reference, outcome.metadata, scan)
@@ -308,6 +339,14 @@ def scan_command(
 
     _emit(rows, destination, output_format=output_format, columns=columns)
     _write_documents(root, rows, outcomes, scan)
+    _write_statistics(
+        root,
+        run,
+        rows,
+        scan,
+        named=len(resolved.repositories),
+        duration=time.monotonic() - started,
+    )
     _report_failures(outcomes)
 
     # Severity-ordered, highest applicable wins: an unreadable repository is
@@ -355,13 +394,13 @@ def _collect(
     references: Sequence[RepositoryRef],
     *,
     workers: int | None,
-) -> list[Outcome]:
+) -> CollectionRun:
     """Check the budget, then collect. Nothing named means nothing to spend."""
     if not references:
         # Every source was refused. There is no quota to spend, and a
         # header-only file is still the honest answer.
         LOGGER.warning("No repositories to collect")
-        return []
+        return CollectionRun(outcomes=[])
 
     settings = context.settings()
     # One geocoder for the run, shared across the workers: its caches and its
@@ -388,12 +427,125 @@ def _collect(
                 budget.requests_available,
                 budget.repositories,
             )
-            return collect_all(client, references, max_workers=workers, geocoder=geocoder)
+            outcomes = collect_all(client, references, max_workers=workers, geocoder=geocoder)
+            return CollectionRun(
+                outcomes=outcomes,
+                # Spend is measured by difference against the API's own
+                # counters rather than estimated from the cost model, so it
+                # includes anything the model does not know about.
+                budget=_spend(client, budget.available),
+                geocoding=_geocoding(geocoder),
+            )
     finally:
         # In a finally block because a run that failed still resolved
         # locations, and throwing that away would make the next attempt pay
         # for them again. Saving cannot raise; see `GeocodeCache.save`.
         cache.save()
+
+
+def _spend(client: GitHubClient, graphql_before: int) -> BudgetStatistics:
+    """Measure what the run cost, in the one currency that can be measured.
+
+    GraphQL is measured by difference against its own `rateLimit` field,
+    which is authoritative and free to read. That is also the binding
+    budget - two points against one request per repository - so it is the
+    figure that decides whether a run fits.
+
+    The REST figures are left unmeasured on purpose; `BudgetStatistics`
+    documents why, and it is not a gap that better plumbing here would
+    close.
+
+    An hourly reset during the run makes the difference negative. That is
+    clamped to zero rather than published as a nonsense number, which also
+    makes this a lower bound on any run long enough to cross a reset.
+    """
+    graphql_after = client.graphql_points_remaining()
+    return BudgetStatistics(
+        graphql_points_spent=max(0, graphql_before - graphql_after),
+        graphql_remaining=graphql_after,
+    )
+
+
+def _geocoding(geocoder: Geocoder) -> GeocodingStatistics:
+    """Read the geocoder's counters into the shape the artifact publishes."""
+    return GeocodingStatistics(
+        cache_loaded=geocoder.cache.loaded,
+        cache_expired_on_load=geocoder.cache.expired_on_load,
+        cache_hits=geocoder.cache_hits,
+        lookups=geocoder.lookups,
+        matched=geocoder.matched,
+        unmatched=geocoder.unmatched,
+        service_failures=geocoder.service_failures,
+    )
+
+
+def _write_statistics(
+    root: Path,
+    run: CollectionRun,
+    rows: Sequence[SoftwareRow],
+    scan: ScanIdentifier,
+    *,
+    named: int,
+    duration: float,
+) -> None:
+    """Write the third artifact: what the other two are worth.
+
+    Written even when nothing was collected. A statistics file reporting zero
+    repositories is an answer; its absence is indistinguishable from the tool
+    never having run.
+    """
+    per_repository = tuple(
+        build_repository_statistics(
+            row,
+            outcome.contributors,
+            collected=outcome.ok,
+            documented=outcome.documented,
+            # Free: the metrics query already carries it, measured at one
+            # point whether the repository has 1,250 commits or 32,016.
+            commits_total=outcome.metadata.commits if outcome.metadata else None,
+        )
+        for row, outcome in zip(rows, run.outcomes, strict=True)
+    )
+
+    statistics = ScanStatistics(
+        scan_id=scan.scan_id,
+        scan_date=scan.scan_date,
+        tool_version=__version__,
+        duration_seconds=duration,
+        repositories_named=named,
+        budget=run.budget,
+        geocoding=run.geocoding,
+        repositories=per_repository,
+        warnings=tuple(_warnings(run.outcomes)),
+    )
+
+    try:
+        path = write_statistics(root, statistics)
+    except DocumentDirectoryError as exc:
+        # Reported, not fatal: the measurements are already on disk, and a run
+        # that wrote them should not be failed for losing their bounds. The
+        # warning is loud because the bounds are the point.
+        click.echo(f"! statistics could not be written: {exc}", err=True)
+        return
+    click.echo(f"Wrote statistics to {path}")
+
+
+def _warnings(outcomes: Sequence[Outcome]) -> list[str]:
+    """Every degradation, in run order, machine-readable.
+
+    The same facts the log carries, in the artifact, so a consumer reading only
+    the files can see why a number is smaller than it looks.
+    """
+    found: list[str] = []
+    for outcome in outcomes:
+        if outcome.error is not None:
+            found.append(f"{outcome.reference.full_name}: not collected: {outcome.error}")
+        elif outcome.contributor_error is not None:
+            found.append(
+                f"{outcome.reference.full_name}: measured, but contributors could not "
+                f"be read, so no document was written: {outcome.contributor_error}"
+            )
+    return found
 
 
 def _emit(

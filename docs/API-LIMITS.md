@@ -50,6 +50,30 @@ cost 1. Chunking exists solely to stay inside the **ten-second window**, which
 a several-hundred-alias document is not a safe bet against. Raising the chunk
 size trades timeout risk for points; lowering it does the reverse.
 
+### Reading a budget: only two sources are trustworthy — measured
+
+The obvious source is the REST `/rate_limit` endpoint, and it is the wrong one.
+
+| Source | Reports | Trustworthy? |
+|---|---|---|
+| REST `/rate_limit` | 5000 core, 5000 graphql | **No** — the token really had 4984 and 4988 |
+| `X-RateLimit-Remaining` header | 4986 → 4985 → 4984 across three REST calls | **Yes**, for the resource that responded |
+| GraphQL `rateLimit { remaining }` | 4989 → 4988 after one query | **Yes**, and free to read |
+
+Two consequences, both acted on:
+
+1. **`check_budget` used to read `/rate_limit`**, so it was validating a run
+   against a number that does not move. It would have accepted a run whose
+   budget was already gone — the exact failure it exists to prevent. It now
+   reads GraphQL's own `rateLimit`, which a bare document is not charged for
+   (confirmed by issuing it twice and getting the same `remaining`).
+2. **REST spend cannot be measured reliably at all here.** The header is
+   accurate but only the latest is kept, and a GraphQL response overwrites it
+   with the *GraphQL* budget — observed going 4981, 4976 after a GraphQL call,
+   then 4980 after the next REST call. Across eight interleaving threads the
+   end-of-run value is whichever landed last. `statistics.json` therefore
+   publishes `null` for the REST figures rather than a plausible wrong number.
+
 ### What a real repository cost — measured
 
 `NousResearch/hermes-agent`, one repository:

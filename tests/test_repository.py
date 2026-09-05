@@ -120,7 +120,13 @@ def test_the_query_asks_for_totals_only() -> None:
     # `nodes` anywhere would make the cost scale with the repository's history
     # instead of staying at one point.
     assert "nodes" not in query
-    assert query.count("totalCount") == 4
+    # Five totals: closed issues, open issues, releases, tags, and the default
+    # branch's commit count. The last selects from a *connection* rather than a
+    # plain field, which is why it is worth counting separately: asking
+    # `history` for `totalCount` alone requests no nodes, and the combined
+    # document is measured at one point for a 1,250-commit repository and a
+    # 32,016-commit one alike. A `nodes` selection would end that.
+    assert query.count("totalCount") == 5
     # The name is verified from the same query, so verification is free.
     assert any(line.strip() == "name" for line in query.splitlines())
     assert variables == {"owner": "cline", "name": "cline"}

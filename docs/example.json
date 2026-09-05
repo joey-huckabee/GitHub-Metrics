@@ -47,6 +47,7 @@
         }
       },
       "contribution": 2192,
+      "is_bot": false,
       "foreign": null,
       "adversarial": null
     },
@@ -77,6 +78,7 @@
         }
       },
       "contribution": 834,
+      "is_bot": false,
       "foreign": null,
       "adversarial": null
     }

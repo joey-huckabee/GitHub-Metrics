@@ -187,6 +187,11 @@ class GeocodeCache:
         self.path = path
         self._entries: dict[str, CacheEntry] = dict(entries or {})
         self._dirty = False
+        self.loaded = len(self._entries)
+        """Entries present at construction, before the run touched anything."""
+        self.expired_on_load = 0
+        """Entries dropped as stale while loading. Reported, because a cache
+        that quietly expires everything looks identical to a missing one."""
 
     def __len__(self) -> int:
         """How many live entries the cache holds."""
@@ -288,7 +293,9 @@ class GeocodeCache:
         LOGGER.info(
             "Geocode cache: %d locations loaded from %s (%d expired)", len(entries), path, expired
         )
-        return cls(path, entries)
+        cache = cls(path, entries)
+        cache.expired_on_load = expired
+        return cache
 
     def save(self) -> None:
         """Write the cache back, atomically, if there is anything new.

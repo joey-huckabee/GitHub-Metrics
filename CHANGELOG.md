@@ -87,7 +87,27 @@ First half of v0.6.0: the scan now says how good its own data is.
   so where the fields are defined.
 - Still to come in v0.6.0: no-reply account recovery, `--on-exhaustion` and
   `--deep-attribution`.
-- 687 tests, trace matrix 197 of 197.
+- 703 tests, trace matrix 199 of 199.
+
+### Fixed (SonarCloud)
+
+The quality gate failed on the census pull request and the merge went through
+anyway. Every finding was mine, from this release's own work:
+
+- **`new_coverage` 64% against a threshold of 80.** `collect/census.py` had no
+  unit tests and `client.py`'s reworked budget readers had none either — 42%
+  covered. Both now have their own suites; `census.py` is at 100% and
+  `client.py` at 86%. The census tests pin the `Link` header specifically,
+  because reading it slightly wrong fails **silently**: the code falls back to
+  counting entries on the page, which at `per_page=1` is a plausible `1`. That
+  is exactly the bug that occurred during development.
+- **`python:S3776`**, cognitive complexity 19 against 15, in
+  `graphql.execute` — which `tolerate_missing` had pushed over. The failure
+  classification is now its own function, so the happy path reads in one piece.
+- **`python:S5778`** four times and **`python:S9073`** once, in
+  `tests/test_graphql_partial.py`: stubs built inside `pytest.raises` blocks, so
+  a test would pass if *construction* threw rather than the call under test.
+  That is the same defect v0.4.1 fixed fourteen instances of, reintroduced.
 
 ## [0.5.1] - 2026-09-05
 

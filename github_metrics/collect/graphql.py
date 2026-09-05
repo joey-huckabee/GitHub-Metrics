@@ -47,10 +47,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from github.GithubException import GithubException, UnknownObjectException
+from github.GithubException import GithubException
 
 from github_metrics.client import GitHubClient
-from github_metrics.errors import GraphQLQueryError, RepositoryNotFoundError
+from github_metrics.errors import (
+    GitHubMetricsError,
+    GraphQLQueryError,
+    RepositoryNotFoundError,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -144,44 +148,29 @@ def execute(
 
     try:
         _, payload = client.graphql(query, variables)
-    except UnknownObjectException as exc:
-        recovered = _tolerated(exc.data, description, tolerate_missing=tolerate_missing)
-        if recovered is not None:
-            return recovered
-        LOGGER.debug("GraphQL %s: repository not found", description)
-        raise RepositoryNotFoundError(f"{description}: {exc.message or exc}") from exc
     except GithubException as exc:
-        # PyGithub only maps a *lone* NOT_FOUND to UnknownObjectException; a
-        # response carrying several errors is collapsed to a generic 400 even
-        # when one of them is NOT_FOUND. Re-reading the payload keeps the
-        # classification the caller depends on.
+        # PyGithub maps a *lone* NOT_FOUND to UnknownObjectException and
+        # collapses everything else to a generic 400, even when one of several
+        # errors is NOT_FOUND. Both carry the original response, so the
+        # classification is re-read from the payload rather than taken from the
+        # exception type.
         recovered = _tolerated(exc.data, description, tolerate_missing=tolerate_missing)
         if recovered is not None:
             return recovered
-        message = _summarise(_errors_in(exc.data)) or (exc.message or str(exc))
-        # `tolerate_missing` is only set for a document that names no
-        # repository, so a NOT_FOUND in it cannot mean one however it is
-        # mixed with other errors. Classifying it as a missing repository
-        # would send an operator to fix an inventory that is correct.
-        if _mentions_not_found(exc.data) and not tolerate_missing:
-            LOGGER.debug("GraphQL %s: not found, reported among several errors", description)
-            raise RepositoryNotFoundError(f"{description}: {message}") from exc
-        raise GraphQLQueryError(f"{description} failed: {message}") from exc
+        fallback = exc.message or str(exc)
+        raise _classify(
+            exc.data, description, tolerate_missing=tolerate_missing, fallback=fallback
+        ) from exc
 
     # Second layer: a response that carried errors without the transport
     # raising. Not expected, but the cost of checking is one dictionary lookup
     # and the cost of not checking is reading a null repository as though it
     # were an answer.
-    errors = _errors_in(payload)
-    if errors:
+    if _errors_in(payload):
         recovered = _tolerated(payload, description, tolerate_missing=tolerate_missing)
         if recovered is not None:
             return recovered
-        message = _summarise(errors)
-        LOGGER.debug("GraphQL %s returned %d error(s): %s", description, len(errors), message)
-        if _mentions_not_found(payload) and not tolerate_missing:
-            raise RepositoryNotFoundError(f"{description}: {message}")
-        raise GraphQLQueryError(f"{description} failed: {message}")
+        raise _classify(payload, description, tolerate_missing=tolerate_missing)
 
     data = payload.get("data")
     if not isinstance(data, dict):
@@ -189,6 +178,40 @@ def execute(
 
     LOGGER.debug("GraphQL %s succeeded", description)
     return data
+
+
+def _classify(
+    payload: Any,
+    description: str,
+    *,
+    tolerate_missing: bool,
+    fallback: str = "",
+) -> GitHubMetricsError:
+    """Choose the error a failed response deserves.
+
+    Split out of `execute` so the happy path reads in one piece; the branching
+    here is genuinely about which failure this is, and it is the same decision
+    whether the transport raised or answered.
+
+    Args:
+        payload: The response body, from an exception or a return value.
+        description: Label for the message.
+        tolerate_missing: Whether the caller said `NOT_FOUND` is expected here.
+        fallback: Message to use when the payload carries none.
+
+    Returns:
+        `RepositoryNotFoundError` when a `NOT_FOUND` really can mean the
+        repository, `GraphQLQueryError` otherwise. A document that opted into
+        tolerance names no repository, so its `NOT_FOUND` never means one
+        however it is mixed with other errors - classifying it that way would
+        send an operator to fix an inventory that is correct.
+    """
+    message = _summarise(_errors_in(payload)) or fallback
+    if _mentions_not_found(payload) and not tolerate_missing:
+        LOGGER.debug("GraphQL %s: not found", description)
+        return RepositoryNotFoundError(f"{description}: {message}")
+    LOGGER.debug("GraphQL %s failed: %s", description, message)
+    return GraphQLQueryError(f"{description} failed: {message}")
 
 
 def _tolerated(

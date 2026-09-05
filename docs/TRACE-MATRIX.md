@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 19
 - L2 requirements: 82
-- L3 requirements: 115
-- Verified L2+L3: 197 of 197 (100.0%)
+- L3 requirements: 116
+- Verified L2+L3: 198 of 198 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -414,7 +414,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|-------------|----------------|--------|
 | L2-STA-001 | L1-STA-001 | L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004, L3-STA-007 | _(none)_ | Implemented |
 | L2-STA-002 | L1-STA-001 | L3-STA-005 | _(none)_ | Implemented |
-| L2-STA-003 | L1-STA-001 | L3-STA-006 | _(none)_ | Implemented |
+| L2-STA-003 | L1-STA-001 | L3-STA-006, L3-STA-008 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -426,7 +426,8 @@ through their children, so counting them too would count the same work twice.
 | L3-STA-004 | L2-STA-001 | `tests/test_statistics.py::test_a_repository_with_no_contributors_reports_no_concentration`<br>`tests/test_statistics.py::test_an_even_distribution_has_a_gini_of_zero_and_a_high_bus_factor`<br>`tests/test_statistics.py::test_concentration_reports_where_the_work_sits`<br>`tests/test_statistics.py::test_concentration_sorts_rather_than_trusting_input_order`<br>`tests/test_statistics.py::test_the_bus_factor_needs_more_than_half_rather_than_exactly_half` | Implemented |
 | L3-STA-005 | L2-STA-002 | `tests/test_statistics.py::test_countries_are_ordered_by_commits_so_the_largest_reads_first`<br>`tests/test_statistics.py::test_the_unknown_location_share_bounds_every_geographic_claim` | Implemented |
 | L3-STA-006 | L2-STA-003 | `tests/test_statistics.py::test_a_run_that_collected_nothing_still_produces_a_document`<br>`tests/test_statistics.py::test_coordinates_do_not_leak_into_the_country_breakdown`<br>`tests/test_statistics.py::test_the_document_records_which_attribution_method_produced_it`<br>`tests/test_statistics.py::test_the_rest_budget_is_null_because_it_cannot_be_measured`<br>`tests/test_statistics.py::test_the_run_counts_are_derived_rather_than_tracked_separately` | Implemented |
-| L3-STA-007 | L2-STA-001 | `tests/test_statistics.py::test_a_repository_inside_the_ceiling_says_it_was_not_truncated`<br>`tests/test_statistics.py::test_anonymous_commits_are_unknown_rather_than_zero`<br>`tests/test_statistics.py::test_coverage_is_no_longer_a_flattering_hundred_percent`<br>`tests/test_statistics.py::test_the_breakdown_accounts_for_every_identity` | Implemented |
+| L3-STA-007 | L2-STA-001 | `tests/test_census.py::test_a_failed_request_raises_the_contributor_error`<br>`tests/test_census.py::test_a_repository_with_no_contributors_counts_zero`<br>`tests/test_census.py::test_a_single_page_result_counts_the_entries_it_got`<br>`tests/test_census.py::test_an_unreadable_header_and_payload_is_unknown_rather_than_zero`<br>`tests/test_census.py::test_the_census_asks_for_anonymous_contributors_one_per_page`<br>`tests/test_census.py::test_the_count_is_logged_so_a_surprising_coverage_can_be_traced`<br>`tests/test_census.py::test_the_last_link_is_read_rather_than_the_first_one_present`<br>`tests/test_census.py::test_the_last_page_number_is_the_identity_count`<br>`tests/test_census.py::test_the_page_number_is_read_even_though_it_does_not_end_the_url`<br>`tests/test_statistics.py::test_a_repository_inside_the_ceiling_says_it_was_not_truncated`<br>`tests/test_statistics.py::test_anonymous_commits_are_unknown_rather_than_zero`<br>`tests/test_statistics.py::test_coverage_is_no_longer_a_flattering_hundred_percent`<br>`tests/test_statistics.py::test_the_breakdown_accounts_for_every_identity` | Implemented |
+| L3-STA-008 | L2-STA-003 | `tests/test_client.py::test_a_contributors_page_can_ask_for_anonymous_entries`<br>`tests/test_client.py::test_a_response_with_no_data_at_all_reads_as_spent`<br>`tests/test_client.py::test_an_unreadable_graphql_budget_reads_as_spent`<br>`tests/test_client.py::test_anonymous_contributors_are_not_requested_by_default`<br>`tests/test_client.py::test_pages_are_requested_at_the_endpoint_maximum_by_default`<br>`tests/test_client.py::test_the_graphql_budget_is_read_from_graphql`<br>`tests/test_client.py::test_the_rest_budget_comes_from_the_response_header` | Implemented |
 
 ### TRU: Trust policy
 

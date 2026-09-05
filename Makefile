@@ -5,7 +5,7 @@ PKG := github_metrics
 TESTS := tests
 SCRIPTS := scripts
 
-.PHONY: help install format lint types test cov dead trace trace-check mutants check clean hooks
+.PHONY: help install format lint types test cov dead trace trace-check conformance mutants check clean hooks
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -43,6 +43,10 @@ trace: ## Regenerate docs/TRACE-MATRIX.md from requirements and test markers
 
 trace-check: ## Fail if the committed trace matrix is stale
 	$(RUN) python scripts/build-trace-matrix.py --check
+
+conformance: ## Rewrite the golden artifacts, then read the diff
+	CONFORMANCE_REGENERATE=1 $(RUN) pytest tests/test_conformance.py -q
+	@echo "Now read the diff: git diff tests/conformance/expected"
 
 mutants: ## Break one documented behaviour at a time; the suite must notice
 	$(RUN) python scripts/mutation-check.py

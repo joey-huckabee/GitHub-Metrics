@@ -1,0 +1,433 @@
+{
+  "contributors": {
+    "octocat/Hello-World": [
+      {
+        "contributions": 1,
+        "id": 251370,
+        "login": "Spaceghost",
+        "type": "User"
+      },
+      {
+        "contributions": 1,
+        "id": 583231,
+        "login": "octocat",
+        "type": "User"
+      },
+      {
+        "contributions": 1,
+        "id": 94719050,
+        "login": "Cameron423698",
+        "type": "User"
+      }
+    ],
+    "octocat/Spoon-Knife": [
+      {
+        "contributions": 3,
+        "id": 583231,
+        "login": "octocat",
+        "type": "User"
+      }
+    ]
+  },
+  "graphql": {
+    "{\"query\": \"query($login0: String!) { u0: user(login: $login0) { databaseId name company location } }\", \"variables\": {\"login0\": \"octocat\"}}": {
+      "payload": {
+        "data": {
+          "u0": {
+            "company": "@github",
+            "databaseId": 583231,
+            "location": "San Francisco",
+            "name": "The Octocat"
+          }
+        }
+      }
+    },
+    "{\"query\": \"query($login0: String!, $login1: String!, $login2: String!) { u0: user(login: $login0) { databaseId name company location } u1: user(login: $login1) { databaseId name company location } u2: user(login: $login2) { databaseId name company location } }\", \"variables\": {\"login0\": \"Spaceghost\", \"login1\": \"octocat\", \"login2\": \"Cameron423698\"}}": {
+      "payload": {
+        "data": {
+          "u0": {
+            "company": null,
+            "databaseId": 251370,
+            "location": "UTC-8",
+            "name": "Johnneylee Jack Rollins"
+          },
+          "u1": {
+            "company": "@github",
+            "databaseId": 583231,
+            "location": "San Francisco",
+            "name": "The Octocat"
+          },
+          "u2": {
+            "company": null,
+            "databaseId": 94719050,
+            "location": null,
+            "name": null
+          }
+        }
+      }
+    },
+    "{\"query\": \"query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { name owner { login __typename } stargazerCount forkCount createdAt updatedAt pushedAt hasIssuesEnabled closedIssues: issues(states: CLOSED) { totalCount } openIssues: issues(states: OPEN) { totalCount } releases { totalCount } tags: refs(refPrefix: \\\"refs/tags/\\\") { totalCount } defaultBranchRef { target { ... on Commit { history { totalCount } } } } } }\", \"variables\": {\"name\": \"Hello-World\", \"owner\": \"octocat\"}}": {
+      "payload": {
+        "data": {
+          "repository": {
+            "closedIssues": {
+              "totalCount": 2527
+            },
+            "createdAt": "2011-01-26T19:01:12Z",
+            "defaultBranchRef": {
+              "target": {
+                "history": {
+                  "totalCount": 3
+                }
+              }
+            },
+            "forkCount": 6674,
+            "hasIssuesEnabled": true,
+            "name": "Hello-World",
+            "openIssues": {
+              "totalCount": 5893
+            },
+            "owner": {
+              "__typename": "User",
+              "login": "octocat"
+            },
+            "pushedAt": "2024-08-20T23:54:42Z",
+            "releases": {
+              "totalCount": 0
+            },
+            "stargazerCount": 3803,
+            "tags": {
+              "totalCount": 0
+            },
+            "updatedAt": "2026-09-05T19:21:39Z"
+          }
+        }
+      }
+    },
+    "{\"query\": \"query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { name owner { login __typename } stargazerCount forkCount createdAt updatedAt pushedAt hasIssuesEnabled closedIssues: issues(states: CLOSED) { totalCount } openIssues: issues(states: OPEN) { totalCount } releases { totalCount } tags: refs(refPrefix: \\\"refs/tags/\\\") { totalCount } defaultBranchRef { target { ... on Commit { history { totalCount } } } } } }\", \"variables\": {\"name\": \"Spoon-Knife\", \"owner\": \"octocat\"}}": {
+      "payload": {
+        "data": {
+          "repository": {
+            "closedIssues": {
+              "totalCount": 718
+            },
+            "createdAt": "2011-01-27T19:30:43Z",
+            "defaultBranchRef": {
+              "target": {
+                "history": {
+                  "totalCount": 3
+                }
+              }
+            },
+            "forkCount": 159033,
+            "hasIssuesEnabled": true,
+            "name": "Spoon-Knife",
+            "openIssues": {
+              "totalCount": 2807
+            },
+            "owner": {
+              "__typename": "User",
+              "login": "octocat"
+            },
+            "pushedAt": "2024-08-21T15:25:42Z",
+            "releases": {
+              "totalCount": 0
+            },
+            "stargazerCount": 14010,
+            "tags": {
+              "totalCount": 0
+            },
+            "updatedAt": "2026-09-05T19:21:41Z"
+          }
+        }
+      }
+    },
+    "{\"query\": \"query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { name owner { login __typename } stargazerCount forkCount createdAt updatedAt pushedAt hasIssuesEnabled closedIssues: issues(states: CLOSED) { totalCount } openIssues: issues(states: OPEN) { totalCount } releases { totalCount } tags: refs(refPrefix: \\\"refs/tags/\\\") { totalCount } defaultBranchRef { target { ... on Commit { history { totalCount } } } } } }\", \"variables\": {\"name\": \"no-such-repository-conformance\", \"owner\": \"ghost\"}}": {
+      "data": {
+        "data": {
+          "repository": null
+        },
+        "errors": [
+          {
+            "locations": [
+              {
+                "column": 3,
+                "line": 3
+              }
+            ],
+            "message": "Could not resolve to a Repository with the name 'ghost/no-such-repository-conformance'.",
+            "path": [
+              "repository"
+            ],
+            "type": "NOT_FOUND"
+          }
+        ]
+      },
+      "error": "UnknownObjectException"
+    },
+    "{\"query\": \"query($owner: String!, $name: String!, $cursor: String) { repository(owner: $owner, name: $name) { defaultBranchRef { target { ... on Commit { history(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { author { user { databaseId login } } } } } } } } }\", \"variables\": {\"cursor\": null, \"name\": \"Hello-World\", \"owner\": \"octocat\"}}": {
+      "payload": {
+        "data": {
+          "repository": {
+            "defaultBranchRef": {
+              "target": {
+                "history": {
+                  "nodes": [
+                    {
+                      "author": {
+                        "user": {
+                          "databaseId": 583231,
+                          "login": "octocat"
+                        }
+                      }
+                    },
+                    {
+                      "author": {
+                        "user": {
+                          "databaseId": 251370,
+                          "login": "Spaceghost"
+                        }
+                      }
+                    },
+                    {
+                      "author": {
+                        "user": {
+                          "databaseId": 94719050,
+                          "login": "Cameron423698"
+                        }
+                      }
+                    }
+                  ],
+                  "pageInfo": {
+                    "endCursor": "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d 2",
+                    "hasNextPage": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "{\"query\": \"query($owner: String!, $name: String!, $cursor: String) { repository(owner: $owner, name: $name) { defaultBranchRef { target { ... on Commit { history(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { author { user { databaseId login } } } } } } } } }\", \"variables\": {\"cursor\": null, \"name\": \"Spoon-Knife\", \"owner\": \"octocat\"}}": {
+      "payload": {
+        "data": {
+          "repository": {
+            "defaultBranchRef": {
+              "target": {
+                "history": {
+                  "nodes": [
+                    {
+                      "author": {
+                        "user": {
+                          "databaseId": 583231,
+                          "login": "octocat"
+                        }
+                      }
+                    },
+                    {
+                      "author": {
+                        "user": {
+                          "databaseId": 583231,
+                          "login": "octocat"
+                        }
+                      }
+                    },
+                    {
+                      "author": {
+                        "user": {
+                          "databaseId": 583231,
+                          "login": "octocat"
+                        }
+                      }
+                    }
+                  ],
+                  "pageInfo": {
+                    "endCursor": "d0dd1f61b33d64e29d8bc1372a94ef6a2fee76a9 2",
+                    "hasNextPage": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "pages": {
+    "{\"anonymous\": true, \"page\": 1, \"per_page\": 1, \"slug\": \"octocat/Hello-World\"}": {
+      "headers": {
+        "link": "<https://api.github.com/repositories/1296269/contributors?anon=1&page=2&per_page=1>; rel=\"next\", <https://api.github.com/repositories/1296269/contributors?anon=1&page=3&per_page=1>; rel=\"last\""
+      },
+      "payload": [
+        {
+          "avatar_url": "https://avatars.githubusercontent.com/u/251370?v=4",
+          "contributions": 1,
+          "events_url": "https://api.github.com/users/Spaceghost/events{/privacy}",
+          "followers_url": "https://api.github.com/users/Spaceghost/followers",
+          "following_url": "https://api.github.com/users/Spaceghost/following{/other_user}",
+          "gists_url": "https://api.github.com/users/Spaceghost/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/Spaceghost",
+          "id": 251370,
+          "login": "Spaceghost",
+          "node_id": "MDQ6VXNlcjI1MTM3MA==",
+          "organizations_url": "https://api.github.com/users/Spaceghost/orgs",
+          "received_events_url": "https://api.github.com/users/Spaceghost/received_events",
+          "repos_url": "https://api.github.com/users/Spaceghost/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/Spaceghost/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/Spaceghost/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/Spaceghost",
+          "user_view_type": "public"
+        }
+      ]
+    },
+    "{\"anonymous\": true, \"page\": 1, \"per_page\": 1, \"slug\": \"octocat/Spoon-Knife\"}": {
+      "headers": {
+        "link": ""
+      },
+      "payload": [
+        {
+          "avatar_url": "https://avatars.githubusercontent.com/u/583231?v=4",
+          "contributions": 3,
+          "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+          "followers_url": "https://api.github.com/users/octocat/followers",
+          "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+          "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/octocat",
+          "id": 583231,
+          "login": "octocat",
+          "node_id": "MDQ6VXNlcjU4MzIzMQ==",
+          "organizations_url": "https://api.github.com/users/octocat/orgs",
+          "received_events_url": "https://api.github.com/users/octocat/received_events",
+          "repos_url": "https://api.github.com/users/octocat/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/octocat",
+          "user_view_type": "public"
+        }
+      ]
+    },
+    "{\"anonymous\": true, \"page\": 1, \"per_page\": 100, \"slug\": \"octocat/Hello-World\"}": {
+      "headers": {
+        "link": ""
+      },
+      "payload": [
+        {
+          "avatar_url": "https://avatars.githubusercontent.com/u/251370?v=4",
+          "contributions": 1,
+          "events_url": "https://api.github.com/users/Spaceghost/events{/privacy}",
+          "followers_url": "https://api.github.com/users/Spaceghost/followers",
+          "following_url": "https://api.github.com/users/Spaceghost/following{/other_user}",
+          "gists_url": "https://api.github.com/users/Spaceghost/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/Spaceghost",
+          "id": 251370,
+          "login": "Spaceghost",
+          "node_id": "MDQ6VXNlcjI1MTM3MA==",
+          "organizations_url": "https://api.github.com/users/Spaceghost/orgs",
+          "received_events_url": "https://api.github.com/users/Spaceghost/received_events",
+          "repos_url": "https://api.github.com/users/Spaceghost/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/Spaceghost/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/Spaceghost/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/Spaceghost",
+          "user_view_type": "public"
+        },
+        {
+          "avatar_url": "https://avatars.githubusercontent.com/u/583231?v=4",
+          "contributions": 1,
+          "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+          "followers_url": "https://api.github.com/users/octocat/followers",
+          "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+          "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/octocat",
+          "id": 583231,
+          "login": "octocat",
+          "node_id": "MDQ6VXNlcjU4MzIzMQ==",
+          "organizations_url": "https://api.github.com/users/octocat/orgs",
+          "received_events_url": "https://api.github.com/users/octocat/received_events",
+          "repos_url": "https://api.github.com/users/octocat/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/octocat",
+          "user_view_type": "public"
+        },
+        {
+          "avatar_url": "https://avatars.githubusercontent.com/u/94719050?v=4",
+          "contributions": 1,
+          "events_url": "https://api.github.com/users/Cameron423698/events{/privacy}",
+          "followers_url": "https://api.github.com/users/Cameron423698/followers",
+          "following_url": "https://api.github.com/users/Cameron423698/following{/other_user}",
+          "gists_url": "https://api.github.com/users/Cameron423698/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/Cameron423698",
+          "id": 94719050,
+          "login": "Cameron423698",
+          "node_id": "U_kgDOBaVMSg",
+          "organizations_url": "https://api.github.com/users/Cameron423698/orgs",
+          "received_events_url": "https://api.github.com/users/Cameron423698/received_events",
+          "repos_url": "https://api.github.com/users/Cameron423698/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/Cameron423698/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/Cameron423698/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/Cameron423698",
+          "user_view_type": "public"
+        }
+      ]
+    },
+    "{\"anonymous\": true, \"page\": 1, \"per_page\": 100, \"slug\": \"octocat/Spoon-Knife\"}": {
+      "headers": {
+        "link": ""
+      },
+      "payload": [
+        {
+          "avatar_url": "https://avatars.githubusercontent.com/u/583231?v=4",
+          "contributions": 3,
+          "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+          "followers_url": "https://api.github.com/users/octocat/followers",
+          "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+          "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/octocat",
+          "id": 583231,
+          "login": "octocat",
+          "node_id": "MDQ6VXNlcjU4MzIzMQ==",
+          "organizations_url": "https://api.github.com/users/octocat/orgs",
+          "received_events_url": "https://api.github.com/users/octocat/received_events",
+          "repos_url": "https://api.github.com/users/octocat/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/octocat",
+          "user_view_type": "public"
+        }
+      ]
+    }
+  },
+  "repositories": [
+    [
+      "octocat",
+      "Hello-World"
+    ],
+    [
+      "octocat",
+      "Spoon-Knife"
+    ],
+    [
+      "ghost",
+      "no-such-repository-conformance"
+    ]
+  ]
+}

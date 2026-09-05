@@ -347,6 +347,7 @@ a plain number while every metric column is optional.
 | `location` | `str` | API | The account's self-reported location, verbatim, or `null` when it publishes none. Free text; GitHub does not validate it. | **Settled** |
 | `internal_address` | `object` | derived | What `location` resolved to. See [Addresses](#addresses). | **Settled** |
 | `contribution` | `int` | API | Commits attributed to this account in this repository. | **Settled** |
+| `is_bot` | `bool` | API | Whether GitHub reports this account as an automation. `true` for a GitHub App; `false` means **GitHub did not say so**, not "definitely a person" - a bot running under an ordinary user account is indistinguishable from one. Its commits stay in `contribution_total`; see [Bots](#bots). | **Settled** |
 | `foreign` | `bool` | policy | Whether the contributor is foreign to the United States. | **TBD** |
 | `adversarial` | `bool` | policy | Whether the contributor is adversarial. | **TBD** |
 
@@ -602,8 +603,23 @@ deliberately cannot, because both produce the same `Address`.
 
 ### Per repository
 
-`repositories[]` carries one entry per named reference, **in input order**, so
-it aligns positionally with the CSV.
+`repository_statistics` carries one entry per named reference, **in input
+order**, so it aligns positionally with the CSV.
+
+The name is not `repositories`: that key is already taken at run level by the
+counts above, and one document cannot spell two different things the same way.
+An earlier draft of this section called the array `repositories[]`, which named
+a key that does not exist and pointed at one that does.
+
+#### Identity
+
+| Field | Type | Definition | Status |
+|---|---|---|---|
+| `owner` | `str` | The owner as the input named it, matching the CSV row. | **Settled** |
+| `name` | `str` | The repository name, matching the CSV row. | **Settled** |
+| `url` | `str` | Its canonical address, matching the CSV row. | **Settled** |
+| `collected` | `bool` | Whether the repository's metrics were read. `false` means the row carries identity and no measurements. | **Settled** |
+| `documented` | `bool` | Whether a per-repository document was written. `false` with `collected` true means the metrics survived but the contributor list did not — the one case where a complete-looking row has no document beside it. | **Settled** |
 
 #### Attribution and completeness
 

@@ -9,6 +9,7 @@
 | Understand an error code | [`ERROR-CATALOG.md`](ERROR-CATALOG.md) |
 | Know exactly what a scan does, and where it can mislead you | [`SCAN-PROCESS.md`](SCAN-PROCESS.md) |
 | Know what the API will not give us, and what to do about it | [`API-LIMITS.md`](API-LIMITS.md) |
+| Change the output, and know what that breaks | [`CONFORMANCE.md`](CONFORMANCE.md) |
 | Know how a metric is calculated | [`METRICS.md`](METRICS.md) |
 | Change the code | [`MAINTAINER-GUIDE.md`](MAINTAINER-GUIDE.md) |
 | Understand how it fits together | [`ARCHITECTURE.md`](ARCHITECTURE.md) |

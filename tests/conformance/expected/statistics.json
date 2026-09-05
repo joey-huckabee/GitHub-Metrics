@@ -1,0 +1,198 @@
+{
+  "scan_id": "00000000-0000-4000-8000-000000000001",
+  "scan_date": "2026-01-01 00:00:00+00:00",
+  "tool_version": "0.6.0",
+  "duration_seconds": 0.11,
+  "repositories": {
+    "named": 3,
+    "collected": 2,
+    "documented": 2,
+    "failed": 1,
+    "not_attempted": 0
+  },
+  "budget": {
+    "graphql_points_spent": 0,
+    "rest_requests_spent": null,
+    "graphql_remaining": 5000,
+    "rest_remaining": null,
+    "exhaustion_policy": "wait",
+    "exhausted": false,
+    "incomplete_because_exhausted": false,
+    "waits": 0
+  },
+  "geocoding": {
+    "cache_loaded": 2,
+    "cache_expired_on_load": 0,
+    "cache_hits": 3,
+    "lookups": 0,
+    "matched": 0,
+    "unmatched": 0,
+    "service_failures": 0
+  },
+  "warnings": [
+    "ghost/no-such-repository-conformance: not collected: [GM-COL-001] repository metadata for ghost/no-such-repository-conformance: Could not resolve to a Repository with the name 'ghost/no-such-repository-conformance'."
+  ],
+  "repository_statistics": [
+    {
+      "owner": "octocat",
+      "name": "Hello-World",
+      "url": "https://github.com/octocat/Hello-World",
+      "collected": true,
+      "documented": true,
+      "attribution": {
+        "method": "contributor_list"
+      },
+      "commits": {
+        "total": 3,
+        "attributed": 3,
+        "coverage_percent": 100.0
+      },
+      "contributors": {
+        "identities": 3,
+        "collected": 3,
+        "coverage_percent": 100.0,
+        "breakdown": {
+          "linked_by_github": 3,
+          "recovered_from_noreply": 0,
+          "anonymous_unrecoverable": 0,
+          "unresolvable_accounts": 0
+        },
+        "truncated_by_github": false
+      },
+      "exclusions": [
+        {
+          "reason": "no_location_published",
+          "people": 1,
+          "commits": 1
+        }
+      ],
+      "bots": {
+        "count": 0,
+        "commits": 0,
+        "logins": [],
+        "contribution_excluding_bots": 3
+      },
+      "concentration": {
+        "top_1_percent": 33.33,
+        "top_5_percent": 100.0,
+        "top_10_percent": 100.0,
+        "bus_factor": 2,
+        "gini": 0.0
+      },
+      "geography": {
+        "countries": {
+          "ru": {
+            "people": 1,
+            "commits": 1
+          },
+          "us": {
+            "people": 1,
+            "commits": 1
+          }
+        },
+        "distinct_countries": 2,
+        "commits_with_known_location_percent": 66.67,
+        "commits_with_unknown_location_percent": 33.33
+      }
+    },
+    {
+      "owner": "octocat",
+      "name": "Spoon-Knife",
+      "url": "https://github.com/octocat/Spoon-Knife",
+      "collected": true,
+      "documented": true,
+      "attribution": {
+        "method": "contributor_list"
+      },
+      "commits": {
+        "total": 3,
+        "attributed": 3,
+        "coverage_percent": 100.0
+      },
+      "contributors": {
+        "identities": 1,
+        "collected": 1,
+        "coverage_percent": 100.0,
+        "breakdown": {
+          "linked_by_github": 1,
+          "recovered_from_noreply": 0,
+          "anonymous_unrecoverable": 0,
+          "unresolvable_accounts": 0
+        },
+        "truncated_by_github": false
+      },
+      "exclusions": [],
+      "bots": {
+        "count": 0,
+        "commits": 0,
+        "logins": [],
+        "contribution_excluding_bots": 3
+      },
+      "concentration": {
+        "top_1_percent": 100.0,
+        "top_5_percent": 100.0,
+        "top_10_percent": 100.0,
+        "bus_factor": 1,
+        "gini": 0.0
+      },
+      "geography": {
+        "countries": {
+          "us": {
+            "people": 1,
+            "commits": 3
+          }
+        },
+        "distinct_countries": 1,
+        "commits_with_known_location_percent": 100.0,
+        "commits_with_unknown_location_percent": 0.0
+      }
+    },
+    {
+      "owner": "ghost",
+      "name": "no-such-repository-conformance",
+      "url": "https://github.com/ghost/no-such-repository-conformance",
+      "collected": false,
+      "documented": false,
+      "attribution": {
+        "method": "contributor_list"
+      },
+      "commits": {
+        "total": null,
+        "attributed": 0,
+        "coverage_percent": null
+      },
+      "contributors": {
+        "identities": 0,
+        "collected": 0,
+        "coverage_percent": null,
+        "breakdown": {
+          "linked_by_github": 0,
+          "recovered_from_noreply": 0,
+          "anonymous_unrecoverable": 0,
+          "unresolvable_accounts": 0
+        },
+        "truncated_by_github": false
+      },
+      "exclusions": [],
+      "bots": {
+        "count": 0,
+        "commits": 0,
+        "logins": [],
+        "contribution_excluding_bots": 0
+      },
+      "concentration": {
+        "top_1_percent": null,
+        "top_5_percent": null,
+        "top_10_percent": null,
+        "bus_factor": null,
+        "gini": null
+      },
+      "geography": {
+        "countries": {},
+        "distinct_countries": 0,
+        "commits_with_known_location_percent": null,
+        "commits_with_unknown_location_percent": null
+      }
+    }
+  ]
+}

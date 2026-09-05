@@ -20,7 +20,11 @@ from github_metrics.analysis.maturity import describe_bands as describe_maturity
 from github_metrics.analysis.popularity import describe_bands as describe_popularity_bands
 from github_metrics.analysis.releases import describe_bands as describe_release_bands
 from github_metrics.analysis.row import build_block, build_empty_row, build_row
-from github_metrics.analysis.statistics import build_repository_statistics
+from github_metrics.analysis.statistics import (
+    build_repository_statistics,
+    gaps_from_outcome,
+    recommend_deep_attribution,
+)
 from github_metrics.client import GitHubClient
 from github_metrics.collect.budget import (
     MIN_POINTS_PER_REPOSITORY,
@@ -47,10 +51,7 @@ from github_metrics.model.scan import ScanIdentifier
 from github_metrics.model.software import SoftwareRow
 from github_metrics.model.statistics import (
     BudgetStatistics,
-    Exclusion,
-    ExclusionReason,
     GeocodingStatistics,
-    IdentityGaps,
     ScanStatistics,
 )
 from github_metrics.output import (
@@ -90,6 +91,17 @@ EXIT_NO_CREDENTIALS = 7
 
 EXIT_BAD_CREDENTIALS = 8
 """Aborted: GitHub rejected the token that was supplied."""
+
+DEFAULT_DEEP_THRESHOLD = 10.0
+"""Unattributed share, as a percentage, above which deep attribution is
+recommended for a repository.
+
+**A starting value, not a derived one.** It is set where the first measured
+repository falls above it - 13% unattributed - so the recommendation
+demonstrably fires on a real case, and it is expected to be tuned once a
+portfolio has been scanned. That it is arbitrary is recorded rather than
+implied by its presence.
+"""
 
 EXIT_INCOMPLETE = 9
 """Degraded: the budget ran out and `--on-exhaustion partial` stopped the run.
@@ -296,6 +308,25 @@ def main(
     help="Concurrent collections. Defaults to min(repositories, 8).",
 )
 @click.option(
+    "--deep-attribution",
+    is_flag=True,
+    help=(
+        "Attribute every commit by walking the history instead of reading the "
+        "contributors endpoint. Complete, and about 35x the cost. For a "
+        "watchlist, not an inventory."
+    ),
+)
+@click.option(
+    "--deep-attribution-threshold",
+    type=click.FloatRange(min=0, max=100),
+    default=DEFAULT_DEEP_THRESHOLD,
+    show_default=True,
+    help=(
+        "Recommend --deep-attribution for any repository where this percentage "
+        "of commits could not be attributed."
+    ),
+)
+@click.option(
     "--on-exhaustion",
     type=click.Choice([policy.value for policy in ExhaustionPolicy]),
     default=ExhaustionPolicy.WAIT.value,
@@ -334,6 +365,8 @@ def scan_command(  # noqa: PLR0913, PLR0917
     output_format: str,
     fields: str | None,
     workers: int | None,
+    deep_attribution: bool,
+    deep_attribution_threshold: float,
     on_exhaustion: str,
     recover_anonymous: bool,
     strict: bool,
@@ -362,7 +395,6 @@ def scan_command(  # noqa: PLR0913, PLR0917
     """
     context: CliContext = ctx.obj
     root = _document_root(output)
-    destination = _destination(root, output_format=output_format)
     columns = resolve_fields(split_selection(fields) if fields else None)
 
     try:
@@ -379,20 +411,25 @@ def scan_command(  # noqa: PLR0913, PLR0917
         resolved.repositories,
         workers=workers,
         recover_anonymous=recover_anonymous,
+        deep_attribution=deep_attribution,
         policy=ExhaustionPolicy(on_exhaustion),
     )
-    outcomes = run.outcomes
     rows = [
         (
             build_row(outcome.reference, outcome.metadata, scan)
             if outcome.metadata is not None
             else build_empty_row(outcome.reference, scan)
         )
-        for outcome in outcomes
+        for outcome in run.outcomes
     ]
 
-    _emit(rows, destination, output_format=output_format, columns=columns)
-    _write_documents(root, rows, outcomes, scan)
+    _emit(
+        rows,
+        _destination(root, output_format=output_format),
+        output_format=output_format,
+        columns=columns,
+    )
+    _write_documents(root, rows, run.outcomes, scan)
     _write_statistics(
         root,
         run,
@@ -401,15 +438,16 @@ def scan_command(  # noqa: PLR0913, PLR0917
         named=len(resolved.repositories),
         duration=time.monotonic() - started,
     )
-    _report_failures(outcomes)
+    _report_recommendations(run.outcomes, threshold=deep_attribution_threshold)
+    _report_failures(run.outcomes)
 
     # Severity-ordered, highest applicable wins: an unreadable repository is
     # worse news than a rejected input row, and both still produced a file.
-    if any(not outcome.attempted for outcome in outcomes):
+    if any(not outcome.attempted for outcome in run.outcomes):
         # Above 4: an unreadable repository still produced everything it could,
         # while this run has repositories it never looked at.
         ctx.exit(EXIT_INCOMPLETE)
-    if any(not outcome.ok for outcome in outcomes):
+    if any(not outcome.ok for outcome in run.outcomes):
         ctx.exit(EXIT_REPOSITORY_UNFETCHABLE)
     if resolved.issues:
         ctx.exit(EXIT_ROWS_REJECTED)
@@ -453,6 +491,7 @@ def _collect(
     *,
     workers: int | None,
     recover_anonymous: bool = True,
+    deep_attribution: bool = False,
     policy: ExhaustionPolicy = ExhaustionPolicy.WAIT,
 ) -> CollectionRun:
     """Check the budget, then collect. Nothing named means nothing to spend."""
@@ -484,7 +523,10 @@ def _collect(
                 references,
                 max_workers=workers,
                 geocoder=geocoder,
-                options=CollectionOptions(recover_anonymous=recover_anonymous),
+                options=CollectionOptions(
+                    recover_anonymous=recover_anonymous,
+                    deep_attribution=deep_attribution,
+                ),
                 guard=guard,
             )
             return CollectionRun(
@@ -638,7 +680,8 @@ def _write_statistics(
             # Free: the metrics query already carries it, measured at one
             # point whether the repository has 1,250 commits or 32,016.
             commits_total=outcome.metadata.commits if outcome.metadata else None,
-            gaps=_gaps(outcome),
+            gaps=gaps_from_outcome(outcome),
+            attribution=outcome.attribution,
         )
         for row, outcome in zip(rows, run.outcomes, strict=True)
     )
@@ -664,53 +707,6 @@ def _write_statistics(
         click.echo(f"! statistics could not be written: {exc}", err=True)
         return
     click.echo(f"Wrote statistics to {path}")
-
-
-def _gaps(outcome: Outcome) -> IdentityGaps:
-    """Account for the identities that did not reach the document.
-
-    Everything past GitHub's 500-author-email ceiling is anonymous - a name and
-    an email, no account, no location.
-
-    How much can be said about that tail depends on what was asked for. The
-    census counts it in one request but cannot see its commits, so those stay
-    `None`: a zero would claim the tail contributed nothing. Recovery walks the
-    pages, so it reports both - and how many of those entries named an account
-    through a no-reply address.
-    """
-    tally = outcome.anonymous
-    identities = outcome.identities
-    if identities is None and tally is not None:
-        # Walking the tail counts it exactly, so a failed census is not fatal
-        # to the denominator when recovery ran.
-        identities = len(outcome.contributors) + tally.unrecoverable_people
-    if identities is None:
-        return IdentityGaps()
-
-    if tally is None:
-        missing = max(0, identities - len(outcome.contributors))
-        return IdentityGaps(
-            identities=identities,
-            unrecoverable=(
-                Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=missing) if missing else None
-            ),
-        )
-
-    # The pages were walked, so the tail's commits are measured rather than
-    # unknown - the one thing the cheap census cannot report.
-    return IdentityGaps(
-        identities=identities,
-        unrecoverable=(
-            Exclusion(
-                ExclusionReason.ANONYMOUS_NO_ACCOUNT,
-                people=tally.unrecoverable_people,
-                commits=tally.unrecoverable_commits,
-            )
-            if tally.unrecoverable_people
-            else None
-        ),
-        recovered=tally.recovered_identities,
-    )
 
 
 def _warnings(outcomes: Sequence[Outcome]) -> list[str]:
@@ -785,6 +781,16 @@ def _write_documents(
         written += 1
 
     click.echo(f"Wrote {written} documents to {root}")
+
+
+def _report_recommendations(outcomes: Sequence[Outcome], *, threshold: float) -> None:
+    """Print the repositories a sample answered badly, with the cost of the fix.
+
+    The decision is `analysis.statistics`'; this only puts it on stderr, beside
+    the other per-repository notes a run makes.
+    """
+    for line in recommend_deep_attribution(outcomes, threshold=threshold):
+        click.echo(f"! {line}", err=True)
 
 
 def _report_failures(outcomes: Sequence[Outcome]) -> None:

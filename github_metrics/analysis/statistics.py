@@ -29,6 +29,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
+from github_metrics.collect.history import PAGE_SIZE
+from github_metrics.collect.runner import Outcome
 from github_metrics.model.contributor import Contributor
 from github_metrics.model.software import SoftwareRow
 from github_metrics.model.statistics import (
@@ -257,3 +259,97 @@ def _geography(contributors: Sequence[Contributor], attributed: int) -> Geograph
         commits_with_known_location=known,
         commits_with_unknown_location=attributed - known,
     )
+
+
+def gaps_from_outcome(outcome: Outcome) -> IdentityGaps:
+    """Account for the identities that did not reach the document.
+
+    Everything past GitHub's 500-author-email ceiling is anonymous - a name and
+    an email, no account, no location.
+
+    How much can be said about that tail depends on what was asked for. The
+    census counts it in one request but cannot see its commits, so those stay
+    `None`: a zero would claim the tail contributed nothing. Recovery walks the
+    pages, so it reports both - and how many of those entries named an account
+    through a no-reply address.
+    """
+    tally = outcome.anonymous
+    identities = outcome.identities
+    if identities is None and tally is not None:
+        # Walking the tail counts it exactly, so a failed census is not fatal
+        # to the denominator when recovery ran.
+        identities = len(outcome.contributors) + tally.unrecoverable_people
+    if identities is None:
+        return IdentityGaps()
+
+    if tally is None:
+        missing = max(0, identities - len(outcome.contributors))
+        return IdentityGaps(
+            identities=identities,
+            unrecoverable=(
+                Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=missing) if missing else None
+            ),
+        )
+
+    # The pages were walked, so the tail's commits are measured rather than
+    # unknown - the one thing the cheap census cannot report.
+    return IdentityGaps(
+        identities=identities,
+        unrecoverable=(
+            Exclusion(
+                ExclusionReason.ANONYMOUS_NO_ACCOUNT,
+                people=tally.unrecoverable_people,
+                commits=tally.unrecoverable_commits,
+            )
+            if tally.unrecoverable_people
+            else None
+        ),
+        recovered=tally.recovered_identities,
+    )
+
+
+def recommend_deep_attribution(outcomes: Sequence[Outcome], *, threshold: float) -> list[str]:
+    """Say which repositories a sample answered badly, and what the fix costs.
+
+    A user should not have to read `statistics.json` to discover that a
+    repository was badly under-attributed, so this names them on stderr with
+    the price attached.
+
+    It **recommends rather than escalates**, deliberately. Turning a 9-point
+    repository into a 321-point one is a decision worth an hour of someone's
+    quota, and with `--on-exhaustion wait` the default it could also turn a
+    five-minute run into an overnight one. Neither should happen without being
+    asked for, and warning costs nothing.
+
+    Args:
+        outcomes: What each reference produced.
+        threshold: Percentage of unattributed commits worth mentioning.
+
+    Returns:
+        One line per repository worth re-running, ready to print. Returned
+        rather than printed, so the decision can be tested without a
+        command line and rendered somewhere else later.
+    """
+    found: list[str] = []
+    for outcome in outcomes:
+        if outcome.attribution is AttributionMethod.COMMIT_HISTORY:
+            continue
+        metadata = outcome.metadata
+        if metadata is None or not metadata.commits:
+            continue
+
+        attributed = sum(entry.contribution or 0 for entry in outcome.contributors)
+        missing = max(0, metadata.commits - attributed)
+        share = missing / metadata.commits * 100
+        if share <= threshold:
+            continue
+
+        pages = -(-metadata.commits // PAGE_SIZE)
+        found.append(
+            f"{outcome.reference.full_name}: {share:.1f}% of commits "
+            f"({missing:,} of {metadata.commits:,}) could not be attributed to an "
+            f"account, above the {threshold:g}% threshold. For complete "
+            f"attribution re-run this repository with --deep-attribution "
+            f"(about {pages:,} GraphQL points, and as many round trips)"
+        )
+    return found

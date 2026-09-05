@@ -31,13 +31,16 @@ from github_metrics.collect.anonymous import AnonymousTally, collect_anonymous
 from github_metrics.collect.census import count_identities
 from github_metrics.collect.contributors import (
     DEFAULT_CONTRIBUTOR_LIMIT,
+    build_contributors,
     get_contributors,
 )
 from github_metrics.collect.exhaustion import BudgetGuard, Decision
+from github_metrics.collect.history import HistoryAttribution, attribute_from_history
 from github_metrics.collect.repository import RepoMetaData, get_repository
 from github_metrics.errors import CollectionError, ContributorCollectionError
 from github_metrics.geo import Geocoder
 from github_metrics.model.contributor import Contributor
+from github_metrics.model.statistics import AttributionMethod
 from github_metrics.sources import RepositoryRef
 
 LOGGER = logging.getLogger(__name__)
@@ -66,11 +69,17 @@ class CollectionOptions:
             whose no-reply addresses name them. Costs a page per hundred
             identities - 34 requests for a large repository against 4 -
             which is why it can be turned off for a large inventory.
+        deep_attribution: Attribute every commit by walking the history
+            instead of reading the contributors endpoint. Complete, and about
+            **35 times** the cost - a point per hundred commits, so 321 for a
+            32,016-commit repository against 9. For a watchlist, never an
+            inventory.
     """
 
     contributor_limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT
     census: bool = True
     recover_anonymous: bool = True
+    deep_attribution: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +110,10 @@ class Outcome:
             for every reference: a CSV row is positional, so a shorter file
             would silently change what every later row means, and a consumer
             counting rows against the inventory would see nothing wrong.
+        attribution: How this repository's contributors were determined. Two
+            runs by different methods find different populations and are not
+            comparable, so the method travels with the result.
+        history: What walking the commit history found, when it was walked.
         anonymous: What the anonymous tail contained, when it was walked.
             `None` when recovery was not asked for, which is why the exclusion
             it feeds reports commits as unknown rather than zero.
@@ -120,6 +133,8 @@ class Outcome:
     error: CollectionError | None = None
     contributor_error: CollectionError | None = None
     anonymous: AnonymousTally | None = None
+    history: HistoryAttribution | None = None
+    attribution: AttributionMethod = AttributionMethod.CONTRIBUTOR_LIST
     identities: int | None = None
     attempted: bool = True
 
@@ -188,17 +203,30 @@ def collect_all(
             return Outcome(reference=reference, error=exc)
 
         tally: AnonymousTally | None = None
+        walked: HistoryAttribution | None = None
         try:
-            if options.recover_anonymous:
-                tally = collect_anonymous(client, reference.owner, reference.repoid)
-            contributors = get_contributors(
-                client,
-                reference.owner,
-                reference.repoid,
-                geocoder=geocoder,
-                limit=options.contributor_limit,
-                extra=tally.recovered if tally else (),
-            )
+            if options.deep_attribution:
+                # The history is the whole population, so neither the
+                # contributors endpoint nor its anonymous tail adds anything -
+                # and paying for them would be paying twice for less.
+                walked = attribute_from_history(client, reference.owner, reference.repoid)
+                contributors = build_contributors(
+                    client,
+                    walked.accounts,
+                    slug=reference.full_name,
+                    geocoder=geocoder,
+                )
+            else:
+                if options.recover_anonymous:
+                    tally = collect_anonymous(client, reference.owner, reference.repoid)
+                contributors = get_contributors(
+                    client,
+                    reference.owner,
+                    reference.repoid,
+                    geocoder=geocoder,
+                    limit=options.contributor_limit,
+                    extra=tally.recovered if tally else (),
+                )
         except ContributorCollectionError as exc:
             # The measurements survive; only the document is lost. Warned
             # rather than swallowed, because the missing file would otherwise
@@ -214,13 +242,21 @@ def collect_all(
         # The census is deliberately not inside the try above: a repository
         # whose contributors were read is fully collected, and losing only the
         # denominator should cost the coverage figure rather than the document.
-        identities = _census(client, reference, enabled=options.census)
+        identities = _census(
+            client, reference, enabled=options.census and not options.deep_attribution
+        )
 
         return Outcome(
             reference=reference,
             metadata=metadata,
             contributors=tuple(contributors),
             anonymous=tally,
+            history=walked,
+            attribution=(
+                AttributionMethod.COMMIT_HISTORY
+                if walked is not None
+                else AttributionMethod.CONTRIBUTOR_LIST
+            ),
             identities=identities,
         )
 

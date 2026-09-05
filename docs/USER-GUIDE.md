@@ -691,6 +691,50 @@ Collection is synchronous. To run it in the background, put it in your own
 thread or task — the package does not impose a concurrency model on the
 program embedding it.
 
+### When a sample is not enough
+
+Two questions get asked of this data, and they need different coverage.
+
+*Where does this project's work come from?* is answered well by the default:
+**90% of a large repository's commits**, measured, once no-reply recovery has
+run. The people it misses contributed about 1.4 commits each.
+
+*Is there any adversarial contributor here?* is **not answered by it at all**.
+A single one-commit account is exactly what a sample omits, and no threshold
+makes that acceptable.
+
+`--deep-attribution` walks the commit history instead, which is not subject to
+GitHub's 500-email ceiling and reaches essentially every commit:
+
+```bash
+github-metrics scan watchlist.csv --deep-attribution
+```
+
+**It costs about 35 times an ordinary collection** - a GraphQL point per
+hundred commits, so 321 for a 32,016-commit repository against 9, and as many
+sequential round trips. Point it at a watchlist, not an inventory: 200 large
+repositories would need more than a day's quota. Remember that
+`--on-exhaustion` defaults to `wait`, so an over-ambitious deep run does not
+fail, it takes all night.
+
+You do not have to guess which repositories need it. Every scan says so:
+
+```
+! NousResearch/hermes-agent: 13.0% of commits (4,171 of 32,016) could not be
+  attributed to an account, above the 10% threshold. For complete attribution
+  re-run this repository with --deep-attribution (about 321 GraphQL points,
+  and as many round trips)
+```
+
+`--deep-attribution-threshold` moves that line. The tool **recommends and never
+escalates**: turning a 9-point repository into a 321-point one is a decision
+worth an hour of your quota, and it should be yours.
+
+**The two methods are not comparable.** A deep run finds a larger population
+and a larger `contribution_total`, so `statistics.json` records
+`attribution.method` for every repository. Diff runs of the same method, not
+across them.
+
 ## Before you trust a number
 
 Three documents exist for this, and they are worth reading before an analysis

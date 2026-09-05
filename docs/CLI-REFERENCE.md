@@ -335,6 +335,7 @@ inventories `validate` takes, mixed freely.
 | `--format {csv,json,console}` | `csv` | Form of the tabular artifact. The documents are always JSON. |
 | `--fields a,b,c` | all | Columns the tabular artifact emits, always in canonical order. |
 | `--workers N` | `min(repositories, 8)` | Concurrent collections. |
+| `--recover-anonymous` / `--no-recover-anonymous` | on | Link contributors GitHub left anonymous whose no-reply email names their account. Costs a page per hundred identities — 34 requests for a large repository against 4 — and raised one measured repository from 11.9% to 34.2% of contributors and 87.0% to 90.3% of commits. |
 | `--strict` | off | Abort on the first bad input reference. |
 
 ### What one run produces

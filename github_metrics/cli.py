@@ -279,18 +279,33 @@ def main(
     help="Concurrent collections. Defaults to min(repositories, 8).",
 )
 @click.option(
+    "--recover-anonymous/--no-recover-anonymous",
+    default=True,
+    show_default=True,
+    help=(
+        "Recover contributors GitHub left anonymous but whose no-reply email "
+        "names their account. Costs a page per hundred identities."
+    ),
+)
+@click.option(
     "--strict",
     is_flag=True,
     help="Abort on the first bad input row instead of reporting all of them.",
 )
 @click.pass_context
-def scan_command(
+# A command's parameters are its command-line surface, not a signature anyone
+# calls: Click passes every one of them by keyword. The same reasoning as
+# `SoftwareRow`'s attribute count - the shape is the contract, and collapsing
+# flags into an options object to satisfy a counter would hide the interface
+# from the place it is declared.
+def scan_command(  # noqa: PLR0913, PLR0917
     ctx: click.Context,
     sources: tuple[str, ...],
     output: Path | None,
     output_format: str,
     fields: str | None,
     workers: int | None,
+    recover_anonymous: bool,
     strict: bool,
 ) -> None:
     """Scan every repository SOURCES names and write its metrics.
@@ -329,7 +344,12 @@ def scan_command(
     LOGGER.info("Scan %s started at %s", scan.scan_id, scan.scan_date)
     started = time.monotonic()
 
-    run = _collect(context, resolved.repositories, workers=workers)
+    run = _collect(
+        context,
+        resolved.repositories,
+        workers=workers,
+        recover_anonymous=recover_anonymous,
+    )
     outcomes = run.outcomes
     rows = [
         (
@@ -397,6 +417,7 @@ def _collect(
     references: Sequence[RepositoryRef],
     *,
     workers: int | None,
+    recover_anonymous: bool = True,
 ) -> CollectionRun:
     """Check the budget, then collect. Nothing named means nothing to spend."""
     if not references:
@@ -430,7 +451,13 @@ def _collect(
                 budget.requests_available,
                 budget.repositories,
             )
-            outcomes = collect_all(client, references, max_workers=workers, geocoder=geocoder)
+            outcomes = collect_all(
+                client,
+                references,
+                max_workers=workers,
+                geocoder=geocoder,
+                recover_anonymous=recover_anonymous,
+            )
             return CollectionRun(
                 outcomes=outcomes,
                 # Spend is measured by difference against the API's own
@@ -538,20 +565,46 @@ def _gaps(outcome: Outcome) -> IdentityGaps:
     """Account for the identities that did not reach the document.
 
     Everything past GitHub's 500-author-email ceiling is anonymous - a name and
-    an email, no account, no location - so it is counted rather than collected.
-    Its **commits** are left unknown rather than zero: the census counts
-    identities, and reading their commits needs the pages themselves. A zero
-    there would claim the anonymous tail contributed nothing.
+    an email, no account, no location.
+
+    How much can be said about that tail depends on what was asked for. The
+    census counts it in one request but cannot see its commits, so those stay
+    `None`: a zero would claim the tail contributed nothing. Recovery walks the
+    pages, so it reports both - and how many of those entries named an account
+    through a no-reply address.
     """
-    if outcome.identities is None:
+    tally = outcome.anonymous
+    identities = outcome.identities
+    if identities is None and tally is not None:
+        # Walking the tail counts it exactly, so a failed census is not fatal
+        # to the denominator when recovery ran.
+        identities = len(outcome.contributors) + tally.unrecoverable_people
+    if identities is None:
         return IdentityGaps()
 
-    missing = max(0, outcome.identities - len(outcome.contributors))
+    if tally is None:
+        missing = max(0, identities - len(outcome.contributors))
+        return IdentityGaps(
+            identities=identities,
+            unrecoverable=(
+                Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=missing) if missing else None
+            ),
+        )
+
+    # The pages were walked, so the tail's commits are measured rather than
+    # unknown - the one thing the cheap census cannot report.
     return IdentityGaps(
-        identities=outcome.identities,
+        identities=identities,
         unrecoverable=(
-            Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=missing) if missing else None
+            Exclusion(
+                ExclusionReason.ANONYMOUS_NO_ACCOUNT,
+                people=tally.unrecoverable_people,
+                commits=tally.unrecoverable_commits,
+            )
+            if tally.unrecoverable_people
+            else None
         ),
+        recovered=tally.recovered_identities,
     )
 
 

@@ -85,9 +85,50 @@ First half of v0.6.0: the scan now says how good its own data is.
   each. "Where does this project's work come from" is answered well at 87%;
   "did this person contribute" is not answered at all. `docs/METRICS.md` says
   so where the fields are defined.
-- Still to come in v0.6.0: no-reply account recovery, `--on-exhaustion` and
-  `--deep-attribution`.
-- 703 tests, trace matrix 199 of 199.
+- Still to come in v0.6.0: `--on-exhaustion` and `--deep-attribution`.
+- 722 tests, trace matrix 201 of 201.
+
+### Added (no-reply recovery)
+
+- **`--recover-anonymous`** (on by default), which links the contributors
+  GitHub left anonymous but whose email carries its own no-reply format,
+  `NNN+login@users.noreply.github.com`. That format embeds the account id and
+  login, and round-trips against the API, so nothing is guessed.
+
+  Measured on `NousResearch/hermes-agent`:
+
+  | | Contributors | Commits |
+  |---|---|---|
+  | Without | 395 of 3,310 — 11.9% | 27,845 of 32,016 — 87.0% |
+  | **With** | **1,132 of 3,310 — 34.2%** | **28,904 — 90.3%** |
+
+  The remaining 2,150 identities publish real addresses, and GitHub exposes no
+  email-to-user lookup, so no API resolves them. Nothing infers a login from a
+  display name: that would put a real person's name against work that may not
+  be theirs.
+
+  Costs a page per hundred identities — 34 requests for that repository against
+  4. `--no-recover-anonymous` turns it off for a large inventory.
+- **The anonymous tail's commits are measured when recovery runs**, so
+  `exclusions[].commits` stops being `null` for `anonymous_no_account`.
+
+### Fixed (units)
+
+- **The coverage breakdown counted accounts where it should have counted
+  identities**, so it summed to 3,282 against 3,310 — the documented invariant,
+  quietly broken. GitHub identifies contributors by *author email*, so one
+  person with two git configurations is two identities; 765 recovered
+  identities collapsed into 737 accounts. `linked_by_github` is now derived as
+  the remainder, so the total cannot drift again.
+
+  This also means `coverage_percent` mixes units — accounts over addresses —
+  and is a **lower bound** on person-level coverage. `docs/METRICS.md` says so.
+- **A box-drawing character in a docstring made vulture skip the file**,
+  reporting `'charmap' codec can't encode` as a warning and exiting clean — a
+  dead-code check that stopped checking. `CLAUDE.md`'s note that non-ASCII
+  source is safe is right about em-dashes (cp1252 has one at 0x97) and wrong
+  about characters cp1252 cannot encode at all. Diagrams are ASCII now, and the
+  convention says why.
 
 ### Fixed (SonarCloud)
 

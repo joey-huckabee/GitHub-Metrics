@@ -41,6 +41,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   object where it expected an array.
 - **`is_bot` was undocumented**, despite being a key in every contributor
   record since v0.6.0.
+- **`.gitignore` silently excluded the golden CSV.** The artifact is called
+  `githubmetrics.csv`, which the ignore rule covers so that scan output never
+  lands in a commit. The suite passed locally, where the untracked file was
+  still on disk, and failed on every CI target with a `FileNotFoundError` from
+  inside the comparison. The rule now exempts `tests/conformance/expected/`,
+  and a test asserts the fixtures are present rather than trusting it.
 - **The per-repository identity fields were undocumented** - `owner`, `name`,
   `url`, `collected` and `documented`. The last is the one that matters:
   `documented: false` with `collected: true` is the single case where a

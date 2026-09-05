@@ -375,3 +375,31 @@ def test_the_run_reaches_no_network_at_all(tmp_path: Path) -> None:
     assert geocoding["lookups"] == 0
     assert geocoding["service_failures"] == 0
     assert geocoding["cache_hits"] > 0, "the fixture cache was not used at all"
+
+
+@pytest.mark.requirement("L3-CNF-003")
+def test_every_fixture_the_suite_needs_is_present() -> None:
+    """A missing fixture must fail here, not deep inside a comparison.
+
+    This was not hypothetical. The golden CSV is called `githubmetrics.csv`,
+    which `.gitignore` excludes so that scan output never lands in a commit -
+    so it was silently left out. Locally the suite passed, because the
+    untracked file was still on disk; on a clean checkout every artifact test
+    failed with a `FileNotFoundError` from inside `compare`.
+
+    The ignore rule now exempts `tests/conformance/expected/`, and this asserts
+    the result rather than trusting it.
+    """
+    required = [
+        INVENTORY,
+        RECORDING,
+        GEOCODE,
+        EXPECTED / "githubmetrics.csv",
+        EXPECTED / "statistics.json",
+    ]
+
+    missing = [path for path in required if not path.is_file()]
+
+    assert not missing, f"conformance fixtures missing: {[p.name for p in missing]}"
+    # At least one document, or the suite would be asserting nothing about them.
+    assert any(path.parent != EXPECTED for path in EXPECTED.rglob("*.json"))

@@ -1,0 +1,4 @@
+name,owner,organization,url,scan_date,scan_id,stars,forks,age_days,last_update_hours,closed_issues,releases,prevalence_score,stars_score,forks_score,maturity_score,last_update_score,trusted_org_bonus,total_score,is_trusted_org
+Hello-World,octocat,,https://github.com/octocat/Hello-World,2026-01-01 00:00:00+00:00,00000000-0000-4000-8000-000000000001,3803,6674,5453.2075,0.0,2527,0,20.0,10.0,15.0,15.0,15.0,0.0,75.0,false
+Spoon-Knife,octocat,,https://github.com/octocat/Spoon-Knife,2026-01-01 00:00:00+00:00,00000000-0000-4000-8000-000000000001,14010,159033,5452.187002314815,0.0,718,0,20.0,10.0,15.0,15.0,15.0,0.0,75.0,false
+no-such-repository-conformance,ghost,,https://github.com/ghost/no-such-repository-conformance,2026-01-01 00:00:00+00:00,00000000-0000-4000-8000-000000000001,,,,,,,,,,,,,,

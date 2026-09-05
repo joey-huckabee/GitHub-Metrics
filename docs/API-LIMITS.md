@@ -161,9 +161,13 @@ repository.**
 
 At inventory scale that is not viable — 200 repositories of this size would
 need 64,000 points against a 5,000-per-hour budget, about thirteen hours of
-pure quota. It is viable for a **short watchlist**, and that is how it should
-be offered if it is offered: an opt-in command over a handful of repositories,
-never the default.
+pure quota. It is viable for a **short watchlist**.
+
+Scheduled for v0.6.0 as **`--deep-attribution`**, off by default, with a
+warning that recommends it per repository when unattributed commits exceed
+`--deep-attribution-threshold` (default 10%). The measured repository sits at
+13%, so the recommendation fires on a real case. See
+[ADR-0010](adr/0010-optional-commit-history-attribution.md).
 
 ### 3.4 Conditional requests
 
@@ -174,7 +178,9 @@ side. Long-deferred; it pairs naturally with the persistence work.
 ### 3.5 Continue past exhaustion rather than refusing
 
 `--on-exhaustion wait` sleeps to the hourly reset and continues, so a run
-larger than one hour's quota completes unattended. See
+larger than one hour's quota completes unattended. From v0.6.0 this is the
+**default**; `--on-exhaustion fail` restores the refuse-up-front behaviour and
+is what a CI job with a step timeout should pass. See
 [ADR-0009](adr/0009-rate-limit-exhaustion-policy.md).
 
 ### 3.6 Things that do **not** help, recorded so they are not retried
@@ -222,7 +228,7 @@ repositories cost close to the floor.
 | 1 | ~9 | ~5 | yes |
 | 100 | ~900 | ~500 | yes |
 | 550 | ~4,950 | ~2,750 | at the GraphQL edge |
-| 1,000 | ~9,000 | ~5,000 | **no — needs `--on-exhaustion wait`** |
+| 1,000 | ~9,000 | ~5,000 | **no — waits for a reset (the default from v0.6.0)** |
 
 Geocoding, not the API, sets wall-clock time on a first run. With a warm cache
 the API becomes the constraint again.

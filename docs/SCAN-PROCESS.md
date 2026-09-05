@@ -247,9 +247,9 @@ Open, and listed so an analyst finds them rather than discovering them in the da
 |---|---|---|---|
 | 1 | 500-email ceiling not reported anywhere in the output | a truncated repository is indistinguishable from a complete one | v0.6.0 `statistics.json` |
 | 2 | `contribution_total` includes bot commits | inflates human contribution | v0.6.0 reports it separately; total stays raw by decision |
-| 3 | No commit-coverage figure | no way to know 87% from 100% | v0.6.0 |
+| 3 | No commit-coverage figure | no way to know 87% from 100% | v0.6.0; `--deep-attribution` reaches 100% for a watchlist |
 | 4 | Contributors failing does not change the exit code | a degraded run exits 0 | open |
-| 5 | Pre-flight is a floor | a run can start and not finish | by design; `--on-exhaustion` in v0.6.0 |
+| 5 | Pre-flight is a floor | a run can start and not finish | by design; v0.6.0 waits for the reset by default |
 | 6 | `foreign` / `adversarial` always `null` | no residency determination is made here | by design; a separate stage |
 | 7 | Location published by only ~44% of contributors | every geographic percentage has a large unknown | inherent; v0.6.0 quantifies it |
 | 8 | Contributor counts may be hours stale | GitHub caches the endpoint | inherent |

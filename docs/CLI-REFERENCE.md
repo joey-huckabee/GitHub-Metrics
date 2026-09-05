@@ -3,6 +3,10 @@
 Complete reference for the `github-metrics` command. For a task-oriented
 introduction see [`USER-GUIDE.md`](USER-GUIDE.md).
 
+For what a scan *does* with the data, and where it can mislead you, see
+[`SCAN-PROCESS.md`](SCAN-PROCESS.md); for the API ceilings behind those
+caveats, [`API-LIMITS.md`](API-LIMITS.md).
+
 The same entry point is available as `python -m github_metrics`.
 
 ## Synopsis
@@ -96,12 +100,31 @@ Read from the environment, or from a `.env` file. See
 |---|---|---|---|
 | `GITHUB_TOKEN` | for API commands | — | Token for all API calls |
 | `GITHUB_API_URL` | no | `https://api.github.com` | Point at GitHub Enterprise |
-| `GEOCODER_USER_AGENT` | no | `github-metrics` | User-Agent sent to Nominatim |
+| `GEOCODER_USER_AGENT` | no | `github-metrics` | User-Agent sent to Nominatim. **Set this**: the policy asks for one identifying you, and the penalty for a generic agent is being blocked |
+| `GEOCODE_CACHE_PATH` | no | platform cache dir | Where resolved locations are remembered between runs. An **empty value** turns persistence off |
 | `LOG_LEVEL` | no | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
 Diagnostics go to **stderr** at `LOG_LEVEL`. Data goes to **stdout**. The two
 never mix, so `github-metrics validate list.csv --format json | jq` works even at
 `LOG_LEVEL=DEBUG`.
+
+### The geocode cache
+
+Resolved locations persist between runs, which is what makes a re-scan cheap:
+measured, one repository took 186 s on a cold cache and 42 s on a warm one.
+
+| | |
+|---|---|
+| Default location | `%LOCALAPPDATA%\github-metrics\geocode.json` on Windows, `$XDG_CACHE_HOME/github-metrics/geocode.json` (or `~/.cache/…`) elsewhere |
+| Move it | `GEOCODE_CACHE_PATH=/some/path.json` |
+| Turn it off | `GEOCODE_CACHE_PATH=` (empty) |
+| Clear it | delete the file |
+
+Deleting it costs time and **loses no measurement** — a cached answer is
+identical to a fresh one, so nothing in the output depends on whether the cache
+existed. A match is trusted for a year and a miss for thirty days; a lookup
+that failed because the geocoder was unreachable is never cached at all, so an
+outage costs one run's resolution rather than every future run's.
 
 ---
 

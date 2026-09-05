@@ -27,6 +27,14 @@ jobs:
     # A pull request from a fork cannot read repository secrets, so the scan
     # would fail for a reason the contributor cannot fix. Skip it there; the
     # push to main after merge covers the code.
+    #
+    # The same is true of Dependabot pull requests, which GitHub also runs
+    # without repository secrets. Their SonarCloud check therefore takes the
+    # documented skip path below and reports **success without scanning** - so
+    # a green tick on a Dependabot PR is not evidence that a bumped action
+    # works. Verify such a bump on the push to main. This is the same
+    # "a check that cannot fail" shape that the coverage-path guard and the
+    # quality-gate read below exist to prevent.
     if: >-
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository

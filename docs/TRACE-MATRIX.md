@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 19
 - L2 requirements: 87
-- L3 requirements: 125
-- Verified L2+L3: 212 of 212 (100.0%)
+- L3 requirements: 127
+- Verified L2+L3: 214 of 214 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -36,8 +36,8 @@ through their children, so counting them too would count the same work twice.
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-ATT-001 | L1-ATT-001 | L3-ATT-001 | _(none)_ | Implemented |
-| L2-ATT-002 | L1-ATT-001 | L3-ATT-002 | _(none)_ | Implemented |
+| L2-ATT-001 | L1-ATT-001 | L3-ATT-001, L3-CNF-004 | _(none)_ | Implemented |
+| L2-ATT-002 | L1-ATT-001 | L3-ATT-002, L3-CNF-005 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -119,6 +119,8 @@ through their children, so counting them too would count the same work twice.
 | L3-CNF-001 | L2-OUT-001 | `tests/test_conformance.py::test_every_document_is_unchanged`<br>`tests/test_conformance.py::test_no_document_is_written_for_a_repository_that_was_not_collected`<br>`tests/test_conformance.py::test_the_exit_status_is_unchanged`<br>`tests/test_conformance.py::test_the_tabular_artifact_is_unchanged` | Implemented |
 | L3-CNF-002 | L2-OUT-001 | `tests/test_conformance.py::test_the_statistics_artifact_is_unchanged`<br>`tests/test_conformance.py::test_two_runs_of_one_input_are_identical` | Implemented |
 | L3-CNF-003 | L2-OUT-001 | `tests/test_conformance.py::test_every_fixture_the_suite_needs_is_present`<br>`tests/test_conformance.py::test_the_replay_covers_every_request_the_scan_makes`<br>`tests/test_conformance.py::test_the_run_reaches_no_network_at_all` | Implemented |
+| L3-CNF-004 | L2-ATT-001 | `tests/test_conformance.py::test_the_deep_route_artifacts_are_unchanged`<br>`tests/test_conformance.py::test_the_deep_route_records_the_method_that_produced_it` | Implemented |
+| L3-CNF-005 | L2-ATT-002 | `tests/test_conformance.py::test_both_routes_find_the_same_bots` | Implemented |
 
 ### COL: COL
 

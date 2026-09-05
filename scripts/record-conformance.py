@@ -51,7 +51,7 @@ from github.GithubException import GithubException
 from github_metrics.client import GitHubClient
 from github_metrics.collect.anonymous import collect_anonymous
 from github_metrics.collect.census import count_identities
-from github_metrics.collect.contributors import get_contributors
+from github_metrics.collect.contributors import build_contributors, get_contributors
 from github_metrics.collect.history import attribute_from_history
 from github_metrics.collect.repository import get_repository
 from github_metrics.config import Settings
@@ -66,6 +66,11 @@ REPOSITORIES = [
     # Valid reference, absent repository: a row with identity and no
     # measurements, no document, and exit 4.
     ("ghost", "no-such-repository-conformance"),
+    # The deep-attribution set. Chosen for the two things nothing else in the
+    # fixtures has: a **bot** contributor, and a history short enough to record
+    # - 333 commits is four pages, against 321 for the repository this feature
+    # was measured on. 15 contributor identities, none anonymous.
+    ("hukkin", "tomli"),
 ]
 
 
@@ -161,7 +166,12 @@ def main() -> int:
             get_contributors(recorder, owner, repoid)  # type: ignore[arg-type]
             count_identities(recorder, owner, repoid)  # type: ignore[arg-type]
             collect_anonymous(recorder, owner, repoid)  # type: ignore[arg-type]
-            attribute_from_history(recorder, owner, repoid)  # type: ignore[arg-type]
+            walked = attribute_from_history(recorder, owner, repoid)  # type: ignore[arg-type]
+            # And the detail query the *deep* route issues. It ranks by the
+            # history's own commit counts rather than the endpoint's, so the
+            # logins arrive in a different order and the recorded list-route
+            # query does not match it.
+            build_contributors(recorder, walked.accounts, slug=slug)  # type: ignore[arg-type]
             print(f"   {len(recorder.contributors.get(slug, []))} contributors")
 
         spent = budget - client.graphql_points_remaining()

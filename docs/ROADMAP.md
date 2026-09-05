@@ -384,7 +384,7 @@ stays where it is, but it is no longer merely a convenience.
 
 ## v0.6.0 — Knowing how good the data is
 
-**Planned.** v0.5.0 made the dataset bigger. This release makes it
+**Released 2026-09-05.** v0.5.0 made the dataset bigger. This release makes it
 **auditable**, which the live run showed matters more.
 
 That run reported 396 contributors and a `contribution_total` of 27,828. Both

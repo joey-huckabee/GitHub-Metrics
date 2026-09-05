@@ -115,6 +115,16 @@ def affordable(_client: Any, count: int) -> Budget:
 class _NullClient:
     """Stands in for a real client, without a socket in sight."""
 
+    @staticmethod
+    def graphql_points_remaining() -> int:
+        """Read at the end of a run to measure what it spent."""
+        return 4991
+
+    @staticmethod
+    def rate_limit_remaining() -> int:
+        """As above, for the REST budget."""
+        return 4995
+
     def __enter__(self) -> _NullClient:
         return self
 
@@ -122,14 +132,38 @@ class _NullClient:
         return None
 
 
+class _NullCache:
+    """A geocode cache that was never read from a file."""
+
+    loaded = 0
+    expired_on_load = 0
+
+    @staticmethod
+    def save() -> None:
+        """Saving an in-memory cache writes nothing."""
+
+
+class _NullGeocoder:
+    """Resolves nothing, and reports having done nothing."""
+
+    def __init__(self) -> None:
+        self.cache = _NullCache()
+        self.cache_hits = 0
+        self.lookups = 0
+        self.matched = 0
+        self.unmatched = 0
+        self.service_failures = 0
+
+
 def _patch(monkeypatch: pytest.MonkeyPatch, collector: Any) -> None:
     """Replace everything that would otherwise need a token or a socket."""
     monkeypatch.setattr("github_metrics.cli.verify_credentials", lambda _settings: None)
     monkeypatch.setattr("github_metrics.cli.GitHubClient", lambda _settings: _NullClient())
     monkeypatch.setattr("github_metrics.cli.check_budget", affordable)
-    # Takes the cache keyword the CLI now passes; the run must not touch a
-    # real cache file, and a test that wrote to one would leak between runs.
-    monkeypatch.setattr("github_metrics.cli.Geocoder", lambda _agent, **_kwargs: None)
+    # A geocoder that resolves nothing and touches no disk. It carries the
+    # counters statistics.json reads, because a run reports what geocoding did
+    # even when it did nothing.
+    monkeypatch.setattr("github_metrics.cli.Geocoder", lambda _agent, **kwargs: _NullGeocoder())
     monkeypatch.setattr("github_metrics.cli.collect_all", collector)
 
 
@@ -288,7 +322,13 @@ def test_document_paths_are_nested_and_lower_cased(tmp_path: Path) -> None:
     # cased path exists: `Path.is_file()` folds case on Windows and macOS, so
     # the question answers yes for `PyPA/VirtualEnv.json` too and the check
     # passes on the platforms this rule exists to protect.
-    written = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*.json"))
+    # The run-level statistics.json sits at the root beside the CSV; only the
+    # nested per-repository documents are under test here.
+    written = sorted(
+        path.relative_to(tmp_path).as_posix()
+        for path in tmp_path.rglob("*.json")
+        if path.parent != tmp_path
+    )
 
     assert written == ["pypa/virtualenv.json"]
 

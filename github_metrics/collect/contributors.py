@@ -103,6 +103,18 @@ The parameter survives so a library caller can still bound a run. Nothing in
 the CLI sets it.
 """
 
+BOT_ACCOUNT_TYPE: Final = "Bot"
+"""What GitHub calls an App account in the contributors list.
+
+Authoritative for GitHub Apps - `dependabot[bot]`, `github-actions[bot]` and a
+repository's own automation all report it - and it is the same fact that makes
+the GraphQL detail query unable to resolve them, since a `Bot` is not a `User`.
+
+A bot running under an ordinary user account reports as `User`, and nothing
+here guesses otherwise. A login that merely looks automated is recorded as the
+account it is.
+"""
+
 DETAIL_CHUNK_SIZE: Final = 50
 """Accounts asked about in one aliased detail document.
 
@@ -123,11 +135,13 @@ class ContributorAccount:
         login: The account's login, used to look its detail up.
         github_id: The account's numeric id, as a string.
         contribution: Commits attributed to the account in this repository.
+        is_bot: Whether GitHub reported `type: "Bot"` for this entry.
     """
 
     login: str
     github_id: str
     contribution: int
+    is_bot: bool = False
 
 
 def _details_query(count: int) -> str:
@@ -198,6 +212,11 @@ def get_contributor_accounts(
             login=str(account.login),
             github_id=str(account.id),
             contribution=int(account.contributions),
+            # GitHub's own classification, not a guess from the login. A
+            # GitHub App is reported as `Bot` here and cannot be resolved as a
+            # `User` by the detail query, which is why the two facts arrive
+            # together.
+            is_bot=str(account.type) == BOT_ACCOUNT_TYPE,
         )
         for account in accounts
     ]
@@ -339,6 +358,7 @@ def _build(
 
     return Contributor(
         github_id=account.github_id,
+        is_bot=account.is_bot,
         # The login is the fallback because a record with no name at all
         # cannot be told from one belonging to an account that is gone.
         name=str(name) if name else account.login,

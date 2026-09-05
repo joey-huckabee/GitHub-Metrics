@@ -275,6 +275,15 @@ class Geocoder:
             swallow_exceptions=False,
         )
         self.cache = cache if cache is not None else GeocodeCache(None)
+        # Counters for statistics.json. `service_failures` is the one that
+        # earns its place: it is the only record anywhere distinguishing "this
+        # contributor published no location" from "the geocoder was
+        # unreachable when we asked", because both produce the same `Address`.
+        self.cache_hits = 0
+        self.lookups = 0
+        self.matched = 0
+        self.unmatched = 0
+        self.service_failures = 0
         # Guards both caches. It covers check-then-ask rather than only the
         # store, so that two workers asking about one location at the same
         # moment produce one request rather than two - which is the difference
@@ -317,14 +326,23 @@ class Geocoder:
         with self._lock:
             remembered = self._pending.get(key)
             if remembered is not None:
+                self.cache_hits += 1
                 return remembered
 
             stored = self.cache.get(key)
             if stored is not None:
+                self.cache_hits += 1
                 self._pending[key] = stored
                 return stored
 
+            self.lookups += 1
             address, matched, persist = self._ask(key)
+            if matched:
+                self.matched += 1
+            elif persist:
+                self.unmatched += 1
+            else:
+                self.service_failures += 1
             self._pending[key] = address
             if persist:
                 self.cache.put(key, address, matched=matched)

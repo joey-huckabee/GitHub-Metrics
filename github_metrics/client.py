@@ -1,4 +1,29 @@
-"""Thin wrapper around PyGithub that centralises auth and rate-limit handling."""
+"""Thin wrapper around PyGithub that centralises auth and rate-limit handling.
+
+Where a budget is read from, and why it is not `/rate_limit`
+------------------------------------------------------------
+The obvious source is the REST `/rate_limit` endpoint, and it is the wrong
+one. Measured on 2026-09-05 against a live token, it reported **5000
+remaining for both budgets** while the same token had 4988 GraphQL points
+and 4984 REST requests left. It does not appear to track spend at all
+here, and it fails in the worst direction: a pre-flight reading it accepts
+a run whose budget is already gone, which is precisely the failure
+`collect.budget` exists to prevent.
+
+Two sources are trustworthy, and both are free:
+
+- **REST**: the `X-RateLimit-Remaining` header on every response, which
+  PyGithub exposes as `Github.rate_limiting`. Verified decrementing one
+  per request.
+- **GraphQL**: the `rateLimit` field inside a GraphQL document. A query
+  selecting nothing else is not charged - confirmed by issuing it twice
+  and reading the same `remaining` - so asking costs nothing of what is
+  being asked about.
+
+`rate_limit_snapshot` still calls `/rate_limit`, and that is correct: it is
+used to *verify credentials*, where the endpoint's value is irrelevant and
+only its status code and scope headers matter.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +38,15 @@ if TYPE_CHECKING:  # pragma: no cover - import cycle only needed for typing
     from github.Repository import Repository
 
 LOGGER = logging.getLogger(__name__)
+
+GRAPHQL_BUDGET_QUERY = "query { rateLimit { remaining resetAt } }"
+"""The only reliable source for the GraphQL budget, and it is free.
+
+REST's `/rate_limit` carries a `resources.graphql` section that does not
+track GraphQL spend - measured at 5000 while GraphQL itself reported 4988
+for the same token at the same moment. A document selecting nothing but
+`rateLimit` is not charged, so asking the right service costs nothing.
+"""
 
 PER_PAGE = 100
 """Results per REST page - the maximum every paginated endpoint here accepts.
@@ -77,8 +111,31 @@ class GitHubClient:
         GraphQL has its own 5000-point budget, separate from REST's 5000
         requests. Checking the wrong one is an easy way to believe a run has
         headroom it does not have.
+
+        **Read from GraphQL, not from REST.** The REST `/rate_limit`
+        endpoint's `resources.graphql` section does not track GraphQL spend:
+        measured, it reported 5000 remaining while the GraphQL API itself
+        reported 4988 for the same token at the same moment. A pre-flight
+        reading the REST figure would accept a run whose budget was already
+        gone, which is the exact failure `check_budget` exists to prevent.
+
+        The query is free. GitHub does not charge for a document selecting
+        nothing but `rateLimit` - confirmed by issuing it twice and reading
+        the same `remaining` both times - so the check costs nothing of what
+        it is checking.
+
+        Returns:
+            Points remaining, or `0` if the field could not be read. Zero is
+            the safe failure: it refuses a run rather than letting one start
+            on a number nothing confirmed.
         """
-        return int(self._github.get_rate_limit().resources.graphql.remaining)
+        _, payload = self.graphql(GRAPHQL_BUDGET_QUERY, {})
+        limit = payload.get("data", {}).get("rateLimit") or {}
+        remaining = limit.get("remaining")
+        if remaining is None:
+            LOGGER.warning("GraphQL rate limit could not be read; treating it as spent")
+            return 0
+        return int(remaining)
 
     def rate_limit_snapshot(self) -> tuple[dict[str, Any], dict[str, Any]]:
         """Fetch the rate-limit endpoint, headers included.
@@ -98,8 +155,25 @@ class GitHubClient:
         )
 
     def rate_limit_remaining(self) -> int:
-        """Return the number of core API requests still available."""
-        return int(self._github.get_rate_limit().resources.core.remaining)
+        """Return the number of core REST requests still available.
+
+        **Read from response headers, not from `/rate_limit`.** Every REST
+        response carries `X-RateLimit-Remaining`, and PyGithub keeps the
+        most recent one; measured, it tracks spend exactly - 4986, 4985,
+        4984 across three requests. The `/rate_limit` endpoint reported a
+        flat 5000 throughout, for the same token, in the same minute.
+
+        The header costs nothing: it arrives on responses the run was
+        making anyway.
+
+        Returns:
+            Requests remaining as of the last response. Before any request
+            has been made this is PyGithub's optimistic default rather than
+            a measurement, which is why `check_budget` leans on the GraphQL
+            budget - the binding one, and independently readable.
+        """
+        remaining, _ = self._github.rate_limiting
+        return int(remaining)
 
     def close(self) -> None:
         """Release the underlying HTTP connection pool."""

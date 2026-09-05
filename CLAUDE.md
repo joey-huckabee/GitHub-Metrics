@@ -248,6 +248,18 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   helper might not.
 - **Modules name a logger; they never configure one.** `logging.getLogger(__name__)`
   and nothing else. Only `logger.py` attaches handlers.
+- **A budget is read from the API that owns it, never from `/rate_limit`.**
+  That endpoint does not track spend: measured, it reported 5000 remaining for
+  both budgets while the token had 4988 GraphQL points and 4984 REST requests
+  left. `check_budget` read it until v0.6.0 and was therefore validating runs
+  against a number that never moves. GraphQL's own `rateLimit { remaining }` is
+  authoritative and a document selecting nothing else is **not charged**, so
+  the right source is also the free one. REST's `X-RateLimit-Remaining` header
+  is accurate but a GraphQL response overwrites PyGithub's copy of it, which is
+  why `statistics.json` publishes `null` for REST spend rather than a number it
+  cannot stand behind. `rate_limit_snapshot` still calls `/rate_limit`, and
+  that is correct - it verifies credentials, where only the status code and the
+  scope headers matter.
 - **Counts come from GraphQL, never REST.** REST cannot count closed issues
   correctly at any price: the repository object has no closed count, its
   `open_issues_count` includes pull requests, the issues endpoint returns pull

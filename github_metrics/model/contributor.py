@@ -247,6 +247,19 @@ class Contributor:
             publishes none. Free text: GitHub does not validate it.
         internal_address: What `location` resolved to.
         contribution: Commits attributed to this account in this repository.
+        is_bot: Whether GitHub reports this account as `type: "Bot"`.
+
+            Authoritative for GitHub Apps and **nothing but** that: a bot
+            running under an ordinary user account reports as a user, and this
+            field does not guess from a login that merely looks automated.
+            `False` is therefore "GitHub did not say so", not "definitely a
+            person".
+
+            Its commits stay in `contribution_total`, because that total is a
+            raw measurement of what GitHub attributed to the repository.
+            Excluding them is a judgement, and this flag is what lets an
+            analysis make it. `statistics.json` publishes the adjusted figure
+            beside the raw one.
         foreign: Whether the contributor is foreign to the United States.
             **Undefined**; always `None` until `docs/METRICS.md` settles it.
         adversarial: Whether the contributor is adversarial. **Undefined**;
@@ -259,6 +272,7 @@ class Contributor:
     location: str | None = None
     internal_address: Address = field(default_factory=Address)
     contribution: int | None = None
+    is_bot: bool = False
     foreign: bool | None = None
     adversarial: bool | None = None
     scan_id: UUID | None = None
@@ -280,6 +294,7 @@ class Contributor:
             "location": self.location,
             "internal_address": self.internal_address.to_mapping(),
             "contribution": self.contribution,
+            "is_bot": self.is_bot,
             "foreign": self.foreign,
             "adversarial": self.adversarial,
         }

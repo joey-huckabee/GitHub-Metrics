@@ -32,10 +32,12 @@ COLLECT_LOGGER = "github_metrics.collect.contributors"
 class _Account:
     """One entry of the REST contributors list."""
 
-    def __init__(self, login: str, identifier: int, contributions: int) -> None:
+    def __init__(self, login: str, identifier: int, contributions: int, kind: str = "User") -> None:
         self.login = login
         self.id = identifier
         self.contributions = contributions
+        # GitHub reports "Bot" for an App account; the collector reads it.
+        self.type = kind
 
 
 class _Repository:

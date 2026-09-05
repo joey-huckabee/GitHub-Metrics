@@ -6,7 +6,60 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+First half of v0.6.0: the scan now says how good its own data is.
+
+### Added
+
+- **`statistics.json`, a third artifact**, written beside `githubmetrics.csv`
+  and carrying the same `scan_id`. Run-level facts plus a per-repository array
+  in input order. [ADR-0008](docs/adr/0008-statistics-json.md), fields defined
+  in `docs/METRICS.md`.
+
+  The number it exists for is **commit coverage**. Measured across two
+  repositories in one run: `NousResearch/hermes-agent` 27,845 of 32,016
+  commits — **86.97%** — against `pypa/virtualenv` at **99.6%**. Both looked
+  identically complete before.
+- **Commit totals, for free.** `history { totalCount }` folded into the
+  existing metrics query. `history` is a connection, so this looked like it
+  should cost more; measured, the combined document reports `cost: 1` for a
+  1,250-commit repository and a 32,016-commit one alike, because asking a
+  connection for `totalCount` alone requests no nodes.
+- **Bot identification** from GitHub's own `type: "Bot"` field, not a login
+  heuristic. `is_bot` on every contributor record, and counts, commits and
+  logins in `statistics.json`. **`contribution_total` deliberately still
+  includes them**, with `contribution_excluding_bots` published beside it.
+- **Concentration** — top-1/5/10 shares, bus factor and Gini — which answers
+  "where does this project's work come from" without naming anyone a
+  maintainer.
+- **The unknown-location share**, which bounds every geographic claim.
+  Measured at **81.66%** for one repository: any national percentage computed
+  from it carries an unknown of up to 81 points.
+- `tool_version` in an artifact, an open item since v0.2.0.
+
+### Fixed
+
+- **`check_budget` was validating runs against a number that never moves.**
+  The REST `/rate_limit` endpoint does not track spend: measured, it reported
+  5000 remaining for both budgets while the same token had 4,988 GraphQL points
+  and 4,984 REST requests left. The pre-flight read it, so it would have
+  accepted a run whose budget was already gone — the exact failure it exists to
+  prevent.
+
+  The GraphQL budget is now read from GraphQL's own `rateLimit` field, which is
+  authoritative and **free**: a document selecting nothing else is not charged,
+  confirmed by issuing it twice and reading the same `remaining`.
+
+### Notes
+
+- **REST spend is published as `null`, not estimated.** The
+  `X-RateLimit-Remaining` header is accurate but only the latest is kept, and a
+  GraphQL response overwrites it with the GraphQL budget — observed going 4,981,
+  then 4,976 after one GraphQL call, then 4,980 after the next REST call. A scan
+  interleaves both across eight threads. GraphQL binds first and *is* measured;
+  a plausible REST number would be a guess wearing a measurement's clothes.
+- Still to come in v0.6.0: no-reply account recovery, `--on-exhaustion` and
+  `--deep-attribution`.
+- 683 tests, trace matrix 196 of 196.
 
 ## [0.5.1] - 2026-09-05
 

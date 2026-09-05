@@ -540,6 +540,173 @@ reads as data rather than announcing itself as a failure. This is the same
 rule as *Unknown vs. zero* below, applied to a number that has no other way to
 say "nothing here".
 
+## The scan statistics document
+
+`statistics.json` is the third artifact of a run, written beside
+`githubmetrics.csv` and carrying the same `scan_id`. Where the CSV is the
+comparable table and a document is one repository's detail record, this file
+answers a different question: **how good is the data in the other two.**
+
+It exists because the other artifacts cannot say what they are missing. A
+repository truncated at GitHub's 500-email ceiling produces a row and a
+document that look exactly like a complete one. Every field below is there to
+put a bound on a number that would otherwise imply a census.
+
+Design reasoning is in [ADR-0008](adr/0008-statistics-json.md).
+
+### Run level
+
+| Field | Type | Definition | Status |
+|---|---|---|---|
+| `scan_id` | `UUID` | The run, identical to the CSV's and the documents'. | **Settled** |
+| `scan_date` | `datetime` | Start of the run, UTC. | **Settled** |
+| `tool_version` | `str` | The package version that produced this scan. **The first place any artifact records one.** | **Settled** |
+| `duration_seconds` | `float` | Wall-clock time of the whole run. | **Settled** |
+| `repositories.named` | `int` | References accepted from the input, after duplicates were dropped. | **Settled** |
+| `repositories.collected` | `int` | Repositories whose metrics were read. | **Settled** |
+| `repositories.documented` | `int` | Repositories that produced a JSON document — metrics *and* contributors. | **Settled** |
+| `repositories.failed` | `int` | Named, attempted, and not collected. | **Settled** |
+| `repositories.not_attempted` | `int` | Named but never attempted, because the run stopped early. `0` unless the budget was exhausted. | **Settled** |
+| `budget.graphql_points_spent` | `int` | Measured from the API's own remaining count, not estimated. | **Settled** |
+| `budget.rest_requests_spent` | `null` | **Always null.** No trustworthy source exists; see below. | **Settled** |
+| `budget.graphql_remaining` | `int` | What the token had left when the run ended. | **Settled** |
+| `budget.rest_remaining` | `null` | **Always null**, for the same reason. | **Settled** |
+| `budget.exhaustion_policy` | `str` | `wait`, `fail` or `partial`. | **Settled** |
+| `budget.exhausted` | `bool` | Whether either budget ran out during the run. | **Settled** |
+| `budget.incomplete_because_exhausted` | `bool` | Whether the run stopped early as a result. **The field a consumer must check before treating the CSV as complete.** | **Settled** |
+| `budget.waits` | `int` | How many hourly resets the run slept through. | **Settled** |
+| `geocoding` | `object` | Cache and lookup behaviour; see below. | **Settled** |
+| `warnings` | `array` | Every degradation, machine-readable, in run order. | **Settled** |
+
+**The REST budget is not reported, and that is deliberate.** Measured on
+2026-09-05: the REST `/rate_limit` endpoint reported 5000 remaining for both
+budgets while the same token actually had 4988 GraphQL points and 4984 REST
+requests left — it does not track spend at all. The `X-RateLimit-Remaining`
+response header *is* accurate, but only the most recent one is retained and a
+**GraphQL** response overwrites it with the GraphQL budget (observed: 4981,
+then 4976 after one GraphQL call, then 4980 after the next REST call). A scan
+interleaves both across eight threads, so whichever arrived last is what would
+be read. Counting locally does not help either, because pagination happens
+inside the HTTP library.
+
+`null` is this document's word for "not measured" everywhere else, and it is
+used here for the same reason. GraphQL binds first at two points against one
+request per repository, and it *is* measured — from GraphQL's own `rateLimit`
+field, which is authoritative and free to read.
+
+`geocoding` carries `cache_loaded`, `cache_expired_on_load`, `cache_hits`,
+`lookups`, `matched`, `unmatched` and `service_failures`. The last is the one
+that matters most: it distinguishes *"this contributor published no location"*
+from *"the geocoder was unreachable when we asked"*, which the documents
+deliberately cannot, because both produce the same `Address`.
+
+### Per repository
+
+`repositories[]` carries one entry per named reference, **in input order**, so
+it aligns positionally with the CSV.
+
+#### Attribution and completeness
+
+| Field | Type | Definition | Status |
+|---|---|---|---|
+| `attribution.method` | `str` | `contributor_list` (default) or `commit_history` (`--deep-attribution`). | **Settled** |
+| `commits.total` | `int` | Commits on the default branch, from `history { totalCount }`. Costs one GraphQL point. `null` if the repository was not collected. | **Settled** |
+| `commits.attributed` | `int` | Commits belonging to collected contributors — equal to the document's `contribution_total`. | **Settled** |
+| `commits.coverage_percent` | `float` | `attributed / total * 100`. | **Settled** |
+| `contributors.identities` | `int` | Every contributor identity GitHub reports, including those with no account. | **Settled** |
+| `contributors.collected` | `int` | How many appear in the document. | **Settled** |
+| `contributors.coverage_percent` | `float` | `collected / identities * 100`. | **Settled** |
+
+**`commits.coverage_percent` is the most important number in the file.** It is
+the difference between "87% of this project's work is characterised" and an
+implied census. `contributors.coverage_percent` is usually far lower and that
+is expected — the uncollected tail is, by construction, the people who
+contributed least.
+
+#### Exclusions
+
+`exclusions[]` says **who is not in the document, and why**, counted in both
+people and commits. Every identity GitHub reports falls in exactly one bucket:
+either collected, or carrying one of these reasons.
+
+| `reason` | Recoverable | Meaning |
+|---|---|---|
+| `anonymous_recovered_noreply` | **recovered** | Beyond the 500-email ceiling, but publishing a `NNN+login@users.noreply.github.com` address, from which GitHub's own account id and login can be read. Recovered and collected from v0.6.0, so this bucket records how many the recovery rescued. |
+| `anonymous_no_account` | no | Beyond the ceiling, publishing a real address. GitHub exposes no email-to-user lookup, so no API resolves these. |
+| `account_unresolvable` | no | A login GitHub reported that GraphQL then could not resolve — deleted or suspended between the two calls. |
+
+The next three are not exclusions from *collection*. The contributor is in the
+document; what is absent is a usable location, which is what bounds any
+geographic claim.
+
+| `reason` | Meaning |
+|---|---|
+| `no_location_published` | Collected; the account publishes no location, so nothing was looked up. |
+| `location_unresolved` | Published a location no gazetteer recognises (`she/her`, `127.0.0.1`). |
+| `geocoder_unavailable` | The lookup failed for a reason unrelated to the location. **Retryable** — a later run may resolve it. |
+
+#### Bots
+
+| Field | Type | Definition | Status |
+|---|---|---|---|
+| `bots.count` | `int` | Contributors GitHub reports with `type: "Bot"`. | **Settled** |
+| `bots.commits` | `int` | Their commits, summed. | **Settled** |
+| `bots.logins` | `array` | Their logins, so the exclusion is checkable. | **Settled** |
+| `bots.contribution_excluding_bots` | `int` | `commits.attributed` minus `bots.commits`. | **Settled** |
+
+**`contribution_total` in the document is *not* adjusted for bots**, and this
+is a decision rather than an oversight. Changing it would be its third
+redefinition in as many releases and would make v0.5.0 and v0.6.0 documents
+silently incomparable; worse, it would bake one judgement — that a bot's
+commits do not count — into a raw measurement. Both figures are published and
+the analysis chooses.
+
+Detection is `type: "Bot"` as GitHub reports it in the contributors list, which
+is authoritative for GitHub Apps. **A bot running under an ordinary user
+account is not detected**, and nothing here guesses: a login that merely looks
+automated is reported as the user it is.
+
+#### Concentration
+
+Computed from the collected contributors, so each carries the coverage caveat
+above.
+
+| Field | Type | Definition | Status |
+|---|---|---|---|
+| `concentration.top_1_percent` | `float` | Share of attributed commits held by the largest contributor. | **Settled** |
+| `concentration.top_5_percent` | `float` | Share held by the largest five. | **Settled** |
+| `concentration.top_10_percent` | `float` | Share held by the largest ten. | **Settled** |
+| `concentration.bus_factor` | `int` | Fewest contributors whose commits together exceed 50% of the attributed total. | **Settled** |
+| `concentration.gini` | `float` | Gini coefficient of the contribution distribution, 0 (even) to 1 (concentrated). | **Settled** |
+
+`bus_factor` is a measure of *concentration*, not of project risk. It counts
+commits, and a person who wrote many commits is not necessarily irreplaceable.
+
+#### Geography
+
+| Field | Type | Definition | Status |
+|---|---|---|---|
+| `geography.countries` | `object` | `country_code` to `{people, commits}`, for contributors whose location resolved. | **Settled** |
+| `geography.distinct_countries` | `int` | How many appear. | **Settled** |
+| `geography.commits_with_known_location_percent` | `float` | Share of attributed commits whose contributor resolved to a country. | **Settled** |
+| `geography.commits_with_unknown_location_percent` | `float` | The complement. **The error bar on every geographic claim made from this scan.** | **Settled** |
+
+That last field is what a downstream residency stage needs most. A
+`foreign_percent` computed without it implies a precision the data does not
+have: if 56% of commits belong to contributors with no resolved location, then
+any national share carries an unknown of up to 56 points.
+
+### What is deliberately absent
+
+- **`foreign` and `adversarial`, and everything derived from them.** That
+  determination happens in a separate project. This file supplies the
+  denominators and the unknown-share that stage needs to bound its own
+  percentages, and asserts nothing about any person.
+- **Maintainer coverage.** Dropped rather than deferred: no route to "who is a
+  maintainer" is consistent enough to publish across a portfolio. See
+  [ADR-0008](adr/0008-statistics-json.md). The concentration figures answer the
+  underlying question without naming anyone.
+
 ## Formatting rules
 
 | Concern | Rule | Status |

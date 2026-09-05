@@ -81,10 +81,23 @@ query($owner: String!, $name: String!) {
     openIssues: issues(states: OPEN) { totalCount }
     releases { totalCount }
     tags: refs(refPrefix: "refs/tags/") { totalCount }
+    defaultBranchRef { target { ... on Commit { history { totalCount } } } }
   }
 }
 """
-"""Every field a row needs. Totals only - no `nodes`, so the cost stays at one."""
+"""Every field a row needs, plus the commit total the statistics artifact needs.
+
+Totals only - no `nodes`, so the cost stays at one.
+
+`history` **is** a connection, unlike everything else selected here, so folding
+it in looked like it should cost more. Measured, it does not: the combined
+document reports `cost: 1` for a 1,250-commit repository and for a
+32,016-commit one alike, because asking a connection for `totalCount` alone
+requests no nodes. The commit total is therefore free - which matters, because
+`commits.coverage_percent` is the number that says whether a repository's
+`contribution_total` describes it or merely samples it, and it cannot be
+computed without this.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +120,10 @@ class RepoMetaData:
         issues_enabled: Whether the issue tracker is switched on.
         releases: Published GitHub Releases.
         tags: Entries under `refs/tags/`.
+        commits: Commits on the default branch, or `None` when there is no
+            default branch - a repository with no commits at all, which is
+            a real state rather than a failure. Feeds `statistics.json`'s
+            coverage figure and nothing in the CSV.
     """
 
     owner: str
@@ -122,6 +139,7 @@ class RepoMetaData:
     issues_enabled: bool
     releases: int
     tags: int
+    commits: int | None = None
 
     @property
     def organization(self) -> str:
@@ -266,6 +284,7 @@ def _build(owner: str, repoid: str, slug: str, repository: dict[str, Any]) -> Re
         issues_enabled=bool(repository["hasIssuesEnabled"]),
         releases=int(repository["releases"]["totalCount"]),
         tags=int(repository["tags"]["totalCount"]),
+        commits=_commit_total(repository),
     )
 
 
@@ -294,3 +313,27 @@ def _log_shape(slug: str, metadata: RepoMetaData) -> None:
             slug,
             metadata.closed_issues,
         )
+
+
+def _commit_total(repository: dict[str, Any]) -> int | None:
+    """Read the default branch's commit count out of the metrics payload.
+
+    Args:
+        repository: The `repository` object GitHub returned.
+
+    Returns:
+        The count, or `None` when the repository has no default branch. That
+        is an empty repository - a real state - so it reads as unknown rather
+        than as zero, which would claim the branch was read and found empty.
+    """
+    branch = repository.get("defaultBranchRef")
+    if not isinstance(branch, dict):
+        return None
+    target = branch.get("target")
+    if not isinstance(target, dict):
+        return None
+    history = target.get("history")
+    if not isinstance(history, dict):
+        return None
+    total = history.get("totalCount")
+    return int(total) if total is not None else None

@@ -335,6 +335,8 @@ inventories `validate` takes, mixed freely.
 | `--format {csv,json,console}` | `csv` | Form of the tabular artifact. The documents are always JSON. |
 | `--fields a,b,c` | all | Columns the tabular artifact emits, always in canonical order. |
 | `--workers N` | `min(repositories, 8)` | Concurrent collections. |
+| `--deep-attribution` | off | Attribute every commit by walking the history instead of reading the contributors endpoint. Complete, and about **35x** the cost - a point per hundred commits, so 321 for a 32,016-commit repository against 9. For a watchlist, not an inventory. |
+| `--deep-attribution-threshold PCT` | `10` | Recommend the above for any repository where this percentage of commits could not be attributed. |
 | `--on-exhaustion {wait,fail,partial}` | `wait` | What to do when the hourly budget runs out. `wait` sleeps to the reset and continues; `fail` stops, as every release before v0.6.0 did; `partial` keeps what was collected, marks the rest unmeasured and exits 9. |
 | `--recover-anonymous` / `--no-recover-anonymous` | on | Link contributors GitHub left anonymous whose no-reply email names their account. Costs a page per hundred identities — 34 requests for a large repository against 4 — and raised one measured repository from 11.9% to 34.2% of contributors and 87.0% to 90.3% of commits. |
 | `--strict` | off | Abort on the first bad input reference. |

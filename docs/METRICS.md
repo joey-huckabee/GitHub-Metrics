@@ -609,7 +609,7 @@ it aligns positionally with the CSV.
 
 | Field | Type | Definition | Status |
 |---|---|---|---|
-| `attribution.method` | `str` | `contributor_list` (default) or `commit_history` (`--deep-attribution`). | **Settled** |
+| `attribution.method` | `str` | `contributor_list` (default) or `commit_history` (`--deep-attribution`). **Two runs of one repository by different methods are not comparable**: the deep route finds a larger population and a larger attributed total, so this field exists to stop them being diffed as though they measured the same thing. | **Settled** |
 | `commits.total` | `int` | Commits on the default branch, from `history { totalCount }`. Costs one GraphQL point. `null` if the repository was not collected. | **Settled** |
 | `commits.attributed` | `int` | Commits belonging to collected contributors — equal to the document's `contribution_total`. | **Settled** |
 | `commits.coverage_percent` | `float` | `attributed / total * 100`. | **Settled** |
@@ -781,7 +781,11 @@ commits do not count — into a raw measurement. Both figures are published and
 the analysis chooses.
 
 Detection is `type: "Bot"` as GitHub reports it in the contributors list, which
-is authoritative for GitHub Apps. **A bot running under an ordinary user
+is authoritative for GitHub Apps. Under `--deep-attribution` that field is not
+available - `Commit.author.user` carries no account type - so the reserved
+`[bot]` login suffix stands in for it. That is equally authoritative rather than
+a fallback heuristic: an account name is `^[A-Za-z0-9-]+$`, so a bracket cannot
+appear in a login anyone chose. **A bot running under an ordinary user
 account is not detected**, and nothing here guesses: a login that merely looks
 automated is reported as the user it is.
 

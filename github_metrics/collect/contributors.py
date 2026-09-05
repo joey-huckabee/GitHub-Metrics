@@ -104,6 +104,19 @@ The parameter survives so a library caller can still bound a run. Nothing in
 the CLI sets it.
 """
 
+BOT_LOGIN_SUFFIX: Final = "[bot]"
+"""What GitHub appends to every GitHub App's login.
+
+Authoritative rather than a heuristic, and provably so: an account name is
+`^[A-Za-z0-9-]+$` - `validation.py` enforces the same grammar on inventory
+input - so a bracket **cannot** appear in a login anyone chose. A login
+carrying this suffix is an App, and no human account can imitate one.
+
+The contributors endpoint reports `type` directly and is preferred where it is
+available. This is what the commit-history route has instead, because
+`Commit.author.user` carries no account type.
+"""
+
 BOT_ACCOUNT_TYPE: Final = "Bot"
 """What GitHub calls an App account in the contributors list.
 
@@ -336,7 +349,36 @@ def get_contributors(
     # ordinary contributors that one endpoint declined to name, and a
     # concentration figure computed over an unsorted list would be wrong.
     accounts = sorted([*listed, *extra], key=lambda account: account.contribution, reverse=True)
-    details = get_account_details(client, accounts, slug=slug)
+    return build_contributors(client, accounts, slug=slug, geocoder=geocoder)
+
+
+def build_contributors(
+    client: GitHubClient,
+    accounts: Sequence[ContributorAccount],
+    *,
+    slug: str,
+    geocoder: Geocoder | None = None,
+) -> list[Contributor]:
+    """Turn accounts into contributor records: detail, then location.
+
+    The half of collection that does not care **where the accounts came from**.
+    The contributors endpoint and a walk of the commit history find different
+    populations, and everything after that point - the aliased detail query,
+    the geocoding, the record shape - is identical, so it lives here and is
+    reached by both.
+
+    Args:
+        client: An authenticated client.
+        accounts: Who to collect, ranked as they should appear.
+        slug: The repository, for messages.
+        geocoder: Resolves locations. `None` leaves every address unresolved,
+            which stays distinguishable from a lookup that found nothing.
+
+    Returns:
+        The contributors, in the order given. The run identity is not stamped
+        here; `analysis.row` applies it alongside the row's own.
+    """
+    details = get_account_details(client, list(accounts), slug=slug)
 
     contributors = [
         _build(account, details.get(account.login, {}), geocoder) for account in accounts

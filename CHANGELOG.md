@@ -85,8 +85,64 @@ First half of v0.6.0: the scan now says how good its own data is.
   each. "Where does this project's work come from" is answered well at 87%;
   "did this person contribute" is not answered at all. `docs/METRICS.md` says
   so where the fields are defined.
-- Still to come in v0.6.0: `--deep-attribution`.
-- 736 tests, trace matrix 208 of 208.
+- **v0.6.0 is feature-complete.**
+- 747 tests, trace matrix 213 of 213.
+
+### Added (`--deep-attribution`)
+
+- **`--deep-attribution`**, which attributes every commit by walking the
+  history rather than reading the contributors endpoint. That route is **not
+  subject to the 500-author-email ceiling** - measured, 99 to 100 of every 100
+  commits come back with an account attached.
+
+  It exists for the question a sample cannot answer. *Where does this project's
+  work come from* is answered well at 90% of commits; *is there any adversarial
+  contributor here* is not answered at all, because a single one-commit account
+  is exactly what a sample omits.
+
+  **Measured cost: one GraphQL point per hundred commits** - 13 for a
+  1,250-commit repository, 321 for a 32,016-commit one against the 9 an
+  ordinary collection takes. Roughly 35x, growing with commit count rather than
+  contributor count. For a watchlist, never an inventory.
+- **A recommendation, not an escalation.** Every scan names the repositories a
+  sample answered badly, with the price attached:
+
+  ```
+  ! NousResearch/hermes-agent: 13.0% of commits (4,171 of 32,016) could not be
+    attributed to an account, above the 10% threshold. For complete attribution
+    re-run this repository with --deep-attribution (about 321 GraphQL points,
+    and as many round trips)
+  ```
+
+  `--deep-attribution-threshold` moves that line; 10% is a starting value, set
+  where the first measured repository falls above it so the mechanism
+  demonstrably fires on a real case. Escalating automatically was rejected:
+  turning a 9-point repository into a 321-point one spends an hour of quota on
+  a decision the user did not make, and with `--on-exhaustion wait` the default
+  it would turn a five-minute run into an overnight one.
+- `attribution.method` in `statistics.json`, because the two routes find
+  different populations and different totals. **Two runs of one repository by
+  different methods are not comparable**, and this is what stops them being
+  diffed as though they were.
+
+### Notes
+
+- **`HISTORY_QUERY` is the one query in this package allowed to select
+  `nodes`.** Everywhere else that is forbidden, because `nodes` prices a query
+  by the objects it could return. Here that pricing is precisely what is being
+  bought, and there is no other way to see individual commits.
+- **Bots are still detected under deep attribution**, from the reserved `[bot]`
+  login suffix rather than the `type` field the history query does not carry.
+  Equally authoritative rather than a fallback guess: an account name is
+  `^[A-Za-z0-9-]+$`, so a bracket cannot appear in a login anyone chose. Caught
+  because the first deep run reported **zero** bots for a repository carrying
+  four of them - a number that looked measured and was not.
+- `build_contributors` was extracted so both routes share everything after
+  "which accounts": the same detail query, the same geocoding, the same record
+  shape. Only the population differs.
+- `gaps_from_outcome` and `recommend_deep_attribution` moved from `cli` to
+  `analysis`, where they belong - the CLI had grown past a thousand lines and
+  both were deriving statistics rather than parsing arguments.
 
 ### Added (`--on-exhaustion`)
 

@@ -21,14 +21,30 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 19
-- L2 requirements: 85
-- L3 requirements: 120
-- Verified L2+L3: 205 of 205 (100.0%)
+- L2 requirements: 87
+- L3 requirements: 122
+- Verified L2+L3: 209 of 209 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
 
 ---
+
+### ATT: ATT
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-ATT-001 | L1-ATT-001 | L3-ATT-001 | _(none)_ | Implemented |
+| L2-ATT-002 | L1-ATT-001 | L3-ATT-002 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-ATT-001 | L2-ATT-001 | `tests/test_history.py::test_a_commit_with_no_account_is_counted_rather_than_dropped`<br>`tests/test_history.py::test_a_malformed_payload_is_treated_as_nothing_to_walk`<br>`tests/test_history.py::test_a_repository_with_no_default_branch_attributes_nothing`<br>`tests/test_history.py::test_accounts_come_back_ranked_by_commits`<br>`tests/test_history.py::test_commits_are_counted_per_account`<br>`tests/test_history.py::test_pages_are_the_endpoint_maximum_because_a_page_is_a_point`<br>`tests/test_history.py::test_pages_are_the_points_spent`<br>`tests/test_history.py::test_paging_follows_the_cursor_until_the_history_ends`<br>`tests/test_history.py::test_this_is_the_one_query_that_asks_for_nodes` | Implemented |
+| L3-ATT-002 | L2-ATT-002 | `tests/test_history.py::test_a_bot_is_recognised_from_its_reserved_login_suffix`<br>`tests/test_history.py::test_an_endless_history_stops_rather_than_spending_the_whole_budget` | Implemented |
 
 ### CFG: Credentials
 

@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 19
-- L2 requirements: 82
-- L3 requirements: 117
-- Verified L2+L3: 199 of 199 (100.0%)
+- L2 requirements: 85
+- L3 requirements: 120
+- Verified L2+L3: 205 of 205 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -91,7 +91,7 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-004 | L2-CLI-004 | `tests/test_cli_validate.py::test_a_clean_file_exits_zero`<br>`tests/test_cli_validate.py::test_an_unreadable_file_produces_its_own_exit_status`<br>`tests/test_cli_validate.py::test_rejected_rows_produce_a_distinct_exit_status`<br>`tests/test_cli_validate.py::test_strict_mode_reports_the_first_bad_row_and_stops` | Implemented |
 | L3-CLI-007 | L2-CLI-006 | `tests/test_cli_bands.py::test_an_unknown_metric_is_a_usage_error`<br>`tests/test_cli_bands.py::test_every_scoring_table_is_reachable`<br>`tests/test_cli_bands.py::test_it_needs_no_token`<br>`tests/test_cli_bands.py::test_no_argument_prints_every_table`<br>`tests/test_cli_bands.py::test_the_tables_carry_their_boundaries` | Implemented |
 | L3-CLI-008 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_csv_is_written_with_one_row_per_reference`<br>`tests/test_cli_scan.py::test_console_format_prints_the_rows_and_still_writes_documents`<br>`tests/test_cli_scan.py::test_fields_selects_columns_in_canonical_order`<br>`tests/test_cli_scan.py::test_json_is_available_for_the_tabular_artifact`<br>`tests/test_cli_scan.py::test_the_csv_carries_no_contributor_columns`<br>`tests/test_cli_scan.py::test_the_sources_are_the_same_ones_validate_takes`<br>`tests/test_cli_scan.py::test_two_runs_are_told_apart` | Implemented |
-| L3-CLI-009 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_bad_destination_fails_before_any_quota_is_spent`<br>`tests/test_cli_scan.py::test_a_rejected_reference_is_a_lesser_status_than_an_unreadable_one`<br>`tests/test_cli_scan.py::test_a_repository_whose_contributors_failed_keeps_its_row_and_loses_its_document`<br>`tests/test_cli_scan.py::test_a_run_that_names_nothing_still_produces_a_well_formed_file`<br>`tests/test_cli_scan.py::test_an_unaffordable_run_spends_nothing`<br>`tests/test_cli_scan.py::test_an_unreadable_repository_gets_a_row_but_no_document` | Implemented |
+| L3-CLI-009 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_bad_destination_fails_before_any_quota_is_spent`<br>`tests/test_cli_scan.py::test_a_rejected_reference_is_a_lesser_status_than_an_unreadable_one`<br>`tests/test_cli_scan.py::test_a_repository_whose_contributors_failed_keeps_its_row_and_loses_its_document`<br>`tests/test_cli_scan.py::test_a_run_that_names_nothing_still_produces_a_well_formed_file`<br>`tests/test_cli_scan.py::test_an_unaffordable_run_spends_nothing_when_told_to_fail`<br>`tests/test_cli_scan.py::test_an_unreadable_repository_gets_a_row_but_no_document` | Implemented |
 | L3-CLI-010 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_document_is_written_for_every_repository_that_was_read`<br>`tests/test_cli_scan.py::test_both_artifacts_of_one_run_carry_the_same_scan`<br>`tests/test_cli_scan.py::test_the_default_destination_is_a_githubmetrics_directory` | Implemented |
 
 ### COL: COL
@@ -161,6 +161,24 @@ through their children, so counting them too would count the same work twice.
 | L3-ERR-002 | L2-ERR-002 | `tests/test_csv_inventory.py::test_every_row_rejection_kind_is_reported_and_the_good_row_survives`<br>`tests/test_csv_inventory.py::test_issues_carry_the_line_number_and_render_like_a_compiler_diagnostic` | Implemented |
 | L3-ERR-003 | L2-ERR-003 | `tests/test_csv_inventory.py::test_a_duplicate_alone_is_enough_to_trip_strict_mode`<br>`tests/test_csv_inventory.py::test_strict_mode_aborts_on_the_first_bad_row`<br>`tests/test_csv_inventory.py::test_strict_mode_accepts_a_clean_file_unchanged` | Implemented |
 | L3-ERR-004 | L2-ERR-004 | `tests/test_csv_inventory.py::test_error_codes_are_unique_across_the_taxonomy`<br>`tests/test_csv_inventory.py::test_every_ingest_failure_shares_one_base_class` | Implemented |
+
+### EXH: EXH
+
+**L2 → L3 → Verification Artifacts**
+
+| L2 ID | Parent | L3 Children | Test Artifacts | Status |
+|-------|--------|-------------|----------------|--------|
+| L2-EXH-001 | L1-EXH-001 | L3-EXH-001 | _(none)_ | Implemented |
+| L2-EXH-002 | L1-EXH-001 | L3-EXH-002 | _(none)_ | Implemented |
+| L2-EXH-003 | L1-EXH-001 | L3-EXH-003 | _(none)_ | Implemented |
+
+**L3 → Verification Artifacts**
+
+| L3 ID | Parent | Test Artifacts | Status |
+|-------|--------|----------------|--------|
+| L3-EXH-001 | L2-EXH-001 | `tests/test_cli_scan.py::test_an_unaffordable_run_starts_anyway_by_default`<br>`tests/test_exhaustion.py::test_a_run_far_from_the_edge_never_asks_the_api`<br>`tests/test_exhaustion.py::test_the_api_is_asked_once_the_estimate_reaches_the_margin`<br>`tests/test_exhaustion.py::test_the_estimate_is_a_floor_so_it_reaches_the_margin_early` | Implemented |
+| L3-EXH-002 | L2-EXH-002 | `tests/test_exhaustion.py::test_a_run_that_never_ran_short_reports_neither`<br>`tests/test_exhaustion.py::test_exhaustion_is_recorded_even_when_the_policy_recovered_from_it`<br>`tests/test_exhaustion.py::test_fail_stops_at_the_first_sign_of_exhaustion`<br>`tests/test_exhaustion.py::test_once_stopped_nothing_else_is_attempted_or_asked`<br>`tests/test_exhaustion.py::test_partial_stops_collecting_and_says_which_repository_it_stopped_at` | Implemented |
+| L3-EXH-003 | L2-EXH-003 | `tests/test_exhaustion.py::test_a_missing_reset_time_waits_a_full_window`<br>`tests/test_exhaustion.py::test_a_reset_already_past_does_not_sleep_at_all`<br>`tests/test_exhaustion.py::test_an_implausible_reset_is_capped_rather_than_hanging_the_run`<br>`tests/test_exhaustion.py::test_wait_sleeps_to_the_reset_and_then_continues`<br>`tests/test_exhaustion.py::test_waking_into_a_still_empty_budget_waits_again` | Implemented |
 
 ### ING: Repository inventory ingestion
 

@@ -121,6 +121,11 @@ class _NullClient:
         return 4991
 
     @staticmethod
+    def graphql_budget() -> tuple[int, None]:
+        """What the budget guard reads before each repository."""
+        return 4991, None
+
+    @staticmethod
     def rate_limit_remaining() -> int:
         """As above, for the REST budget."""
         return 4995
@@ -523,8 +528,14 @@ def test_a_rejected_reference_is_a_lesser_status_than_an_unreadable_one(
 
 
 @pytest.mark.requirement("L3-CLI-009")
-def test_an_unaffordable_run_spends_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The pre-flight is the whole point: refusing costs one free request."""
+def test_an_unaffordable_run_spends_nothing_when_told_to_fail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`--on-exhaustion fail` is what every release before v0.6.0 did.
+
+    Refusing costs one free request, and leaves the quota intact for a smaller
+    run or a later one.
+    """
     collected: list[Any] = []
 
     def refuse(_client: Any, count: int) -> None:
@@ -538,10 +549,41 @@ def test_an_unaffordable_run_spends_nothing(monkeypatch: pytest.MonkeyPatch) -> 
     _patch(monkeypatch, record)
     monkeypatch.setattr("github_metrics.cli.check_budget", refuse)
 
-    result = run("pypa/virtualenv")
+    result = run("pypa/virtualenv", "--on-exhaustion", "fail")
 
     assert result.exit_code != 0
     assert not collected
+
+
+@pytest.mark.requirement("L3-EXH-001")
+def test_an_unaffordable_run_starts_anyway_by_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The deliberate behaviour change: `wait` is the default from v0.6.0.
+
+    Defaulting to `fail` optimised for the caller who already knows their
+    inventory is too large - exactly the caller who can pass a flag - and made
+    the first large scan anyone attempts a refusal. A run that fits never
+    reaches this code at all, so only runs that previously produced nothing
+    usable behave differently.
+    """
+    collected: list[Any] = []
+
+    def refuse(_client: Any, count: int) -> None:
+        raise RateLimitExhaustedError(f"{count} repositories need more than remain")
+
+    def record(*args: Any, **kwargs: Any) -> list[Outcome]:
+        del kwargs
+        collected.append(args)
+        return []
+
+    _patch(monkeypatch, record)
+    monkeypatch.setattr("github_metrics.cli.check_budget", refuse)
+
+    result = run("pypa/virtualenv", "--output", str(tmp_path))
+
+    assert result.exit_code == 0
+    assert collected, "the run should have gone ahead rather than refusing"
 
 
 @pytest.mark.requirement("L3-CLI-009")

@@ -33,6 +33,7 @@ from github_metrics.collect.contributors import (
     DEFAULT_CONTRIBUTOR_LIMIT,
     get_contributors,
 )
+from github_metrics.collect.exhaustion import BudgetGuard, Decision
 from github_metrics.collect.repository import RepoMetaData, get_repository
 from github_metrics.errors import CollectionError, ContributorCollectionError
 from github_metrics.geo import Geocoder
@@ -43,6 +44,33 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_MAX_WORKERS: Final = 8
 """Concurrent collections. Small on purpose: the limit is quota, not CPU."""
+
+
+@dataclass(frozen=True, slots=True)
+class CollectionOptions:
+    """How much of a repository's contributor data to gather.
+
+    Three switches that answer one question - how complete a picture is
+    worth paying for - and that a caller almost always sets together.
+    Grouping them keeps `collect_all` readable as *what* to collect,
+    *where* to put it and *what to do when the budget runs out*, rather
+    than a list of eight positional knobs.
+
+    Attributes:
+        contributor_limit: Contributors kept per repository. `None`, the
+            default, keeps every one GitHub returns.
+        census: Count every contributor identity GitHub reports, anonymous
+            ones included, at one extra REST request per repository. On by
+            default, because without it coverage cannot be stated honestly.
+        recover_anonymous: Walk the anonymous tail and collect the accounts
+            whose no-reply addresses name them. Costs a page per hundred
+            identities - 34 requests for a large repository against 4 -
+            which is why it can be turned off for a large inventory.
+    """
+
+    contributor_limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT
+    census: bool = True
+    recover_anonymous: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +92,15 @@ class Outcome:
             from a repository that has none.
         error: Why there is no metadata, or `None` on success.
         contributor_error: Why there are no contributors, or `None`.
+        attempted: Whether collection was tried at all. `False` only when the
+            run stopped early - the budget ran out under `--on-exhaustion
+            partial` - and the repository was never reached.
+
+            It is the difference between "measured and found wanting" and
+            "never looked at", and it is why a partial run still writes a row
+            for every reference: a CSV row is positional, so a shorter file
+            would silently change what every later row means, and a consumer
+            counting rows against the inventory would see nothing wrong.
         anonymous: What the anonymous tail contained, when it was walked.
             `None` when recovery was not asked for, which is why the exclusion
             it feeds reports commits as unknown rather than zero.
@@ -84,6 +121,7 @@ class Outcome:
     contributor_error: CollectionError | None = None
     anonymous: AnonymousTally | None = None
     identities: int | None = None
+    attempted: bool = True
 
     @property
     def ok(self) -> bool:
@@ -106,9 +144,8 @@ def collect_all(
     *,
     max_workers: int | None = None,
     geocoder: Geocoder | None = None,
-    contributor_limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT,
-    census: bool = True,
-    recover_anonymous: bool = True,
+    options: CollectionOptions | None = None,
+    guard: BudgetGuard | None = None,
 ) -> list[Outcome]:
     """Collect every reference, concurrently, in input order.
 
@@ -120,15 +157,11 @@ def collect_all(
         geocoder: Resolves contributor locations. One per run, shared across
             the workers, because its cache and its one-request-per-second pace
             are both properties of the run rather than of a repository.
-        contributor_limit: Contributors kept per repository. `None`, the
-            default, keeps every one GitHub returns.
-        census: Count every contributor identity GitHub reports, including
-            anonymous ones, at one extra REST request per repository. On by
-            default, because without it coverage cannot be stated honestly.
-        recover_anonymous: Walk the anonymous tail and collect the accounts
-            whose no-reply addresses name them. Costs a page per hundred
-            identities - 34 requests for a large repository against 4 - which
-            is why it can be turned off for a large inventory.
+        options: How complete a contributor picture to gather. Defaults to
+            everything the cheap paths can reach.
+        guard: Decides what happens when the hourly budget runs out. `None`
+            spends without checking, which is what a caller collecting a
+            handful of repositories wants.
 
     Returns:
         One outcome per reference, in the order given.
@@ -136,10 +169,16 @@ def collect_all(
     if not references:
         return []
 
+    options = options or CollectionOptions()
     workers = max_workers or min(len(references), DEFAULT_MAX_WORKERS)
     LOGGER.info("Collecting %d repositories with %d workers", len(references), workers)
 
     def one(reference: RepositoryRef) -> Outcome:
+        if guard is not None and guard.before(reference.full_name) is Decision.SKIP:
+            # The run stopped before reaching this one. Recorded rather than
+            # omitted, so the row count still matches the inventory.
+            return Outcome(reference=reference, attempted=False)
+
         try:
             metadata = get_repository(client, reference.owner, reference.repoid)
         except CollectionError as exc:
@@ -150,14 +189,14 @@ def collect_all(
 
         tally: AnonymousTally | None = None
         try:
-            if recover_anonymous:
+            if options.recover_anonymous:
                 tally = collect_anonymous(client, reference.owner, reference.repoid)
             contributors = get_contributors(
                 client,
                 reference.owner,
                 reference.repoid,
                 geocoder=geocoder,
-                limit=contributor_limit,
+                limit=options.contributor_limit,
                 extra=tally.recovered if tally else (),
             )
         except ContributorCollectionError as exc:
@@ -175,7 +214,7 @@ def collect_all(
         # The census is deliberately not inside the try above: a repository
         # whose contributors were read is fully collected, and losing only the
         # denominator should cost the coverage figure rather than the document.
-        identities = _census(client, reference, enabled=census)
+        identities = _census(client, reference, enabled=options.census)
 
         return Outcome(
             reference=reference,
@@ -188,7 +227,15 @@ def collect_all(
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="collect") as pool:
         outcomes = list(pool.map(one, references))
 
-    failed = [outcome for outcome in outcomes if not outcome.ok]
+    skipped = [outcome for outcome in outcomes if not outcome.attempted]
+    if skipped:
+        LOGGER.warning(
+            "%d of %d repositories were never attempted because the budget ran out",
+            len(skipped),
+            len(outcomes),
+        )
+
+    failed = [outcome for outcome in outcomes if outcome.attempted and not outcome.ok]
     if failed:
         LOGGER.warning(
             "%d of %d repositories could not be collected: %s",
@@ -197,7 +244,7 @@ def collect_all(
             ", ".join(outcome.reference.full_name for outcome in failed),
         )
     else:
-        LOGGER.info("Collected %d repositories", len(outcomes))
+        LOGGER.info("Collected %d repositories", len(outcomes) - len(skipped))
 
     return outcomes
 

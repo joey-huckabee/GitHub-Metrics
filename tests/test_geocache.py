@@ -241,7 +241,12 @@ def test_a_cache_with_nothing_new_is_not_rewritten(tmp_path: Path) -> None:
 def test_an_unwritable_destination_is_a_warning_rather_than_a_failed_run(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """The measurements are already written; losing a cache is not worth a crash."""
+    """The measurements are already written; losing a cache is not worth a crash.
+
+    The destination's parent is a regular file, so both the write and the
+    cleanup that follows it fail - and they fail with different errors on
+    Windows and POSIX. Neither may escape.
+    """
     blocked = tmp_path / "afile"
     blocked.write_text("not a directory", encoding="utf-8")
     cache = GeocodeCache(blocked / "geocode.json")

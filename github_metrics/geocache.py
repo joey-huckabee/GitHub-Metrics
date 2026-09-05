@@ -47,6 +47,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -315,7 +316,15 @@ class GeocodeCache:
             temporary.replace(self.path)
         except OSError as exc:
             LOGGER.warning("Geocode cache at %s could not be written (%s)", self.path, exc)
-            temporary.unlink(missing_ok=True)
+            # Suppressed, not just `missing_ok`: when the destination's parent
+            # is not a directory, `unlink` raises `NotADirectoryError` rather
+            # than `FileNotFoundError`, so the cleanup would escape the handler
+            # it lives in and fail a run whose measurements are already
+            # written. Windows and POSIX disagree about which error arrives
+            # first here, which is how this reached CI green on one and red on
+            # the other.
+            with suppress(OSError):
+                temporary.unlink(missing_ok=True)
             return
 
         self._dirty = False

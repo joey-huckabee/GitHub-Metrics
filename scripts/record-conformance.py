@@ -51,7 +51,7 @@ from github.GithubException import GithubException
 from github_metrics.client import GitHubClient
 from github_metrics.collect.anonymous import collect_anonymous
 from github_metrics.collect.census import count_identities
-from github_metrics.collect.contributors import get_contributors
+from github_metrics.collect.contributors import build_contributors, get_contributors
 from github_metrics.collect.history import attribute_from_history
 from github_metrics.collect.repository import get_repository
 from github_metrics.config import Settings
@@ -66,14 +66,26 @@ REPOSITORIES = [
     # Valid reference, absent repository: a row with identity and no
     # measurements, no document, and exit 4.
     ("ghost", "no-such-repository-conformance"),
+    # The deep-attribution set. Chosen for the two things nothing else in the
+    # fixtures has: a **bot** contributor, and a history short enough to record
+    # - 333 commits is four pages, against 321 for the repository this feature
+    # was measured on. 15 contributor identities, none anonymous.
+    ("hukkin", "tomli"),
 ]
 
 
-class Recorder:
-    """Wraps a real client and remembers everything it was asked."""
+class Recorder(GitHubClient):
+    """A real client that remembers everything it was asked.
 
-    def __init__(self, client: GitHubClient) -> None:
-        self.client = client
+    A **subclass** rather than a wrapper, because the collection functions take
+    a `GitHubClient` and a wrapper would have to be passed with a type
+    suppression at every call site - six of them, each one a small lie about
+    what this is. Subclassing makes it true instead.
+    """
+
+    def __init__(self, settings: Settings) -> None:
+        """Create a recording client from resolved settings."""
+        super().__init__(settings)
         self.graphql_calls: dict[str, Any] = {}
         self.pages: dict[str, Any] = {}
         self.contributors: dict[str, Any] = {}
@@ -82,7 +94,7 @@ class Recorder:
         """Record one GraphQL exchange, error or not."""
         key = graphql_key(query, variables)
         try:
-            headers, payload = self.client.graphql(query, variables)
+            headers, payload = super().graphql(query, variables)
         except GithubException as exc:
             self.graphql_calls[key] = {"error": type(exc).__name__, "data": _data_of(exc)}
             raise
@@ -92,19 +104,19 @@ class Recorder:
     def contributors_page(self, slug: str, **kwargs: Any) -> tuple[Any, Any]:
         """Record one raw contributors page, headers included."""
         key = page_key(slug, kwargs)
-        headers, payload = self.client.contributors_page(slug, **kwargs)
+        headers, payload = super().contributors_page(slug, **kwargs)
         self.pages[key] = {"headers": {"link": headers.get("link", "")}, "payload": payload}
         return headers, payload
 
-    def repository(self, slug: str) -> Any:
+    def repository(self, full_name: str) -> Any:
         """Record the account list PyGithub's paginated object yields.
 
         The object cannot be serialised, so what is kept is the derived list -
         exactly the fields `get_contributor_accounts` reads from it - and a
         stand-in is handed back so the caller behaves normally.
         """
-        repository = self.client.repository(slug)
-        self.contributors[slug] = [
+        repository = super().repository(full_name)
+        self.contributors[full_name] = [
             {
                 "login": account.login,
                 "id": account.id,
@@ -141,16 +153,18 @@ def _data_of(exc: Exception) -> Any:
 
 def main() -> int:
     """Record every repository in the conformance set."""
-    settings = Settings.from_env()
-    with GitHubClient(settings) as client:
-        recorder = Recorder(client)
-        budget = client.graphql_points_remaining()
+    # Bound before the `with`, because `GitHubClient.__enter__` is annotated
+    # as returning the base class and would narrow away everything this
+    # subclass adds.
+    recorder = Recorder(Settings.from_env())
+    with recorder:
+        budget = recorder.graphql_points_remaining()
 
         for owner, repoid in REPOSITORIES:
             slug = f"{owner}/{repoid}"
             print(f"recording {slug}")
             try:
-                get_repository(recorder, owner, repoid)  # type: ignore[arg-type]
+                get_repository(recorder, owner, repoid)
             except CollectionError as exc:
                 print(f"   metrics: {type(exc).__name__} (recorded)")
                 continue
@@ -158,13 +172,18 @@ def main() -> int:
             # The whole contributor path, so the aliased detail query is
             # recorded too - recording only the account list leaves the
             # replay with a hole exactly where the interesting data is.
-            get_contributors(recorder, owner, repoid)  # type: ignore[arg-type]
-            count_identities(recorder, owner, repoid)  # type: ignore[arg-type]
-            collect_anonymous(recorder, owner, repoid)  # type: ignore[arg-type]
-            attribute_from_history(recorder, owner, repoid)  # type: ignore[arg-type]
+            get_contributors(recorder, owner, repoid)
+            count_identities(recorder, owner, repoid)
+            collect_anonymous(recorder, owner, repoid)
+            walked = attribute_from_history(recorder, owner, repoid)
+            # And the detail query the *deep* route issues. It ranks by the
+            # history's own commit counts rather than the endpoint's, so the
+            # logins arrive in a different order and the recorded list-route
+            # query does not match it.
+            build_contributors(recorder, walked.accounts, slug=slug)
             print(f"   {len(recorder.contributors.get(slug, []))} contributors")
 
-        spent = budget - client.graphql_points_remaining()
+        spent = budget - recorder.graphql_points_remaining()
 
     ROOT.mkdir(parents=True, exist_ok=True)
     RECORDING.write_text(

@@ -19,7 +19,7 @@ running against the live API and none by the unit suite:
 |---|---|
 | A bot in a contributor list ended an entire scan | green — every stub returned a clean payload |
 | `check_budget` read a `/rate_limit` figure that never moves | green — the stub returned what it was told |
-| A deep run reported zero bots while carrying four | green — no test compared the two routes |
+| A deep run reported zero bots while carrying four | green — no test compared the two routes. `test_both_routes_find_the_same_bots` now does |
 | The coverage breakdown summed to 3,282 against 3,310 | green — no test summed it |
 
 The last one is the clearest case. It was arithmetic drift in a published
@@ -46,27 +46,39 @@ mode this suite exists to catch, occurring inside the suite itself.
 
 | Path | What it is |
 |---|---|
-| `tests/conformance/inventory.csv` | The input. A real two-column inventory. |
-| `tests/conformance/recording.json` | Every API exchange, captured from the live API (~18 KB). |
-| `tests/conformance/geocode.json` | A pre-populated geocode cache, so no lookup reaches Nominatim. |
-| `tests/conformance/expected/` | The three artifacts, byte for byte. |
+| `tests/conformance/inventory.csv` | The default-route input. |
+| `tests/conformance/inventory-deep.csv` | The `--deep-attribution` input. |
+| `tests/conformance/recording.json` | Every API exchange, captured from the live API (~140 KB). |
+| `tests/conformance/geocode.json` | A pre-populated geocode cache covering **every** location the fixtures publish. |
+| `tests/conformance/expected/` | The default route's artifacts, byte for byte. |
+| `tests/conformance/expected-deep/` | The deep route's artifacts. |
 
 ### Why these repositories
 
-| Repository | Exercises |
-|---|---|
-| `octocat/Hello-World` | The ordinary path: 3 contributor identities, several with locations, a document written |
-| `octocat/Spoon-Knife` | The minimum: a single identity, a single-page census with no `rel="last"` |
-| `ghost/no-such-repository-conformance` | A **valid reference to an absent repository**: identity-only row, no document, exit 4 |
+| Repository | Inventory | Exercises |
+|---|---|---|
+| `octocat/Hello-World` | default | The ordinary path: 3 contributor identities, several with locations |
+| `octocat/Spoon-Knife` | default | The minimum: one identity, a single-page census with no `rel="last"` |
+| `ghost/no-such-repository-conformance` | default | A **valid reference to an absent repository**: identity-only row, no document, exit 4 |
+| `hukkin/tomli` | deep | A **bot** contributor, and a 333-commit history — four pages, short enough to record |
 
-They are GitHub's own demonstration repositories — a handful of contributors,
-last pushed in 2024, and about as unlikely to change as a public repository
-gets. Size matters here: the whole recording is 18 KB, so it can be read in a
-review rather than trusted.
+The `octocat` repositories are GitHub's own demonstrations: a handful of
+contributors, last pushed in 2024, about as unlikely to change as a public
+repository gets.
 
-The third is not an afterthought. **Which repositories get a document is half
-the output contract**, and a suite that only scanned healthy repositories would
-not notice if that rule inverted.
+The absent repository is not an afterthought. **Which repositories get a
+document is half the output contract**, and a suite that only scanned healthy
+repositories would not notice if that rule inverted.
+
+`hukkin/tomli` was chosen against a specific constraint: deep attribution costs
+a page per hundred commits, so a fixture repository needs a bot *and* a short
+history. At 333 commits it records in four pages, against the 321 the feature
+was measured on.
+
+The recording is ~140 KB, most of it those four pages of commit nodes. That is
+past the point where it can be read end to end in review — an earlier version
+of this document claimed 18 KB and no longer holds. The parts worth reading are
+the metadata and detail responses; the history pages are bulk.
 
 ## What is asserted
 
@@ -79,7 +91,11 @@ not notice if that rule inverted.
 | `test_no_document_is_written_for_a_repository_that_was_not_collected` | The absent file, and the row that survives it |
 | `test_two_runs_of_one_input_are_identical` | Determinism, which is a requirement rather than a quality attribute |
 | `test_the_replay_covers_every_request_the_scan_makes` | No hole in the recording |
-| `test_the_run_reaches_no_network_at_all` | `geocoding.lookups == 0` — the artifact proves its own isolation |
+| `test_the_run_reaches_no_network_at_all` | `geocoding.lookups == 0` for **both** inventories — the artifact proves its own isolation |
+| `test_the_deep_route_artifacts_are_unchanged` | The `--deep-attribution` artifacts, which describe a different population |
+| `test_the_deep_route_records_the_method_that_produced_it` | `attribution.method`, without which the two routes could be diffed as though comparable |
+| `test_both_routes_find_the_same_bots` | The two bot-detection mechanisms agree |
+| `test_every_fixture_the_suite_needs_is_present` | A missing fixture fails here rather than inside a comparison |
 
 ## What is normalised, and why only that
 
@@ -146,13 +162,13 @@ together. Re-record in its own commit.
 
 ## Known limits
 
-- **It exercises the default path only.** `--deep-attribution`,
-  `--on-exhaustion partial` and `--no-recover-anonymous` have unit tests but no
-  golden artifacts. Adding a second inventory for them is the obvious next
-  extension.
-- **No repository in the set has a bot**, which is the one thing that has caused
-  two defects. `octocat`'s repositories predate GitHub Apps. A third fixture
-  repository with a bot contributor would close that.
+- **`--on-exhaustion partial` and `--no-recover-anonymous` have no golden
+  artifacts.** Both have unit tests. `partial` is the harder one to fixture,
+  because it needs a budget that runs out mid-run.
+- **No fixture repository has an anonymous contributor**, so the no-reply
+  recovery path is exercised only by unit tests. Finding one small enough to
+  record is the difficulty: the ceiling bites at 500 author emails, which means
+  a large repository and a large recording.
 - **The recording freezes upstream data**, so a change in what GitHub returns
   for these repositories is invisible until someone re-records. That is the
   deliberate trade for determinism, and it is why the one live `integration`

@@ -10,7 +10,8 @@ import pytest
 
 from github_metrics.client import GitHubClient
 from github_metrics.collect.budget import Budget, check_budget
-from github_metrics.collect.runner import collect_all
+from github_metrics.collect.exhaustion import BudgetGuard, Decision
+from github_metrics.collect.runner import collect_all, collect_one
 from github_metrics.errors import RateLimitExhaustedError, RepositoryNotFoundError
 from github_metrics.sources import RepositoryRef
 
@@ -333,3 +334,47 @@ def test_the_rest_budget_is_checked_as_well_as_the_graphql_one() -> None:
     assert "400 REST requests" in message
     assert "only 10 remain" in message
     assert "GraphQL" not in message
+
+
+@pytest.mark.requirement("L3-MET-017")
+def test_one_repository_can_be_collected_without_a_pool() -> None:
+    """`collect_one` is reachable on its own.
+
+    It used to be a closure inside `collect_all`, where the most consequential
+    sequence in the package - ask the budget, read the metrics, choose an
+    attribution route, count the identities - could only be exercised through
+    the whole worker pool, and had grown past a complexity threshold doing it.
+    """
+    stub = _StubClient()
+
+    outcome = collect_one(cast(GitHubClient, stub), RepositoryRef("pypa", "virtualenv"))
+
+    assert outcome.ok
+    assert outcome.attempted
+    assert outcome.contributors
+
+
+@pytest.mark.requirement("L3-EXH-002")
+def test_a_stopped_guard_skips_a_repository_without_collecting_it() -> None:
+    """The partial-run path, reachable now that the sequence is a function."""
+
+    class _Stopped:
+        """A guard that has already given up on the run."""
+
+        @staticmethod
+        def before(slug: str) -> Decision:
+            """Refuse every repository, as a stopped guard does."""
+            del slug
+            return Decision.SKIP
+
+    stub = _StubClient()
+
+    outcome = collect_one(
+        cast(GitHubClient, stub),
+        RepositoryRef("pypa", "virtualenv"),
+        guard=cast(BudgetGuard, _Stopped()),
+    )
+
+    assert not outcome.attempted
+    assert not outcome.ok
+    assert not stub.calls, "a skipped repository must cost nothing"

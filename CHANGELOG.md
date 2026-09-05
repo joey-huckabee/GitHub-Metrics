@@ -8,6 +8,45 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A second conformance inventory for `--deep-attribution`**, with its own
+  golden artifacts under `tests/conformance/expected-deep/`. The deep route
+  finds a different population and therefore different totals, concentration
+  and coverage — 333 of 333 commits, **100%**, against the sampling route.
+- **A fixture repository with a bot.** `hukkin/tomli` was chosen against a
+  specific constraint: deep attribution costs a page per hundred commits, so a
+  fixture needs a bot *and* a short history. At 333 commits it records in four
+  pages.
+- **`test_both_routes_find_the_same_bots`**, which is the regression this
+  fixture exists for. The contributors endpoint reports an account type;
+  `Commit.author.user` does not, so the deep route reads the reserved `[bot]`
+  suffix instead. When the feature landed the second mechanism was missing and
+  a deep run reported **zero** bots for a repository carrying four. Two
+  mechanisms, one answer, and now a test that fails if they diverge.
+
+### Fixed
+
+- **`.gitignore` excluded the second golden CSV too.** The exemption added
+  last time named `tests/conformance/expected/` exactly, so `expected-deep/`
+  fell straight back into the `githubmetrics.csv` rule — the same defect, one
+  directory over, three commits later. The exemption is now a pattern, and the
+  fixture-presence test covers both sets rather than the first.
+- **`collect_all`'s worker closure is now `collect_one`, a function.** It had
+  grown to a cognitive complexity of 26 against a threshold of 15 and could
+  only be exercised through the whole worker pool - the most consequential
+  sequence in the package (ask the budget, read the metrics, choose an
+  attribution route, count the identities) reachable only in aggregate. Two
+  tests now call it directly, including the skip path a partial run takes.
+- **The conformance recorder no longer lies about its type.** It passed itself
+  where a `GitHubClient` was expected behind six `type: ignore` comments; it is
+  a subclass now, and there are none.
+- **The conformance suite was reaching Nominatim.** Adding the second inventory
+  brought contributors whose locations the shipped cache did not cover, so six
+  lookups went over the network at one request per second — the suite's whole
+  offline guarantee, broken silently, and visible only as the runtime going
+  from 2.7 s to 22.7 s. The cache now covers every location the fixtures
+  publish, and the offline assertion covers **both** inventories rather than
+  the first.
+
 - **A conformance suite**: a real inventory, real API traffic recorded from
   GitHub, and the three artifacts committed byte for byte. The plan is
   [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).

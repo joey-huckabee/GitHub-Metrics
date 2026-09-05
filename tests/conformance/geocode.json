@@ -1,5 +1,97 @@
 {
   "entries": {
+    "czech republic": {
+      "address": {
+        "city": "",
+        "country": "Czechia",
+        "country_code": "cz",
+        "county": "",
+        "formatted_address": "Czechia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 49.7439047,
+          "longitude": 15.3381061
+        },
+        "post_code": "",
+        "query": "czech republic",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "france": {
+      "address": {
+        "city": "",
+        "country": "France",
+        "country_code": "fr",
+        "county": "",
+        "formatted_address": "France",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 46.603354,
+          "longitude": 1.8883335
+        },
+        "post_code": "",
+        "query": "france",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "helsinki, finland": {
+      "address": {
+        "city": "Helsinki",
+        "country": "Finland",
+        "country_code": "fi",
+        "county": "",
+        "formatted_address": "Helsinki, Helsinki sub-region, Uusimaa, Mainland Finland, Finland",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 60.1666204,
+          "longitude": 24.9435408
+        },
+        "post_code": "",
+        "query": "helsinki, finland",
+        "state": "Uusimaa",
+        "state_code": "FI-18",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "knowhere": {
+      "address": {
+        "city": "",
+        "country": "United States",
+        "country_code": "us",
+        "county": "King County",
+        "formatted_address": "Knowhere, King County, Washington, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 47.6958834,
+          "longitude": -121.8388882
+        },
+        "post_code": "",
+        "query": "knowhere",
+        "state": "Washington",
+        "state_code": "US-WA",
+        "state_district": "",
+        "street": "Knowhere",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
     "san francisco": {
       "address": {
         "city": "San Francisco",
@@ -23,6 +115,29 @@
       "matched": true,
       "resolved_at": "2026-01-01T00:00:00+00:00"
     },
+    "universit\u00e9 paris-saclay": {
+      "address": {
+        "city": "Orsay",
+        "country": "France",
+        "country_code": "fr",
+        "county": "Essonne",
+        "formatted_address": "Universit\u00e9 Paris-Saclay, Avenue des Sciences, Belved\u00e8re, Campus Urbain de Paris-Saclay, Orsay, Palaiseau, Essonne, Ile-de-France, Metropolitan France, 91400, France",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 48.7121501,
+          "longitude": 2.1735087
+        },
+        "post_code": "91400",
+        "query": "universit\u00e9 paris-saclay",
+        "state": "Ile-de-France",
+        "state_code": "FR-IDF",
+        "state_district": "",
+        "street": "Avenue des Sciences",
+        "suburb": "Belved\u00e8re"
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
     "utc-8": {
       "address": {
         "city": "",
@@ -39,6 +154,29 @@
         "query": "utc-8",
         "state": "Siberian Federal District",
         "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "washington": {
+      "address": {
+        "city": "Washington",
+        "country": "United States",
+        "country_code": "us",
+        "county": "",
+        "formatted_address": "Washington, District of Columbia, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 38.8950982,
+          "longitude": -77.0363849
+        },
+        "post_code": "",
+        "query": "washington",
+        "state": "District of Columbia",
+        "state_code": "US-DC",
         "state_district": "",
         "street": "",
         "suburb": ""

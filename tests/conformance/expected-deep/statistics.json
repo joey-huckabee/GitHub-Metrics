@@ -1,0 +1,107 @@
+{
+  "scan_id": "00000000-0000-4000-8000-000000000001",
+  "scan_date": "2026-01-01 00:00:00+00:00",
+  "tool_version": "0.6.0",
+  "duration_seconds": 0.11,
+  "repositories": {
+    "named": 1,
+    "collected": 1,
+    "documented": 1,
+    "failed": 0,
+    "not_attempted": 0
+  },
+  "budget": {
+    "graphql_points_spent": 0,
+    "rest_requests_spent": null,
+    "graphql_remaining": 5000,
+    "rest_remaining": null,
+    "exhaustion_policy": "wait",
+    "exhausted": false,
+    "incomplete_because_exhausted": false,
+    "waits": 0
+  },
+  "geocoding": {
+    "cache_loaded": 8,
+    "cache_expired_on_load": 0,
+    "cache_hits": 6,
+    "lookups": 0,
+    "matched": 0,
+    "unmatched": 0,
+    "service_failures": 0
+  },
+  "warnings": [],
+  "repository_statistics": [
+    {
+      "owner": "hukkin",
+      "name": "tomli",
+      "url": "https://github.com/hukkin/tomli",
+      "collected": true,
+      "documented": true,
+      "attribution": {
+        "method": "commit_history"
+      },
+      "commits": {
+        "total": 333,
+        "attributed": 333,
+        "coverage_percent": 100.0
+      },
+      "contributors": {
+        "identities": 15,
+        "collected": 15,
+        "coverage_percent": 100.0,
+        "breakdown": {
+          "linked_by_github": 15,
+          "recovered_from_noreply": 0,
+          "anonymous_unrecoverable": 0,
+          "unresolvable_accounts": 0
+        },
+        "truncated_by_github": false
+      },
+      "exclusions": [
+        {
+          "reason": "no_location_published",
+          "people": 9,
+          "commits": 324
+        }
+      ],
+      "bots": {
+        "count": 1,
+        "commits": 13,
+        "logins": [
+          "pre-commit-ci[bot]"
+        ],
+        "contribution_excluding_bots": 320
+      },
+      "concentration": {
+        "top_1_percent": 56.16,
+        "top_5_percent": 96.4,
+        "top_10_percent": 98.5,
+        "bus_factor": 1,
+        "gini": 0.8272
+      },
+      "geography": {
+        "countries": {
+          "fr": {
+            "people": 2,
+            "commits": 3
+          },
+          "cz": {
+            "people": 1,
+            "commits": 2
+          },
+          "fi": {
+            "people": 1,
+            "commits": 2
+          },
+          "us": {
+            "people": 2,
+            "commits": 2
+          }
+        },
+        "distinct_countries": 4,
+        "commits_with_known_location_percent": 2.7,
+        "commits_with_unknown_location_percent": 97.3
+      }
+    }
+  ]
+}

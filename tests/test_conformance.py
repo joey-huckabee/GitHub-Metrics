@@ -61,6 +61,17 @@ EXPECTED = CONFORMANCE / "expected"
 INVENTORY = CONFORMANCE / "inventory.csv"
 GEOCODE = CONFORMANCE / "geocode.json"
 
+EXPECTED_DEEP = CONFORMANCE / "expected-deep"
+INVENTORY_DEEP = CONFORMANCE / "inventory-deep.csv"
+"""The second set, scanned with `--deep-attribution`.
+
+It exists for two things the first set cannot show. `hukkin/tomli` has a **bot**
+contributor, and the deep route learns that from the reserved `[bot]` login
+suffix rather than from the account type the contributors endpoint reports -
+two different mechanisms that must agree, and did not when the feature landed.
+Its history is 333 commits, four pages, short enough to record.
+"""
+
 # Pinned so the artifacts are reproducible. A run identity is a property of the
 # run, not of the data, and leaving it random would make every field that
 # carries it differ on every execution.
@@ -199,15 +210,22 @@ the tests still run, and the review is `git diff tests/conformance/expected`.
 """
 
 
-def compare(produced: Path, relative: Path, *, normalised: bool = False) -> None:
+def compare(
+    produced: Path,
+    relative: Path,
+    *,
+    golden_root: Path = EXPECTED,
+    normalised: bool = False,
+) -> None:
     """Assert one artifact matches its golden copy, or rewrite that copy.
 
     Args:
         produced: The file the scan just wrote.
-        relative: Where it belongs under `expected/`.
+        relative: Where it belongs under the golden root.
+        golden_root: Which golden set this artifact belongs to.
         normalised: Whether to blank the fields that change per run or release.
     """
-    golden = EXPECTED / relative
+    golden = golden_root / relative
     if REGENERATE:
         golden.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(produced, golden)
@@ -224,8 +242,8 @@ def normalise(text: str) -> str:
     return VOLATILE.sub(lambda match: f'"{match.group(1)}": "<normalised>"', text)
 
 
-def run_scan(tmp_path: Path, *extra: str) -> Any:
-    """Scan the conformance inventory into a temporary directory."""
+def run_scan(tmp_path: Path, *extra: str, inventory: Path = INVENTORY) -> Any:
+    """Scan one conformance inventory into a temporary directory."""
     # A copy, so a run cannot write back into the committed fixture.
     cache = tmp_path / "geocode.json"
     if not cache.exists():
@@ -238,7 +256,7 @@ def run_scan(tmp_path: Path, *extra: str) -> Any:
             "--token",
             "ghp_conformance",
             "scan",
-            str(INVENTORY),
+            str(inventory),
             "--output",
             str(tmp_path),
             *extra,
@@ -367,14 +385,23 @@ def test_the_run_reaches_no_network_at_all(tmp_path: Path) -> None:
     which would make it slow, flaky, and dependent on a third party's uptime
     for a result that has nothing to do with the change under test.
     """
-    run_scan(tmp_path)
+    for inventory, extra in (
+        (INVENTORY, ()),
+        # The deep set is checked too: it was added later, its contributors
+        # publish locations the first set does not, and the suite silently
+        # started geocoding over the network until this covered it.
+        (INVENTORY_DEEP, ("--deep-attribution",)),
+    ):
+        target = tmp_path / inventory.stem
+        target.mkdir()
+        run_scan(target, *extra, inventory=inventory)
 
-    statistics = json.loads((tmp_path / "statistics.json").read_text(encoding="utf-8"))
-    geocoding = statistics["geocoding"]
+        statistics = json.loads((target / "statistics.json").read_text(encoding="utf-8"))
+        geocoding = statistics["geocoding"]
 
-    assert geocoding["lookups"] == 0
-    assert geocoding["service_failures"] == 0
-    assert geocoding["cache_hits"] > 0, "the fixture cache was not used at all"
+        assert geocoding["lookups"] == 0, f"{inventory.name} reached Nominatim"
+        assert geocoding["service_failures"] == 0
+        assert geocoding["cache_hits"] > 0, f"{inventory.name} used no cached location"
 
 
 @pytest.mark.requirement("L3-CNF-003")
@@ -392,14 +419,96 @@ def test_every_fixture_the_suite_needs_is_present() -> None:
     """
     required = [
         INVENTORY,
+        INVENTORY_DEEP,
         RECORDING,
         GEOCODE,
         EXPECTED / "githubmetrics.csv",
         EXPECTED / "statistics.json",
+        EXPECTED_DEEP / "githubmetrics.csv",
+        EXPECTED_DEEP / "statistics.json",
     ]
 
     missing = [path for path in required if not path.is_file()]
 
-    assert not missing, f"conformance fixtures missing: {[p.name for p in missing]}"
-    # At least one document, or the suite would be asserting nothing about them.
-    assert any(path.parent != EXPECTED for path in EXPECTED.rglob("*.json"))
+    assert not missing, f"conformance fixtures missing: {[str(p) for p in missing]}"
+    for root in (EXPECTED, EXPECTED_DEEP):
+        # At least one document, or the suite asserts nothing about them.
+        assert any(path.parent != root for path in root.rglob("*.json")), root
+
+
+# ---------------------------------------------------------------------------
+# The deep-attribution route
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-CNF-004")
+@pytest.mark.usefixtures("replay")
+def test_the_deep_route_artifacts_are_unchanged(tmp_path: Path) -> None:
+    """A different population, and therefore a different everything.
+
+    Walking the history finds contributors the endpoint's 500-email ceiling
+    would have hidden, so the totals, the concentration and the coverage all
+    differ from the same repository scanned normally. That is the point, and it
+    is why `attribution.method` travels with the result.
+    """
+    run_scan(tmp_path, "--deep-attribution", inventory=INVENTORY_DEEP)
+
+    compare(
+        tmp_path / "githubmetrics.csv",
+        Path("githubmetrics.csv"),
+        golden_root=EXPECTED_DEEP,
+    )
+    compare(
+        tmp_path / "statistics.json",
+        Path("statistics.json"),
+        golden_root=EXPECTED_DEEP,
+        normalised=True,
+    )
+    for path in sorted(tmp_path.rglob("*.json")):
+        if path.parent == tmp_path:
+            continue
+        compare(path, path.relative_to(tmp_path), golden_root=EXPECTED_DEEP)
+
+
+@pytest.mark.requirement("L3-CNF-004")
+@pytest.mark.usefixtures("replay")
+def test_the_deep_route_records_the_method_that_produced_it(tmp_path: Path) -> None:
+    """Two runs of one repository by different methods are not comparable, and
+    only this field stops them being diffed as though they were."""
+    run_scan(tmp_path, "--deep-attribution", inventory=INVENTORY_DEEP)
+
+    statistics = json.loads((tmp_path / "statistics.json").read_text(encoding="utf-8"))
+
+    assert statistics["repository_statistics"][0]["attribution"]["method"] == "commit_history"
+
+
+@pytest.mark.requirement("L3-CNF-005")
+@pytest.mark.usefixtures("replay")
+def test_both_routes_find_the_same_bots(tmp_path: Path) -> None:
+    """The regression this fixture exists for.
+
+    The contributors endpoint reports an account type; `Commit.author.user`
+    does not, so the deep route reads the reserved `[bot]` login suffix
+    instead. When the feature landed the second mechanism was missing entirely
+    and a deep run reported **zero** bots for a repository carrying four - a
+    number that looked measured and was not.
+
+    Two mechanisms, one answer. Nothing but a test comparing the routes over
+    one repository would notice them diverging again.
+    """
+    listed = tmp_path / "listed"
+    deep = tmp_path / "deep"
+    listed.mkdir()
+    deep.mkdir()
+
+    run_scan(listed, inventory=INVENTORY_DEEP)
+    run_scan(deep, "--deep-attribution", inventory=INVENTORY_DEEP)
+
+    def bots_of(root: Path) -> set[str]:
+        statistics = json.loads((root / "statistics.json").read_text(encoding="utf-8"))
+        return set(statistics["repository_statistics"][0]["bots"]["logins"])
+
+    from_list = bots_of(listed)
+
+    assert from_list, "the fixture repository is supposed to have a bot"
+    assert bots_of(deep) == from_list

@@ -2,7 +2,7 @@
   "scan_id": "00000000-0000-4000-8000-000000000001",
   "scan_date": "2026-01-01 00:00:00+00:00",
   "tool_version": "0.6.0",
-  "duration_seconds": 0.11,
+  "duration_seconds": 0.12,
   "repositories": {
     "named": 3,
     "collected": 2,
@@ -21,7 +21,7 @@
     "waits": 0
   },
   "geocoding": {
-    "cache_loaded": 2,
+    "cache_loaded": 8,
     "cache_expired_on_load": 0,
     "cache_hits": 3,
     "lookups": 0,

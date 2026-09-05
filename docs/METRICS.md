@@ -613,15 +613,79 @@ it aligns positionally with the CSV.
 | `commits.total` | `int` | Commits on the default branch, from `history { totalCount }`. Costs one GraphQL point. `null` if the repository was not collected. | **Settled** |
 | `commits.attributed` | `int` | Commits belonging to collected contributors — equal to the document's `contribution_total`. | **Settled** |
 | `commits.coverage_percent` | `float` | `attributed / total * 100`. | **Settled** |
-| `contributors.identities` | `int` | Every contributor identity GitHub reports, including those with no account. | **Settled** |
+| `contributors.identities` | `int` | Every contributor identity GitHub reports, including those with no account. From the census; see below. | **Settled** |
 | `contributors.collected` | `int` | How many appear in the document. | **Settled** |
 | `contributors.coverage_percent` | `float` | `collected / identities * 100`. | **Settled** |
+| `contributors.breakdown` | `object` | The four components of `identities`; see below. | **Settled** |
+| `contributors.truncated_by_github` | `bool` | Whether GitHub's 500-email ceiling affected this repository at all. | **Settled** |
 
-**`commits.coverage_percent` is the most important number in the file.** It is
-the difference between "87% of this project's work is characterised" and an
-implied census. `contributors.coverage_percent` is usually far lower and that
-is expected — the uncollected tail is, by construction, the people who
-contributed least.
+### Read the two coverage figures together
+
+They answer different questions and neither is sufficient alone. Measured in
+one run:
+
+| Repository | Contributors | Commits |
+|---|---|---|
+| `NousResearch/hermes-agent` | 395 of 3,310 — **11.9%** | 27,845 of 32,016 — **87.0%** |
+| `pypa/virtualenv` | 156 of 161 — **96.9%** | 1,245 of 1,250 — **99.6%** |
+
+For `hermes-agent`, **88% of the people are missing and 13% of the work is.**
+The uncollected tail averages about 1.4 commits each, so:
+
+- *"Where does this project's work come from?"* is answered well — 87% of the
+  commits are characterised.
+- *"Did this particular person contribute?"* is not answered at all — most
+  people are absent, and they are absent non-randomly.
+
+A single percentage cannot carry both, which is why both are published.
+`truncated_by_github` is the one-glance version: `false` means the contributor
+list is everyone and neither caveat applies.
+
+### The census: where `identities` comes from
+
+`contributors.identities` counts every identity GitHub reports for the
+repository, **including the anonymous ones**. It is taken with a single extra
+REST request per repository, and it is on by default because without it the
+fraction would be `collected / collected` — 100% for a repository whose real
+figure is 11.9%, a number that overstates its own completeness.
+
+The request is cheap by construction rather than by luck. The contributors
+endpoint paginates by offset and returns a `rel="last"` link, so asking for
+`per_page=1&anon=1` makes the last page number *be* the total count. One
+request answers it whatever the repository's size — 3,310 for `hermes-agent`,
+161 for `virtualenv` — instead of the 34 pages that walking the list would
+cost.
+
+**The census counts people, not their commits.** Reading how many commits the
+anonymous tail holds needs every page of that list, which is the expensive
+thing the census avoids. `exclusions[].commits` is therefore `null` rather than
+`0` for `anonymous_no_account`: zero would claim the tail contributed nothing,
+which for a large repository is false by thousands of commits.
+
+### `contributors.breakdown`
+
+`coverage_percent` alone hides *which* of several different things happened,
+and they call for different responses. The components sum exactly to
+`identities`, so the breakdown can be checked rather than trusted.
+
+| Component | Meaning | Can it be improved? |
+|---|---|---|
+| `linked_by_github` | Inside the 500-author-email ceiling, so GitHub linked an account and the detail query resolved it. | Already collected |
+| `recovered_from_noreply` | Beyond the ceiling, but publishing a `NNN+login@users.noreply.github.com` address carrying GitHub's own account id and login. | Recovered when enabled |
+| `anonymous_unrecoverable` | Beyond the ceiling with a real email address. GitHub exposes no email-to-user lookup, deliberately. | **No** — not by any API |
+| `unresolvable_accounts` | A login GitHub listed that GraphQL then could not resolve: deleted or suspended between the two calls. | No |
+
+Read it as a diagnosis. A large `anonymous_unrecoverable` is a property of the
+repository's size and there is nothing to be done about most of it. A large
+`unresolvable_accounts` is a property of its age, and means accounts are
+disappearing between the two calls. 12% coverage from the first is expected;
+12% from the second would be a defect worth investigating.
+
+**`commits.coverage_percent` remains the most important number in the file.**
+It is the difference between "87% of this project's work is characterised" and
+an implied census. `contributors.coverage_percent` is usually far lower, and
+that is expected rather than alarming — the uncollected tail is, by
+construction, the people who contributed least.
 
 #### Exclusions
 
@@ -634,6 +698,10 @@ either collected, or carrying one of these reasons.
 | `anonymous_recovered_noreply` | **recovered** | Beyond the 500-email ceiling, but publishing a `NNN+login@users.noreply.github.com` address, from which GitHub's own account id and login can be read. Recovered and collected from v0.6.0, so this bucket records how many the recovery rescued. |
 | `anonymous_no_account` | no | Beyond the ceiling, publishing a real address. GitHub exposes no email-to-user lookup, so no API resolves these. |
 | `account_unresolvable` | no | A login GitHub reported that GraphQL then could not resolve — deleted or suspended between the two calls. |
+
+`people` is always counted. **`commits` is `null` unless the anonymous list was
+walked**, because the census counts identities in one request and reading their
+commits costs every page. `0` would be a different and usually false claim.
 
 The next three are not exclusions from *collection*. The contributor is in the
 document; what is absent is a usable location, which is what bounds any

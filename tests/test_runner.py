@@ -66,6 +66,16 @@ class _StubClient:
         self.concurrent = 0
         self.peak = 0
         self._lock = threading.Lock()
+        # How many identities the census should report, anonymous included.
+        # Larger than the collected list on purpose: the point of the census is
+        # that the two differ.
+        self.identities = 50
+
+    def contributors_page(self, slug: str, **_kwargs: Any) -> tuple[dict[str, Any], Any]:
+        """Answer the identity census with a `rel="last"` page number."""
+        del slug
+        link = f'<https://api.github.com/x?anon=1&page={self.identities}&per_page=1>; rel="last"'
+        return {"link": link}, [{}]
 
     def graphql(
         self, query: str, variables: dict[str, Any]

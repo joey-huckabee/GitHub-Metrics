@@ -134,12 +134,16 @@ class Exclusion:
     Attributes:
         reason: Why these identities are not fully represented.
         people: How many identities.
-        commits: How many commits they hold between them.
+        commits: How many commits they hold between them, or `None` when that
+            was not counted. The identity census counts *people* in one
+            request; counting their commits needs every page of the anonymous
+            list. `0` would claim the group contributed nothing, which is a
+            different statement and usually a false one.
     """
 
     reason: ExclusionReason
     people: int = 0
-    commits: int = 0
+    commits: int | None = None
 
     def to_mapping(self) -> dict[str, Any]:
         """Render as a JSON-ready mapping."""
@@ -161,8 +165,8 @@ class IdentityGaps:
 
     Attributes:
         identities: Every contributor identity GitHub reports, including
-            those with no account. `None` when the wider count was not
-            taken, in which case what was collected is all that is known.
+            those with no account. `None` when the census was not taken, in
+            which case what was collected is all that is known.
         unrecoverable: Identities beyond GitHub's email ceiling that no API
             resolves, with their commits.
         recovered: Identities rescued from a no-reply address.
@@ -173,6 +177,39 @@ class IdentityGaps:
     unrecoverable: Exclusion | None = None
     recovered: int = 0
     unresolvable: int = 0
+
+    def breakdown(self, collected: int) -> dict[str, int]:
+        """Account for every identity, in categories needing different responses.
+
+        A single coverage percentage hides which of two very different things
+        happened. 12% coverage because GitHub's email ceiling bit is a property
+        of the repository's size and nothing can be done about most of it; 12%
+        because accounts were deleted is a property of its age. The components
+        say which.
+
+        Args:
+            collected: Contributors that reached the document.
+
+        Returns:
+            Counts that **sum to `identities`**, so the breakdown can be
+            checked rather than trusted.
+        """
+        recovered = min(self.recovered, collected)
+        unrecoverable = self.unrecoverable.people if self.unrecoverable else 0
+        return {
+            # Within GitHub's 500-author-email ceiling, so an account was
+            # linked and the detail query could resolve it.
+            "linked_by_github": collected - recovered,
+            # Beyond the ceiling, but publishing a no-reply address carrying
+            # GitHub's own account id and login.
+            "recovered_from_noreply": recovered,
+            # Beyond the ceiling with a real email. GitHub exposes no
+            # email-to-user lookup, so no API reaches these.
+            "anonymous_unrecoverable": unrecoverable,
+            # A login GitHub listed that GraphQL then could not resolve:
+            # deleted or suspended between the two calls.
+            "unresolvable_accounts": self.unresolvable,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -310,8 +347,10 @@ class RepositoryStatistics:
             not be read.
         commits_attributed: Commits belonging to collected contributors.
         contributor_identities: Every identity GitHub reports, including those
-            with no account. Equals `contributors_collected` when the extra
-            count was not taken.
+            with no account. Equals `contributors_collected` when the census
+            was not taken.
+        gaps: The components of the identity count, so contributor coverage can
+            be read as a breakdown rather than as one opaque percentage.
         contributors_collected: How many appear in the document.
         exclusions: Who is missing and why.
         bots: Bot contributors and their commits.
@@ -329,6 +368,7 @@ class RepositoryStatistics:
     commits_attributed: int = 0
     contributor_identities: int = 0
     contributors_collected: int = 0
+    gaps: IdentityGaps = field(default_factory=IdentityGaps)
     exclusions: tuple[Exclusion, ...] = ()
     bots: BotStatistics = field(default_factory=BotStatistics)
     concentration: Concentration = field(default_factory=Concentration)
@@ -354,6 +394,11 @@ class RepositoryStatistics:
                 "coverage_percent": percent(
                     self.contributors_collected, self.contributor_identities
                 ),
+                "breakdown": self.gaps.breakdown(self.contributors_collected),
+                # The single most useful boolean in the file: whether GitHub's
+                # 500-author-email ceiling affected this repository at all.
+                # False means the contributor list is everyone.
+                "truncated_by_github": (self.contributor_identities > self.contributors_collected),
             },
             "exclusions": [item.to_mapping() for item in self.exclusions],
             "bots": self.bots.to_mapping(),

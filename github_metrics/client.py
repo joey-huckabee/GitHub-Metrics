@@ -154,6 +154,42 @@ class GitHubClient:
             "GET", f"{self._settings.api_url}/rate_limit"
         )
 
+    def contributors_page(
+        self,
+        slug: str,
+        *,
+        page: int = 1,
+        per_page: int = 100,
+        anonymous: bool = False,
+    ) -> tuple[dict[str, Any], Any]:
+        """Fetch one page of the contributors list, headers included.
+
+        PyGithub's `PaginatedList` hides the `Link` header, and that header is
+        the whole point here: with `per_page=1` its `rel="last"` page number is
+        the total identity count, which turns a 34-request census into a
+        one-request one.
+
+        Args:
+            slug: The `owner/name` identifier.
+            page: Which page to fetch, 1-based.
+            per_page: Entries per page, at most 100.
+            anonymous: Include contributors GitHub could not link to an
+                account. These carry a name and an email and nothing else.
+
+        Returns:
+            The `(headers, payload)` pair, so the caller can read pagination
+            as well as content.
+        """
+        parameters: dict[str, Any] = {"page": page, "per_page": per_page}
+        if anonymous:
+            parameters["anon"] = "1"
+        LOGGER.debug("Requesting contributors page %d for %s (anon=%s)", page, slug, anonymous)
+        return self._github.requester.requestJsonAndCheck(
+            "GET",
+            f"{self._settings.api_url}/repos/{slug}/contributors",
+            parameters=parameters,
+        )
+
     def rate_limit_remaining(self) -> int:
         """Return the number of core REST requests still available.
 

@@ -153,6 +153,105 @@ class Outcome:
         return self.metadata is not None and self.contributor_error is None
 
 
+def collect_one(
+    client: GitHubClient,
+    reference: RepositoryRef,
+    *,
+    geocoder: Geocoder | None = None,
+    options: CollectionOptions | None = None,
+    guard: BudgetGuard | None = None,
+) -> Outcome:
+    """Collect one repository, whatever the run around it is doing.
+
+    Lifted out of `collect_all`'s worker closure, where it had grown to
+    the point of failing a complexity threshold and could only be reached
+    through the whole pool. The sequence it runs - ask the budget, read the
+    metrics, take one of two attribution routes, count the identities - is
+    the most consequential in the package, and it should be callable on its
+    own.
+
+    Args:
+        client: An authenticated client.
+        reference: The repository to collect.
+        geocoder: Resolves contributor locations.
+        options: How complete a contributor picture to gather.
+        guard: Decides what happens when the hourly budget runs out.
+
+    Returns:
+        What this reference produced. Never raises for an expected
+        failure: every reference produces an outcome.
+    """
+    options = options or CollectionOptions()
+    if guard is not None and guard.before(reference.full_name) is Decision.SKIP:
+        # The run stopped before reaching this one. Recorded rather than
+        # omitted, so the row count still matches the inventory.
+        return Outcome(reference=reference, attempted=False)
+
+    try:
+        metadata = get_repository(client, reference.owner, reference.repoid)
+    except CollectionError as exc:
+        # Every reference produces an outcome. Letting this propagate would
+        # abandon the repositories after it and lose the ones before it.
+        LOGGER.warning("%s could not be collected: %s", reference.full_name, exc)
+        return Outcome(reference=reference, error=exc)
+
+    tally: AnonymousTally | None = None
+    walked: HistoryAttribution | None = None
+    try:
+        if options.deep_attribution:
+            # The history is the whole population, so neither the
+            # contributors endpoint nor its anonymous tail adds anything -
+            # and paying for them would be paying twice for less.
+            walked = attribute_from_history(client, reference.owner, reference.repoid)
+            contributors = build_contributors(
+                client,
+                walked.accounts,
+                slug=reference.full_name,
+                geocoder=geocoder,
+            )
+        else:
+            if options.recover_anonymous:
+                tally = collect_anonymous(client, reference.owner, reference.repoid)
+            contributors = get_contributors(
+                client,
+                reference.owner,
+                reference.repoid,
+                geocoder=geocoder,
+                limit=options.contributor_limit,
+                extra=tally.recovered if tally else (),
+            )
+    except ContributorCollectionError as exc:
+        # The measurements survive; only the document is lost. Warned
+        # rather than swallowed, because the missing file would otherwise
+        # read as "this repository was never named".
+        LOGGER.warning(
+            "%s was measured but its contributors could not be read, so no "
+            "document is written for it: %s",
+            reference.full_name,
+            exc,
+        )
+        return Outcome(reference=reference, metadata=metadata, contributor_error=exc)
+
+    # The census is deliberately not inside the try above: a repository
+    # whose contributors were read is fully collected, and losing only the
+    # denominator should cost the coverage figure rather than the document.
+    identities = _census(client, reference, enabled=options.census and not options.deep_attribution)
+
+    return Outcome(
+        reference=reference,
+        metadata=metadata,
+        contributors=tuple(contributors),
+        anonymous=tally,
+        history=walked,
+        attribution=(
+            AttributionMethod.COMMIT_HISTORY
+            if walked is not None
+            else AttributionMethod.CONTRIBUTOR_LIST
+        ),
+        identities=identities,
+    )
+
+
 def collect_all(
     client: GitHubClient,
     references: Sequence[RepositoryRef],
@@ -188,80 +287,19 @@ def collect_all(
     workers = max_workers or min(len(references), DEFAULT_MAX_WORKERS)
     LOGGER.info("Collecting %d repositories with %d workers", len(references), workers)
 
-    def one(reference: RepositoryRef) -> Outcome:
-        if guard is not None and guard.before(reference.full_name) is Decision.SKIP:
-            # The run stopped before reaching this one. Recorded rather than
-            # omitted, so the row count still matches the inventory.
-            return Outcome(reference=reference, attempted=False)
-
-        try:
-            metadata = get_repository(client, reference.owner, reference.repoid)
-        except CollectionError as exc:
-            # Every reference produces an outcome. Letting this propagate would
-            # abandon the repositories after it and lose the ones before it.
-            LOGGER.warning("%s could not be collected: %s", reference.full_name, exc)
-            return Outcome(reference=reference, error=exc)
-
-        tally: AnonymousTally | None = None
-        walked: HistoryAttribution | None = None
-        try:
-            if options.deep_attribution:
-                # The history is the whole population, so neither the
-                # contributors endpoint nor its anonymous tail adds anything -
-                # and paying for them would be paying twice for less.
-                walked = attribute_from_history(client, reference.owner, reference.repoid)
-                contributors = build_contributors(
-                    client,
-                    walked.accounts,
-                    slug=reference.full_name,
-                    geocoder=geocoder,
-                )
-            else:
-                if options.recover_anonymous:
-                    tally = collect_anonymous(client, reference.owner, reference.repoid)
-                contributors = get_contributors(
-                    client,
-                    reference.owner,
-                    reference.repoid,
-                    geocoder=geocoder,
-                    limit=options.contributor_limit,
-                    extra=tally.recovered if tally else (),
-                )
-        except ContributorCollectionError as exc:
-            # The measurements survive; only the document is lost. Warned
-            # rather than swallowed, because the missing file would otherwise
-            # read as "this repository was never named".
-            LOGGER.warning(
-                "%s was measured but its contributors could not be read, so no "
-                "document is written for it: %s",
-                reference.full_name,
-                exc,
-            )
-            return Outcome(reference=reference, metadata=metadata, contributor_error=exc)
-
-        # The census is deliberately not inside the try above: a repository
-        # whose contributors were read is fully collected, and losing only the
-        # denominator should cost the coverage figure rather than the document.
-        identities = _census(
-            client, reference, enabled=options.census and not options.deep_attribution
-        )
-
-        return Outcome(
-            reference=reference,
-            metadata=metadata,
-            contributors=tuple(contributors),
-            anonymous=tally,
-            history=walked,
-            attribution=(
-                AttributionMethod.COMMIT_HISTORY
-                if walked is not None
-                else AttributionMethod.CONTRIBUTOR_LIST
-            ),
-            identities=identities,
-        )
-
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="collect") as pool:
-        outcomes = list(pool.map(one, references))
+        outcomes = list(
+            pool.map(
+                lambda reference: collect_one(
+                    client,
+                    reference,
+                    geocoder=geocoder,
+                    options=options,
+                    guard=guard,
+                ),
+                references,
+            )
+        )
 
     skipped = [outcome for outcome in outcomes if not outcome.attempted]
     if skipped:

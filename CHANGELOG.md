@@ -30,6 +30,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   fell straight back into the `githubmetrics.csv` rule — the same defect, one
   directory over, three commits later. The exemption is now a pattern, and the
   fixture-presence test covers both sets rather than the first.
+- **`collect_all`'s worker closure is now `collect_one`, a function.** It had
+  grown to a cognitive complexity of 26 against a threshold of 15 and could
+  only be exercised through the whole worker pool - the most consequential
+  sequence in the package (ask the budget, read the metrics, choose an
+  attribution route, count the identities) reachable only in aggregate. Two
+  tests now call it directly, including the skip path a partial run takes.
+- **The conformance recorder no longer lies about its type.** It passed itself
+  where a `GitHubClient` was expected behind six `type: ignore` comments; it is
+  a subclass now, and there are none.
 - **The conformance suite was reaching Nominatim.** Adding the second inventory
   brought contributors whose locations the shipped cache did not cover, so six
   lookups went over the network at one request per second — the suite's whole

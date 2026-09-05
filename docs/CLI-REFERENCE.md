@@ -384,16 +384,23 @@ the inventory look exactly like ones that could not be read. Refusing costs one
 request that does not count against the limit.
 
 No reserve is held back, so the budgets run to zero and a full hourly quota
-collects exactly 2,500 repositories — GraphQL binds first, at two points
+collects **at most** 2,500 repositories — GraphQL binds first, at two points
 against REST's one request. Keeping points back would buy a convenience by
 refusing a run the token could actually have finished.
+
+**The pre-flight is a floor, not a guarantee.** Since every contributor is
+collected, a repository's real cost rises with its contributor list and nothing
+knows that count until the list is read. The check refuses a run that cannot
+afford the minimum; it does not promise that a run which starts will finish.
 
 **Geocoding, not the API, sets the pace of a large run.** Nominatim permits one
 request per second, and the tool enforces it: exceeding the policy gets the
 user agent blocked, which fails every later run rather than the one that
-misbehaved. Locations are cached per run, so the cost is the number of
-*distinct* locations rather than of contributors — but a first run over a
-large inventory takes hours.
+misbehaved. The cost is therefore the number of *distinct* locations rather
+than of contributors — and, because resolved locations are cached to disk
+between runs, the number of distinct locations **never seen before**. A first
+run over a large inventory still takes hours; a second over the same inventory
+does not. `GEOCODE_CACHE_PATH` moves or disables the cache file.
 
 ### Rows
 

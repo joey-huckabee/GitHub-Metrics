@@ -90,7 +90,8 @@ someone will look.
 | `config` | `Settings` from environment | never | Requires `GITHUB_TOKEN` |
 | `client` | Authenticated PyGithub wrapper | yes | |
 | `metrics` | Collection over the API | via `client` | |
-| `geo` | Location → coordinates | yes | Nominatim, cached per run |
+| `geo` | Location → coordinates | yes | Nominatim, paced at 1/sec |
+| `geocache` | The cache file behind `geo` | never | Owns the format so `geo` need not |
 | `models` | Serializable result types | never | |
 
 ## Ingestion data flow

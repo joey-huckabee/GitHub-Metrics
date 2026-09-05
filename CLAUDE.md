@@ -100,7 +100,8 @@ before doing it.
 | `client` | Authenticated PyGithub wrapper | yes |
 | `collect/` | Collection: repository, counts, timestamps, contributors, credentials | via `client` |
 | `analysis/` | Scoring. Band tables and the weights they produce | never |
-| `geo` | Location to a structured address (Nominatim, paced and cached per run) | yes |
+| `geo` | Location to a structured address (Nominatim, paced at one per second) | yes |
+| `geocache` | The on-disk geocode cache: format, expiry, atomic write | never |
 
 `sources/` is where a repository gets named, in any of the three forms a
 command accepts: a slug, a GitHub URL, or a CSV inventory. `resolve_sources`
@@ -253,23 +254,49 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   construction, and costs one point per repository for the whole query.
   `Requester.graphql_query()` is on PyGithub already, so this adds no
   dependency.
-- **Two queries per repository, and neither asks for `nodes`.** GraphQL bills
-  per query rather than per field, so `collect/repository.py` folds every value
-  a row needs into one document costing **one point** - measured, not assumed
-  - and `collect/contributors.py` folds every contributor's detail into a
-  second, aliased one. The condition that keeps both cheap is the absence of a
-  `nodes` selection: `nodes` prices a query by the number of objects it could
-  return, so adding one would make the cheapest route the most expensive one
-  for exactly the largest repositories, and nothing would fail visibly. Tests
-  assert neither query contains `nodes`.
+- **No query asks for `nodes`.** GraphQL bills per query rather than per field,
+  so `collect/repository.py` folds every value a row needs into one document
+  costing **one point** - measured, not assumed - and
+  `collect/contributors.py` folds contributor detail into aliased ones. The
+  condition that keeps both cheap is the absence of a `nodes` selection:
+  `nodes` prices a query by the number of objects it could return, so adding
+  one would make the cheapest route the most expensive one for exactly the
+  largest repositories, and nothing would fail visibly. Tests assert neither
+  query contains `nodes`.
 
-  The contributor **list** is the one REST call in a scan, because GraphQL has
-  no connection reporting commits attributed per account. Its *details* are
+  The contributor **list** is the one REST endpoint in a scan, because GraphQL
+  has no connection reporting commits attributed per account. Its *details* are
   deliberately not REST: the contributors payload carries no name, company or
-  location, so PyGithub would complete each account lazily at one request each
-  - 26 per repository - and a 200-repository inventory would exhaust the REST
-  budget. A scan therefore costs 2 GraphQL points and 1 REST request per
-  repository, and `check_budget` checks **both**.
+  location, so PyGithub would complete each account lazily at one request each,
+  and any large repository would exhaust the REST budget on its own.
+
+- **The contributor list is unbounded, and that changed what the budget can
+  promise** (ADR-0006). `DEFAULT_CONTRIBUTOR_LIMIT` is `None`: every
+  contributor GitHub attributes to an account is collected, because
+  `contribution_total` and the percentages over it should describe the
+  repository rather than a 25-account sample of it. Three consequences, none
+  optional:
+
+  - the REST list is paginated at `client.PER_PAGE` (100, the endpoint maximum)
+    rather than PyGithub's default 30;
+  - the aliased detail query is chunked at `DETAIL_CHUNK_SIZE`. This is **not**
+    a cost control - a chunk costs one point whatever it carries, since the
+    cost formula counts connections and this document has none. It is a
+    **timeout** control: GitHub terminates any query it has not processed in
+    ten seconds;
+  - `check_budget` is now a **floor**, not a guarantee. `MIN_POINTS_PER_REPOSITORY`
+    and `MIN_REQUESTS_PER_REPOSITORY` are the minimum, a repository's real cost
+    depends on a contributor count nothing knows until the list is read, and
+    passing the pre-flight is necessary but not sufficient. Do not "restore"
+    this to an estimate by multiplying by an assumed average - a number that
+    looks like the old guarantee and is not one is exactly the failure this
+    repository keeps getting caught by.
+
+  GitHub links only the first **500 author email addresses** to accounts, and
+  `anon` is deliberately left unset, so every collected contributor has a real
+  account and a repository past that ceiling reports a total below its true
+  commit count. That is a property of the source; `METRICS.md` records it
+  rather than the code working around it.
 
 - **Two artifacts, two purposes.** `githubmetrics.csv` is the comparable
   table - twenty columns, fixed shape, sortable and diffable. A document is one
@@ -300,6 +327,22 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   (all `None`), asked and unresolved (`query` only), and matched (`""` for
   components the match lacks) - because collapsing them would make an account
   publishing nothing look like one publishing `she/her`.
+
+- **A service failure is never written to the geocode cache** (ADR-0007). The
+  cache persists between runs, which is what makes unbounded contributor
+  collection affordable to repeat, and it expires a match after a year and a
+  miss after thirty days. The load-bearing rule is the third case: Nominatim
+  being unreachable produces the *same* `Address(query=...)` a genuine miss
+  does, and persisting it would let one outage poison those locations forever -
+  every later run reading "unresolved" from the cache and never asking again.
+  `Geocoder._ask` is where the three outcomes are told apart, and it is the
+  only place they are. A service failure still memoises **in-process**, so
+  eight workers do not each wait out the same dead lookup.
+
+- **`geocache.py` owns the file; `geo.py` owns the socket.** That split is the
+  structural rule applied to the cache: collection may not touch a disk format,
+  so the CLI builds a `GeocodeCache` and hands it to the `Geocoder`. Do not
+  move the JSON into `geo.py` because it is "only a cache".
 - **`organization` is empty for a personally owned repository, and that is the
   answer.** GitHub says whether an owner is a `User` or an `Organization`, and
   empty is the only place a row records the former. Echoing the user's login

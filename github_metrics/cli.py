@@ -32,6 +32,7 @@ from github_metrics.errors import (
     OutputDestinationError,
 )
 from github_metrics.geo import Geocoder
+from github_metrics.geocache import GeocodeCache
 from github_metrics.logger import LogLevels, reset_logger
 from github_metrics.model.scan import ScanIdentifier
 from github_metrics.model.software import SoftwareRow
@@ -276,8 +277,11 @@ def scan_command(
     says 'named, not measured', while a document with an empty contributor
     array would read as a repository that has none.
 
-    Costs two GraphQL points and one REST request per repository, confirmed
-    against the token's remaining budget before anything is collected.
+    Every contributor GitHub attributes to an account is collected, so a
+    repository's cost rises with its contributor count. The pre-flight confirms
+    the token can afford the run's *minimum* - two GraphQL points and one REST
+    request per repository - which refuses an obviously impossible run but no
+    longer promises that a run which starts will finish.
     """
     context: CliContext = ctx.obj
     root = _document_root(output)
@@ -360,22 +364,36 @@ def _collect(
         return []
 
     settings = context.settings()
-    # One geocoder for the run, shared across the workers: its cache and its
+    # One geocoder for the run, shared across the workers: its caches and its
     # one-request-per-second pace are properties of the run, and a geocoder
     # per repository would honour neither.
-    geocoder = Geocoder(settings.geocoder_user_agent)
+    #
+    # The cache outlives the run, which is what makes unbounded contributor
+    # collection affordable to repeat - geocoding is the slowest thing a scan
+    # does, and a re-run should pay only for places never seen before. The CLI
+    # builds it because `geo` may not parse a file format and `geocache` may
+    # not open a socket; this is where the two meet.
+    cache = GeocodeCache.load(settings.geocode_cache_path)
+    geocoder = Geocoder(settings.geocoder_user_agent, cache=cache)
 
-    with GitHubClient(settings) as client:
-        budget = check_budget(client, len(references))
-        LOGGER.info(
-            "Budget: %d of %d GraphQL points and %d of %d REST requests for %d repositories",
-            budget.required,
-            budget.available,
-            budget.requests_required,
-            budget.requests_available,
-            budget.repositories,
-        )
-        return collect_all(client, references, max_workers=workers, geocoder=geocoder)
+    try:
+        with GitHubClient(settings) as client:
+            budget = check_budget(client, len(references))
+            LOGGER.info(
+                "Budget: at least %d of %d GraphQL points and at least %d of %d "
+                "REST requests for %d repositories",
+                budget.required,
+                budget.available,
+                budget.requests_required,
+                budget.requests_available,
+                budget.repositories,
+            )
+            return collect_all(client, references, max_workers=workers, geocoder=geocoder)
+    finally:
+        # In a finally block because a run that failed still resolved
+        # locations, and throwing that away would make the next attempt pay
+        # for them again. Saving cannot raise; see `GeocodeCache.save`.
+        cache.save()
 
 
 def _emit(

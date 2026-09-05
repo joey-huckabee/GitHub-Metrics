@@ -14,9 +14,10 @@ from typing import Any, cast
 import pytest
 from github.GithubException import GithubException
 
-from github_metrics.client import GitHubClient
+from github_metrics.client import PER_PAGE, GitHubClient
 from github_metrics.collect.contributors import (
     DEFAULT_CONTRIBUTOR_LIMIT,
+    DETAIL_CHUNK_SIZE,
     ContributorAccount,
     _details_query,
     get_account_details,
@@ -142,7 +143,7 @@ def test_the_detail_query_selects_no_nodes() -> None:
     end of the cost formula however long the contributor list is. This is the
     same condition `collect/repository.py` is held to.
     """
-    assert "nodes" not in _details_query(DEFAULT_CONTRIBUTOR_LIMIT)
+    assert "nodes" not in _details_query(DETAIL_CHUNK_SIZE)
 
 
 @pytest.mark.requirement("L3-MET-017")
@@ -299,3 +300,114 @@ def test_an_account_record_is_immutable() -> None:
 
     with pytest.raises(AttributeError):
         account.contribution = 6  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Unbounded collection, and the chunking that makes it safe
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-MET-019")
+def test_the_default_is_no_limit_at_all() -> None:
+    """25 was inherited from a retired command and never chosen.
+
+    It decided what `contribution_total` counted, and therefore what every
+    percentage derived from it would mean, which makes it a measurement
+    decision rather than a tuning knob. See ADR-0006.
+    """
+    assert DEFAULT_CONTRIBUTOR_LIMIT is None
+
+
+@pytest.mark.requirement("L3-MET-019")
+def test_every_contributor_is_collected_when_no_limit_is_given() -> None:
+    accounts = [_Account(f"person{index}", index, 100 - index) for index in range(120)]
+    stub = _StubClient(accounts=accounts)
+
+    collected = collect(stub)
+
+    assert len(collected) == 120
+    # Ranked as GitHub ranked them; nothing here reorders the list.
+    assert [entry.name for entry in collected][:2] == ["Person 0", "Person 1"]
+
+
+@pytest.mark.requirement("L3-MET-019")
+def test_a_caller_supplying_a_limit_still_gets_one() -> None:
+    """The parameter survives for a library caller that wants to bound a run."""
+    accounts = [_Account(f"person{index}", index, 100 - index) for index in range(120)]
+    stub = _StubClient(accounts=accounts)
+
+    assert len(collect(stub, limit=10)) == 10
+
+
+@pytest.mark.requirement("L3-MET-019")
+def test_the_detail_document_is_chunked_rather_than_growing_with_the_repository() -> None:
+    """Cost is not the constraint here; the ten-second window is.
+
+    A chunk costs one point whether it carries five aliases or fifty, because
+    the cost formula counts connections and this document has none. What a
+    single unbounded document risks is a query GitHub will not finish in time,
+    and it would fail on exactly the largest repositories.
+    """
+    accounts = [_Account(f"person{index}", index, 1) for index in range(DETAIL_CHUNK_SIZE * 2 + 3)]
+    stub = _StubClient(accounts=accounts)
+
+    collect(stub)
+
+    assert len(stub.queries) == 3
+    for query in stub.queries:
+        assert query.count("user(login: $login") <= DETAIL_CHUNK_SIZE
+
+
+@pytest.mark.requirement("L3-MET-019")
+def test_aliases_are_numbered_within_their_chunk() -> None:
+    """Otherwise the alias index would follow the repository, not the chunk."""
+    accounts = [_Account(f"person{index}", index, 1) for index in range(DETAIL_CHUNK_SIZE + 5)]
+    stub = _StubClient(accounts=accounts)
+
+    collect(stub)
+
+    second = stub.queries[1]
+    assert "u0: user(login: $login0)" in second
+    assert f"u{DETAIL_CHUNK_SIZE}" not in second
+
+
+@pytest.mark.requirement("L3-MET-019")
+def test_every_chunk_lands_in_one_merged_result() -> None:
+    """A contributor in the second chunk keeps its detail, not its login."""
+    count = DETAIL_CHUNK_SIZE + 4
+    accounts = [_Account(f"person{index}", index, 1) for index in range(count)]
+
+    collected = collect(_StubClient(accounts=accounts))
+
+    assert len(collected) == count
+    # The stub answers each chunk with `Person <index within the chunk>`, so a
+    # record that fell out of the merge would fall back to its login instead.
+    assert all(entry.name.startswith("Person ") for entry in collected)
+
+
+@pytest.mark.requirement("L3-MET-017")
+def test_truncation_is_logged_only_when_a_caller_asked_for_a_limit(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """There is nothing to warn about when the list was not truncated."""
+    accounts = [_Account(f"person{index}", index, 1) for index in range(5)]
+
+    with caplog.at_level(logging.DEBUG, logger=COLLECT_LOGGER):
+        collect(_StubClient(accounts=accounts))
+    assert "truncated" not in caplog.text
+
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG, logger=COLLECT_LOGGER):
+        collect(_StubClient(accounts=accounts), limit=5)
+    assert "truncated" in caplog.text
+
+
+@pytest.mark.requirement("L3-MET-019")
+def test_pages_are_requested_at_the_endpoint_maximum() -> None:
+    """The REST budget is spent almost entirely on the contributors list.
+
+    PyGithub defaults to 30 per page, which was invisible while the list
+    stopped at 25. Reading the list in full makes it the difference between 5
+    requests and 17 for a 500-contributor repository.
+    """
+    assert PER_PAGE == 100

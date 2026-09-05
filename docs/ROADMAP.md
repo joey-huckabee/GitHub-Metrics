@@ -324,7 +324,65 @@ what the project can prove about itself.
 
 ---
 
-## v0.5.0 — Persistence
+## v0.5.0 — Every contributor, and a cache that outlives the run
+
+**Released 2026-09-05.** One change to what is measured, and one to what it
+costs - plus the first defect this project's own live API run ever found.
+
+`DEFAULT_CONTRIBUTOR_LIMIT` is `None`: a scan collects **every contributor**
+GitHub attributes to an account, rather than the top 25 by commits. The old
+limit was inherited from the retired `contributors` command and had never been
+chosen for the current design, and it made `contribution_total` - and every
+percentage that will be derived from it - a statistic about a sample whose size
+was a property of this tool. The downstream residency analysis cannot ask about
+a contributor this tool did not collect, and the accounts a 25-cap dropped were
+exactly the long tail. [ADR-0006](adr/0006-collect-every-contributor.md).
+
+**Totals from v0.4.1 and earlier are not comparable with totals from this
+release.** Nothing in a document records which limit produced it.
+
+That change is only affordable because of the second one: the geocode cache now
+**persists between runs**, so a re-run over a stable inventory pays
+approximately nothing for the slowest part of a scan.
+[ADR-0007](adr/0007-persistent-geocode-cache.md), and the expiry table under
+[Carried, and known](#geocoding-has-no-cache-beyond-a-single-run).
+
+What it forced, none of which was optional:
+
+- **The REST list is paginated** and the client sets `per_page = 100`, the
+  endpoint's maximum. 25 fitted in PyGithub's default page of 30, which was the
+  only reason one repository ever cost exactly one REST request.
+- **The GraphQL detail query is chunked** at `DETAIL_CHUNK_SIZE` accounts. Its
+  *cost* was never the constraint - the point formula counts connections and
+  this query has none - but GitHub terminates any query taking more than ten
+  seconds, and several hundred aliased account lookups in one document is not a
+  safe bet against that.
+- **The budget pre-flight weakens from a guarantee to a floor.** See below; it
+  is the one thing here that the project can do less well than before.
+
+### The budget pre-flight is now necessary, not sufficient
+
+`check_budget` used to promise that a run which starts can finish, because the
+per-repository cost was exactly known. An unbounded contributor list ends that:
+the cost depends on a count nobody has until the request that reveals it has
+been spent.
+
+`MIN_POINTS_PER_REPOSITORY` and `MIN_REQUESTS_PER_REPOSITORY` are what a
+repository costs at minimum, and the pre-flight refuses a run that cannot
+afford even that. Passing no longer means the run will finish.
+
+Inventing an average contributor count and calling the product an estimate was
+rejected: it would produce a number that looks like the old guarantee and is
+not one. The honest form is a floor that says it is a floor.
+
+This raises the value of the exhaustion policy deferred from v0.2.0 - waiting
+for the reset, or emitting partial results, rather than failing the run - since
+mid-run exhaustion is now reachable in a way it was not before. That work
+stays where it is, but it is no longer merely a convenience.
+
+---
+
+## v0.6.0 — Persistence
 
 Capture results in **SQLite**, behind an interface that allows the store to be
 swapped for **PostgreSQL** later without changing the collection code. One
@@ -349,6 +407,59 @@ Points to settle:
   row is attributable to a *run* and not to the code that made it, which
   matters more once rows outlive the release that produced them. Adding a
   column is a change to the output contract and wants an ADR.
+- **Folding the geocode cache in.** v0.5.0 shipped it as a JSON file rather
+  than waiting for this store, because unbounded contributor collection was
+  unusable without it. This store will already hold addresses, so the cache
+  belongs here rather than beside it - and a JSON file stops being the right
+  shape well before it stops working. The trigger, and the reasoning behind
+  it, is below.
+
+### When the geocode cache should become a table
+
+A single JSON file is parsed in full at startup and rewritten in full at the
+end of a run. That is right while it is small and wrong once it is not, so the
+boundary is recorded rather than left to be noticed when a run starts feeling
+slow.
+
+Measured against the real `GeocodeCache`, filled with fully-populated
+city-level matches - the worst case, since a real cache holds many
+country-only matches and misses, which are smaller:
+
+| Entries | File size | Save | Load | Resident |
+|---|---|---|---|---|
+| 1,000 | 0.49 MB | 14 ms | 102 ms | 1.2 MB |
+| 5,000 | 2.46 MB | 58 ms | 468 ms | 5.3 MB |
+| 20,000 | 9.89 MB | 245 ms | 1.9 s | 20.2 MB |
+| 50,000 | 24.80 MB | 677 ms | 4.8 s | 51.1 MB |
+| 100,000 | 49.64 MB | 1.3 s | 9.7 s | 101.9 MB |
+
+An entry is about **510 bytes**. Resident memory is 2.1x the file, and loading
+costs roughly four times what saving does.
+
+**Review at 10 MB, about 20,000 distinct locations. Move by 50 MB.**
+
+**Load time forces the move, not memory** - which is the opposite of what the
+first estimate assumed, and the reason these numbers were measured rather than
+reasoned about. Every run pays the parse in full before it does anything: two
+seconds at 20,000 entries, ten at 100,000, whether the run needs forty
+locations or all of them. That tax lands hardest on precisely the small re-runs
+the cache exists to make fast. Memory is mild by comparison at 2.1x, and the
+atomic whole-file rewrite costs a quarter of the load.
+
+The move is **into [v0.6.0](#v060--persistence)'s store, not a database of its
+own**, and SQLite answers the binding constraint directly: a run reads the keys
+it needs and parses nothing else, so start-up stops scaling with the cache.
+
+For scale, a 200-repository inventory with unbounded contributors produces
+somewhere around eight to fifteen thousand distinct locations - so a serious
+portfolio lands near 4-8 MB with a half-second load, inside the JSON regime and
+within sight of the review point. A program of a few thousand repositories
+crosses it.
+
+**That last paragraph is the estimated one.** How many distinct locations an
+inventory actually yields has not been observed against a real run, and belongs
+with the other things below that have never been checked against the live API.
+Everything in the table is measured.
 
 ---
 
@@ -381,19 +492,28 @@ look like defects are not "fixed" back into defects.
 
 ### A cost that is calculated rather than measured
 
-`POINTS_PER_REPOSITORY` is 2. One of those points was measured against the live
-API - `collect.repository` sends one document and the response reports a cost
-of 1. The other, for the aliased contributor-detail query, follows from
-GitHub's documented cost formula and has never been confirmed.
+`MIN_POINTS_PER_REPOSITORY` is 2 - one metrics query, one detail chunk. The
+first was measured against the live API: `collect.repository` sends one
+document and the response reports a cost of 1. The second follows from
+GitHub's documented cost formula, which prices a query by its connections, and
+has never been confirmed. The formula says an aliased document of single-object
+`user(login:)` selections has no connections and therefore costs the minimum of
+1 however many aliases it carries - which is also why chunking that query for
+the ten-second window costs points rather than being free.
 
 This repository's own convention is that a cost is measured rather than
 assumed, so this is a departure recorded rather than a rule quietly relaxed. It
-matters because the budget pre-flight refuses runs on it: if the real cost is
-higher, a run that `check_budget` accepts can still exhaust the quota halfway,
-which is the exact failure that check exists to prevent.
+matters less than it did, because v0.5.0 already downgraded the pre-flight from
+a guarantee to a floor - but it matters in a new way: the floor is now what
+decides whether a run is refused outright, so an understated per-chunk cost
+makes an unaffordable run look affordable.
 
-**Settling it:** one scan of two or three repositories with a real token at
-`LOG_LEVEL=DEBUG`, reading the cost the API reports back.
+**Settling it** is the same one-scan check as before, and now also worth
+reading for how the *chunked* detail query is priced against a repository with
+several hundred contributors.
+
+One scan of two or three repositories with a real token at `LOG_LEVEL=DEBUG`,
+reading the cost the API reports back.
 
 ### Nothing has run against the live API
 
@@ -414,10 +534,12 @@ catches drift in an API nobody controls.
 
 ### `DEFAULT_CONTRIBUTOR_LIMIT` is inherited, not chosen
 
-25, carried over from the `contributors` command v0.2.0 retired. It decides
-what `contribution_total` counts and therefore what every percentage derived
-from it will mean, so it is a measurement decision rather than a tuning knob -
-and nobody has made it deliberately for the current design.
+**Settled in v0.5.0.** The limit is gone: `DEFAULT_CONTRIBUTOR_LIMIT` is
+`None` and a scan collects every contributor GitHub attributes to an account.
+The decision, the alternatives and the ceiling GitHub imposes regardless are in
+[ADR-0006](adr/0006-collect-every-contributor.md). Kept here because the entry
+records a question that was open for three releases, and because totals from
+v0.4.1 and earlier are not comparable with totals from this one.
 
 ### The geocoder user agent is generic
 
@@ -430,15 +552,34 @@ Setting the environment variable is enough; the default is what is wrong.
 
 ### Geocoding has no cache beyond a single run
 
-The cache lives on the `Geocoder` and dies with the process, so a re-run over
-the same inventory pays a second per distinct location again for places that
-have not moved. At one request per second that is the difference between a
-re-run taking minutes and taking hours, and it is the single largest
-improvement available to this tool's wall-clock time.
+**Settled in v0.5.0.** The cache persists to disk, and re-runs over a stable
+inventory pay approximately nothing for geocoding. It arrived ahead of the
+store rather than inside it because
+[ADR-0006](adr/0006-collect-every-contributor.md) made unbounded contributor
+collection unusable without it - the reasoning that deferred it was sound right
+up until the thing it was waiting behind became the thing that needed it.
 
-It belongs with [v0.5.0](#v050--persistence): a store that already holds
-addresses is the obvious place for one, and doing it before there is a store
-would mean designing the same cache twice.
+What expires, and when, is the part worth knowing:
+
+| Outcome | Persisted | Expiry |
+|---|---|---|
+| Matched | yes | 365 days |
+| No match | yes | 30 days |
+| Service error | **no** | - |
+
+A matched entry needs no TTL for correctness: places do not move, and
+`country_code` - the field a residency rule should key on - is ISO 3166-1
+alpha-2 and does not shift when a country is renamed in one dataset before
+another. The year is there to pick up gazetteer improvements, not to guard
+against staleness. A miss expires sooner because a miss is a statement about
+coverage rather than about the place, and OSM coverage grows. A **service
+error is never written to disk at all**: persisting one would let a single
+outage permanently poison every location it touched, since every later run
+would read "unresolved" from the cache and never ask again. That is an error
+that looks like data, which is the failure this repository refuses everywhere
+else.
+
+Full reasoning in [ADR-0007](adr/0007-persistent-geocode-cache.md).
 
 ### Two SonarCloud rules are deliberately answered differently
 

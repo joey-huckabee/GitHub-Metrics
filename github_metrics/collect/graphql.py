@@ -78,12 +78,33 @@ def _mentions_not_found(data: Any) -> bool:
     return any(error.get("type") == NOT_FOUND_TYPE for error in _errors_in(data))
 
 
+def _only_not_found(data: Any) -> bool:
+    """True if a response carries errors and every one of them is `NOT_FOUND`."""
+    errors = _errors_in(data)
+    return bool(errors) and all(error.get("type") == NOT_FOUND_TYPE for error in errors)
+
+
+def _partial_data(payload: Any) -> dict[str, Any] | None:
+    """Recover the `data` object from a response that also carried errors.
+
+    GraphQL answers a partly-resolvable document with **both**: the fields it
+    could resolve, and an error naming each one it could not. Returns `None`
+    when there is no usable data object, which is a real failure rather than
+    a partial success.
+    """
+    if not isinstance(payload, dict):
+        return None
+    data = payload.get("data")
+    return data if isinstance(data, dict) else None
+
+
 def execute(
     client: GitHubClient,
     query: str,
     variables: dict[str, Any],
     *,
     description: str = "query",
+    tolerate_missing: bool = False,
 ) -> dict[str, Any]:
     """Run one GraphQL query and return its `data` payload.
 
@@ -97,9 +118,21 @@ def execute(
         variables: Values for the document's declared variables.
         description: Short label used in messages, so a failure names the query
             that produced it rather than only the file.
+        tolerate_missing: Treat `NOT_FOUND` as an expected answer about one
+            selection rather than as a failed query, and return the data the
+            response did carry.
+
+            Only correct for a document where a `NOT_FOUND` cannot mean the
+            repository. The aliased contributor-detail document is the case
+            it exists for: it selects nothing but `user(login:)`, and an
+            alias that does not resolve to a `User` - a bot such as
+            `dependabot[bot]`, or an account deleted since the REST list was
+            read - is a fact about that account and says nothing about the
+            other forty-nine in the same document.
 
     Returns:
-        The `data` object from the response.
+        The `data` object from the response. With `tolerate_missing`, a
+        selection that did not resolve is present and `null`.
 
     Raises:
         RepositoryNotFoundError: The query named a repository that does not
@@ -112,6 +145,9 @@ def execute(
     try:
         _, payload = client.graphql(query, variables)
     except UnknownObjectException as exc:
+        recovered = _tolerated(exc.data, description, tolerate_missing=tolerate_missing)
+        if recovered is not None:
+            return recovered
         LOGGER.debug("GraphQL %s: repository not found", description)
         raise RepositoryNotFoundError(f"{description}: {exc.message or exc}") from exc
     except GithubException as exc:
@@ -119,8 +155,15 @@ def execute(
         # response carrying several errors is collapsed to a generic 400 even
         # when one of them is NOT_FOUND. Re-reading the payload keeps the
         # classification the caller depends on.
+        recovered = _tolerated(exc.data, description, tolerate_missing=tolerate_missing)
+        if recovered is not None:
+            return recovered
         message = _summarise(_errors_in(exc.data)) or (exc.message or str(exc))
-        if _mentions_not_found(exc.data):
+        # `tolerate_missing` is only set for a document that names no
+        # repository, so a NOT_FOUND in it cannot mean one however it is
+        # mixed with other errors. Classifying it as a missing repository
+        # would send an operator to fix an inventory that is correct.
+        if _mentions_not_found(exc.data) and not tolerate_missing:
             LOGGER.debug("GraphQL %s: not found, reported among several errors", description)
             raise RepositoryNotFoundError(f"{description}: {message}") from exc
         raise GraphQLQueryError(f"{description} failed: {message}") from exc
@@ -131,9 +174,12 @@ def execute(
     # were an answer.
     errors = _errors_in(payload)
     if errors:
+        recovered = _tolerated(payload, description, tolerate_missing=tolerate_missing)
+        if recovered is not None:
+            return recovered
         message = _summarise(errors)
         LOGGER.debug("GraphQL %s returned %d error(s): %s", description, len(errors), message)
-        if _mentions_not_found(payload):
+        if _mentions_not_found(payload) and not tolerate_missing:
             raise RepositoryNotFoundError(f"{description}: {message}")
         raise GraphQLQueryError(f"{description} failed: {message}")
 
@@ -142,4 +188,38 @@ def execute(
         raise GraphQLQueryError(f"{description}: response contained no data object")
 
     LOGGER.debug("GraphQL %s succeeded", description)
+    return data
+
+
+def _tolerated(
+    payload: Any,
+    description: str,
+    *,
+    tolerate_missing: bool,
+) -> dict[str, Any] | None:
+    """Return the usable data of a response whose only errors are `NOT_FOUND`.
+
+    Args:
+        payload: The response body, from a raised exception or a return value.
+        description: Label for the log line.
+        tolerate_missing: Whether the caller said `NOT_FOUND` is an expected
+            answer for this document.
+
+    Returns:
+        The `data` object, or `None` when the response is not one this may
+        tolerate - the caller did not opt in, some error was not `NOT_FOUND`,
+        or there is no data object to salvage.
+    """
+    if not tolerate_missing or not _only_not_found(payload):
+        return None
+    data = _partial_data(payload)
+    if data is None:
+        return None
+    missing = [str(error.get("path")) for error in _errors_in(payload)]
+    LOGGER.debug(
+        "GraphQL %s: %d selection(s) did not resolve and are null: %s",
+        description,
+        len(missing),
+        ", ".join(missing),
+    )
     return data

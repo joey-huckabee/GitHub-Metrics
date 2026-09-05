@@ -88,3 +88,37 @@ def test_the_token_source_is_logged_but_never_the_token(
 
     assert "--token" in caplog.text
     assert secret not in caplog.text
+
+
+@pytest.mark.requirement("L3-MET-020")
+def test_the_geocode_cache_defaults_to_the_platform_location(
+    monkeypatch: pytest.MonkeyPatch, empty_env_file: Path
+) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret")
+    monkeypatch.delenv("GEOCODE_CACHE_PATH", raising=False)
+
+    settings = Settings.from_env(empty_env_file)
+
+    assert settings.geocode_cache_path is not None
+    assert settings.geocode_cache_path.name == "geocode.json"
+
+
+@pytest.mark.requirement("L3-MET-020")
+def test_the_geocode_cache_location_can_be_moved(
+    monkeypatch: pytest.MonkeyPatch, empty_env_file: Path, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret")
+    monkeypatch.setenv("GEOCODE_CACHE_PATH", str(tmp_path / "elsewhere.json"))
+
+    assert Settings.from_env(empty_env_file).geocode_cache_path == tmp_path / "elsewhere.json"
+
+
+@pytest.mark.requirement("L3-MET-020")
+def test_an_empty_geocode_cache_path_turns_persistence_off(
+    monkeypatch: pytest.MonkeyPatch, empty_env_file: Path
+) -> None:
+    """Deleting the file would only make the next run rebuild it."""
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret")
+    monkeypatch.setenv("GEOCODE_CACHE_PATH", "   ")
+
+    assert Settings.from_env(empty_env_file).geocode_cache_path is None

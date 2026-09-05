@@ -14,6 +14,16 @@ if TYPE_CHECKING:  # pragma: no cover - import cycle only needed for typing
 
 LOGGER = logging.getLogger(__name__)
 
+PER_PAGE = 100
+"""Results per REST page - the maximum every paginated endpoint here accepts.
+
+PyGithub defaults to 30. That was invisible while the contributor list stopped
+at 25, because 25 fitted in one page and one page was one request; it is the
+difference between 5 requests and 17 for a 500-contributor repository now that
+the list is read in full. The REST budget is spent almost entirely on that one
+endpoint, so this is the cheapest lever there is.
+"""
+
 
 class GitHubClient:
     """Authenticated GitHub API client."""
@@ -21,7 +31,11 @@ class GitHubClient:
     def __init__(self, settings: Settings) -> None:
         """Create a client from resolved settings."""
         self._settings = settings
-        self._github = Github(auth=Auth.Token(settings.github_token), base_url=settings.api_url)
+        self._github = Github(
+            auth=Auth.Token(settings.github_token),
+            base_url=settings.api_url,
+            per_page=PER_PAGE,
+        )
 
     def repository(self, full_name: str) -> Repository:
         """Fetch a repository by its `owner/name` identifier.

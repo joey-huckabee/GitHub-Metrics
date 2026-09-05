@@ -127,7 +127,9 @@ def _patch(monkeypatch: pytest.MonkeyPatch, collector: Any) -> None:
     monkeypatch.setattr("github_metrics.cli.verify_credentials", lambda _settings: None)
     monkeypatch.setattr("github_metrics.cli.GitHubClient", lambda _settings: _NullClient())
     monkeypatch.setattr("github_metrics.cli.check_budget", affordable)
-    monkeypatch.setattr("github_metrics.cli.Geocoder", lambda _agent: None)
+    # Takes the cache keyword the CLI now passes; the run must not touch a
+    # real cache file, and a test that wrote to one would leak between runs.
+    monkeypatch.setattr("github_metrics.cli.Geocoder", lambda _agent, **_kwargs: None)
     monkeypatch.setattr("github_metrics.cli.collect_all", collector)
 
 
@@ -574,3 +576,33 @@ def test_two_runs_are_told_apart(tmp_path: Path) -> None:
     run("pypa/virtualenv", "--output", str(second))
 
     assert rows_of(first)[0]["scan_id"] != rows_of(second)[0]["scan_id"]
+
+
+@pytest.mark.requirement("L3-MET-020")
+def test_the_geocode_cache_is_saved_even_when_the_run_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A run that failed still resolved locations, and they cost a second each.
+
+    Throwing them away would make the next attempt pay for them again, which
+    is the opposite of what the cache is for.
+    """
+    saved: list[str] = []
+
+    class _Cache:
+        """Records that the run flushed it, without touching a disk."""
+
+        @staticmethod
+        def save() -> None:
+            """Stand in for `GeocodeCache.save`."""
+            saved.append("saved")
+
+    def explode(_client: Any, references: Any, **_kwargs: Any) -> list[Outcome]:
+        raise RateLimitExhaustedError("nothing left")
+
+    _patch(monkeypatch, explode)
+    monkeypatch.setattr("github_metrics.cli.GeocodeCache.load", lambda _path: _Cache())
+
+    run("pypa/virtualenv", "--output", str(tmp_path))
+
+    assert saved == ["saved"]

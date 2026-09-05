@@ -248,14 +248,21 @@ reference.
 **Meaning**: The token has too little of one of the two hourly budgets left to
 finish the run.
 **Typical cause**: An earlier run in the same hour, or an inventory larger than
-a full quota covers. A scan costs two GraphQL points and one REST request per
-repository, so a full quota covers 2,500 repositories and GraphQL binds first.
+a full quota covers. A scan costs **at least** two GraphQL points and one REST
+request per repository, so a full quota covers at most 2,500 repositories and
+GraphQL binds first.
 **Resolution**: The message names which budget is short and by how much. Wait
 for the hourly reset, or split the inventory.
 
-Raised **before** collection starts, never during it. A run that discovers
-exhaustion halfway has already spent what it had and produced a file that is
-part measurement and part absence, with nothing in it to tell the two apart.
+Raised **before** collection starts, and the pre-flight is a **floor rather
+than a guarantee**: since v0.5.0 collects every contributor, a repository's real
+cost depends on a contributor count nothing knows until the list is read. A run
+whose minimum fits can still exhaust the budget partway through. See
+`docs/adr/0006-collect-every-contributor.md`.
+
+The common case it was built for is unchanged. A run that discovers exhaustion
+halfway has already spent what it had and produced a file that is part
+measurement and part absence, with nothing in it to tell the two apart.
 Refusing costs one free request and leaves the quota intact for a smaller run.
 
 ### `GM-COL-005` - Contributor list unreadable

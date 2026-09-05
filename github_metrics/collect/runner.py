@@ -91,7 +91,7 @@ def collect_all(
     *,
     max_workers: int | None = None,
     geocoder: Geocoder | None = None,
-    contributor_limit: int = DEFAULT_CONTRIBUTOR_LIMIT,
+    contributor_limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT,
 ) -> list[Outcome]:
     """Collect every reference, concurrently, in input order.
 
@@ -103,7 +103,8 @@ def collect_all(
         geocoder: Resolves contributor locations. One per run, shared across
             the workers, because its cache and its one-request-per-second pace
             are both properties of the run rather than of a repository.
-        contributor_limit: Contributors kept per repository.
+        contributor_limit: Contributors kept per repository. `None`, the
+            default, keeps every one GitHub returns.
 
     Returns:
         One outcome per reference, in the order given.

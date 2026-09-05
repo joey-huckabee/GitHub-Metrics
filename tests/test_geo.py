@@ -16,6 +16,7 @@ from geopy.exc import GeocoderServiceError
 
 from github_metrics import geo
 from github_metrics.geo import Geocoder
+from github_metrics.geocache import GeocodeCache
 from github_metrics.model.contributor import Address
 
 GEO_LOGGER = "github_metrics.geo"
@@ -73,10 +74,14 @@ def instant(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(geo, "ERROR_WAIT_SECONDS", 0.0)
 
 
-def build(monkeypatch: pytest.MonkeyPatch, locator: _Nominatim) -> Geocoder:
+def build(
+    monkeypatch: pytest.MonkeyPatch,
+    locator: _Nominatim,
+    cache: GeocodeCache | None = None,
+) -> Geocoder:
     """Create a geocoder bound to a stub gazetteer."""
     monkeypatch.setattr(geo, "Nominatim", lambda **_kwargs: locator)
-    return Geocoder("github-metrics-tests")
+    return Geocoder("github-metrics-tests", cache=cache)
 
 
 # ---------------------------------------------------------------------------
@@ -467,3 +472,119 @@ def test_a_location_of_only_whitespace_is_never_asked(
 
     assert geocoder.locate("\t\n  ") == Address()
     assert not locator.asked
+
+
+# ---------------------------------------------------------------------------
+# What survives the run, and what deliberately does not
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-MET-020")
+@pytest.mark.usefixtures("instant")
+def test_a_match_is_remembered_for_the_next_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    cache = GeocodeCache(None)
+    locator = _Nominatim(_Match("Austin, Texas", 30.2711, -97.7437, AUSTIN))
+    build(monkeypatch, locator, cache).locate("Austin, TX")
+
+    assert cache.get("austin, tx") is not None
+
+
+@pytest.mark.requirement("L3-MET-020")
+@pytest.mark.usefixtures("instant")
+def test_a_miss_is_remembered_too(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`she/her` and `earth` are common enough that re-asking them is the cost."""
+    cache = GeocodeCache(None)
+    build(monkeypatch, _Nominatim(None), cache).locate("she/her")
+
+    remembered = cache.get("she/her")
+    assert remembered is not None
+    assert remembered.country is None
+
+
+@pytest.mark.requirement("L3-MET-020")
+@pytest.mark.usefixtures("instant")
+def test_a_service_failure_is_never_written_to_the_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The one that would have been a defect.
+
+    A gazetteer that was unreachable said nothing about the location, but the
+    address it produces is identical to a genuine miss. Persisting it would
+    make one outage permanent: every later run would read "unresolved" and
+    never ask again, publishing an unresolved address for a place that
+    resolves perfectly well.
+    """
+    cache = GeocodeCache(None)
+    geocoder = build(monkeypatch, _Nominatim(fails=True), cache)
+
+    assert geocoder.locate("Austin, TX").country is None
+    assert cache.get("austin, tx") is None
+    assert len(cache) == 0
+
+
+@pytest.mark.requirement("L3-MET-020")
+@pytest.mark.usefixtures("instant")
+def test_a_failed_location_is_still_asked_only_once_within_the_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Eight workers must not each wait out the same unreachable location."""
+    locator = _Nominatim(fails=True)
+    geocoder = build(monkeypatch, locator, GeocodeCache(None))
+
+    geocoder.locate("Austin, TX")
+    # A failing lookup is retried, so the count is MAX_RETRIES + 1 rather than
+    # one. What matters is that the second ask adds nothing to it.
+    after_first = len(locator.asked)
+    geocoder.locate("austin,  tx")
+
+    assert after_first > 0
+    assert len(locator.asked) == after_first
+
+
+@pytest.mark.requirement("L3-MET-020")
+@pytest.mark.usefixtures("instant")
+def test_a_cached_answer_is_indistinguishable_from_a_fresh_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nothing downstream may depend on whether a cache existed."""
+    locator = _Nominatim(_Match("Austin, Texas", 30.2711, -97.7437, AUSTIN))
+    fresh = build(monkeypatch, locator, GeocodeCache(None)).locate("Austin, TX")
+
+    warm = GeocodeCache(None)
+    build(monkeypatch, locator, warm).locate("Austin, TX")
+    silent = _Nominatim(fails=True)
+    cached = build(monkeypatch, silent, warm).locate("Austin, TX")
+
+    assert cached == fresh
+    # And the second geocoder never had to ask.
+    assert not silent.asked
+
+
+@pytest.mark.requirement("L3-MET-020")
+@pytest.mark.usefixtures("instant")
+def test_the_cache_records_the_normalised_key_and_the_caller_keeps_its_spelling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One entry serves every spelling; each contributor keeps their own."""
+    cache = GeocodeCache(None)
+    locator = _Nominatim(_Match("Austin, Texas", 30.2711, -97.7437, AUSTIN))
+    geocoder = build(monkeypatch, locator, cache)
+
+    first = geocoder.locate("Austin, TX")
+    second = geocoder.locate("austin,   tx")
+
+    assert len(locator.asked) == 1
+    assert len(cache) == 1
+    assert first.query == "Austin, TX"
+    assert second.query == "austin, tx"
+
+
+@pytest.mark.requirement("L3-MET-020")
+@pytest.mark.usefixtures("instant")
+def test_a_geocoder_given_no_cache_still_works(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A library caller opts in to a file rather than acquiring one."""
+    locator = _Nominatim(_Match("Austin, Texas", 30.2711, -97.7437, AUSTIN))
+    geocoder = build(monkeypatch, locator)
+
+    assert geocoder.locate("Austin, TX").city == "Austin"
+    assert geocoder.cache.path is None

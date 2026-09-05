@@ -382,7 +382,113 @@ stays where it is, but it is no longer merely a convenience.
 
 ---
 
-## v0.6.0 — Persistence
+## v0.6.0 — Knowing how good the data is
+
+**Planned.** v0.5.0 made the dataset bigger. This release makes it
+**auditable**, which the live run showed matters more.
+
+That run reported 396 contributors and a `contribution_total` of 27,828. Both
+correct; both misleading alone. The repository has 3,310 contributor identities
+and 32,005 commits, GitHub linked only the first 500 author email addresses,
+three of the 396 are bots holding 289 commits, and only 175 published a
+location at all. **None of that appears in either artifact**, so a repository
+truncated at GitHub's ceiling is indistinguishable from a complete one.
+
+The theme is therefore not more metrics. It is: every number this tool
+publishes should carry the bounds within which it is true.
+
+### `statistics.json`, a third artifact
+
+One per scan, beside `githubmetrics.csv`, sharing its `scan_id`. Run-level
+facts plus a per-repository array.
+[ADR-0008](adr/0008-statistics-json.md) has the full field list; the load-bearing
+parts:
+
+- **Completeness.** `commits.total_on_default_branch` against
+  `commits.attributed_to_collected`, and the coverage percentage between them
+  - 87.0% in the measured run. This is the most important number in the file.
+- **Exclusions with reasons**, counted in people *and* commits:
+  `anonymous_recoverable_noreply`, `anonymous_no_account`,
+  `account_unresolvable`, `bot`, `no_location_published`,
+  `location_unresolved`, `geocoder_unavailable`.
+- **Bots**: count, commits, and `contribution_excluding_bots`.
+  **`contribution_total` itself is not adjusted** - a decision, not an
+  oversight. Changing it would be its third redefinition in two releases and
+  would bake one judgement into a raw measurement. Both numbers are published
+  and the analysis chooses.
+- **Concentration**: top-1/5/10 share, bus factor, Gini. Directly answers
+  "where does this project's work come from" and costs nothing extra.
+- **Geography**: commits and people per `country_code`, distinct countries, and
+  `commits_with_unknown_location_percent` - the error bar on every geographic
+  claim, and the number the downstream stage needs most.
+- **`tool_version`**, which finally puts a tool version in an artifact. The gap
+  has been recorded since v0.2.0.
+
+Deliberately absent: `foreign`, `adversarial` and anything derived from them.
+That determination is a separate project. This file supplies the denominators
+and the unknown-share it needs to bound its own percentages, and asserts
+nothing about any person.
+
+### Recovering accounts from no-reply email addresses
+
+GitHub's own no-reply format embeds the account id and login:
+`275304381+hakanpak@users.noreply.github.com`. Verified against the API - the
+embedded id matches `databaseId` exactly - so this is GitHub's construction
+rather than a heuristic.
+
+Measured on the same repository: recovers **767 of the 2,914 anonymous
+contributors**, taking coverage from 396 people / 87.0% of commits to
+**1,163 people / 90.3% of commits**. The remaining 2,147 publish real
+addresses, and GitHub exposes no email-to-user lookup, so no API can resolve
+them.
+
+Cost: `anon=1` makes the contributor list 34 pages instead of 4. That may need
+to be opt-out on very large inventories.
+
+### `--on-exhaustion {fail,wait,partial}`
+
+An inventory larger than one hour's quota cannot be scanned today.
+[ADR-0009](adr/0009-rate-limit-exhaustion-policy.md).
+
+`fail` stays the default so nothing changes silently. `wait` sleeps to the
+reset and continues. `partial` collects what fits and stops.
+
+The important half is not the flag but that **a partial run says so in the
+data**: exit 9, `budget.incomplete_because_exhausted` in `statistics.json`, and
+**a row for every named repository including those never attempted**. Without
+that last part a partial CSV is merely shorter, and a shorter file cannot be
+told from a shorter inventory.
+
+This also inherits the exhaustion-policy work deferred from v0.2.0. Secondary
+rate limits - 403 with `Retry-After` - are a different mechanism and stay
+deferred.
+
+### Documentation
+
+- [`API-LIMITS.md`](API-LIMITS.md) - every ceiling, what it costs, and the
+  ways around it, with the measured figures. Includes the ones that do **not**
+  work, so they are not retried.
+- [`SCAN-PROCESS.md`](SCAN-PROCESS.md) - the run end to end, written to be read
+  adversarially: every place a value can be wrong, absent, or mean something
+  other than it appears to, plus a numbered list of known deficiencies.
+
+### Open, and needing a decision
+
+**How are maintainers identified?** The weakest part of the plan.
+`GET /repos/{o}/{r}/collaborators` requires push access and is unavailable for
+any repository you do not own. `CODEOWNERS` is public and authoritative but
+often absent. Public org membership is opt-in and is not maintainership. Top-N
+by commits is a proxy, and calling a proxy "maintainers" is the kind of
+invented value this project refuses elsewhere.
+
+Proposal: report `maintainers.source` (`codeowners`, `org_public_members`,
+`unavailable`), never fall back to a proxy, and say `unavailable` honestly.
+Whether "are the maintainers and their work fully captured" is answerable then
+depends on the repository, and the file should say which.
+
+---
+
+## v0.7.0 — Persistence
 
 Capture results in **SQLite**, behind an interface that allows the store to be
 swapped for **PostgreSQL** later without changing the collection code. One
@@ -446,7 +552,7 @@ locations or all of them. That tax lands hardest on precisely the small re-runs
 the cache exists to make fast. Memory is mild by comparison at 2.1x, and the
 atomic whole-file rewrite costs a quarter of the load.
 
-The move is **into [v0.6.0](#v060--persistence)'s store, not a database of its
+The move is **into [v0.7.0](#v070--persistence)'s store, not a database of its
 own**, and SQLite answers the binding constraint directly: a run reads the keys
 it needs and parses nothing else, so start-up stops scaling with the cache.
 

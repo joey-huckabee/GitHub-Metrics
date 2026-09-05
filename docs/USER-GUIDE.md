@@ -395,16 +395,22 @@ is_trusted_org     false
 
 ### It checks the budget before it starts
 
-Collection costs one GraphQL point per repository, so a 400-row inventory
-spends 400 of the 5,000 available each hour. The run confirms that before
-collecting anything:
+Collection costs at least two GraphQL points per repository, so a 400-row
+inventory spends at least 800 of the 5,000 available each hour. The run
+confirms that before collecting anything:
 
 ```console
 $ github-metrics scan huge-inventory.csv
-Error: [GM-COL-004] 6000 repositories need 6000 GraphQL points but only 4983
-remain. Short by 1017. Wait for the hourly reset, or collect fewer repositories
-per run
+Error: [GM-COL-004] 6000 repositories need at least 12000 GraphQL points but
+only 4983 remain (short by 7017). Wait for the hourly reset, or collect fewer
+repositories per run
 ```
+
+**"At least" is the operative phrase.** Every contributor is collected, so a
+repository with a long contributor list costs more than the minimum, and
+nothing knows that count until the list has been read. The check refuses a run
+that obviously cannot finish; it does not promise that a run which starts
+will.
 
 Nothing was collected and nothing was spent. That is better than the
 alternative: a run that runs out halfway has already spent its quota and left
@@ -463,11 +469,17 @@ a CSV and a folder of documents collected minutes apart could not be joined or
 grouped by the run that measured them — which is the only reason those columns
 exist.
 
-The price is that every run now pays for contributor pages and for geocoding.
-Nominatim permits one request per second, so a first run over a few hundred
-repositories takes hours; locations are cached within a run, and they repeat
-heavily, so the cost is the number of *distinct* locations rather than of
-contributors.
+The price is that every run pays for contributor pages and for geocoding.
+Nominatim permits one request per second, so a **first** run over a few hundred
+repositories takes hours. Locations repeat heavily, so the cost is the number
+of *distinct* locations rather than of contributors — and because they are
+cached to disk between runs, a second scan over the same inventory pays only
+for locations it has never seen.
+
+The cache lives in the platform cache directory unless `GEOCODE_CACHE_PATH`
+says otherwise, and setting that variable to an empty value turns persistence
+off. Deleting the file costs time and loses no measurement: a cached answer is
+identical to a fresh one, so no output depends on whether the cache existed.
 
 ## In a pipeline
 
@@ -606,8 +618,12 @@ code:
 - **A repository that could not be read still produces a row**, carrying its
   identity with the measurements empty. `outcomes` tells you which, and why:
   `o.error` is the exception rather than a string.
-- **`check_budget` refuses before anything is spent.** Call it or do not, but
-  the CLI's guarantee comes from this call and nothing else.
+- **`check_budget` refuses before anything is spent**, but only when the run
+  cannot afford its *minimum*. It is a floor rather than a guarantee, because
+  a repository's cost depends on how many contributors it has.
+- **Pass a `GeocodeCache` to reuse resolved locations between runs.** A
+  `Geocoder` built without one caches only for the life of the process, which
+  is what a library caller gets unless it opts in.
 - **`ScanIdentifier()` is created once.** Creating one per repository would
   stamp each row with a different run and make the result set ungroupable.
 

@@ -1,30 +1,47 @@
-"""Deciding, before anything is collected, whether a run can finish.
+"""Deciding, before anything is collected, whether a run can obviously not finish.
 
 Collection spends from two separate hourly budgets, and a run has to fit in
-both. Per repository:
+both. Per repository, **at minimum**:
 
-- **two GraphQL points** - one for the metrics query, one for the aliased
-  contributor-detail query, of 5,000 available;
-- **one REST request** - the contributors list, of 5,000 available.
+- **two GraphQL points** - one for the metrics query, one for the first chunk
+  of the aliased contributor-detail query, of 5,000 available;
+- **one REST request** - the first page of the contributors list, of 5,000
+  available.
 
-GraphQL is therefore the binding constraint, at 2,500 repositories an hour
-against REST's 5,000. Checking only one of the two would let a run start that
-cannot finish, which is the failure this module exists to prevent.
+A floor, not a cost
+-------------------
+This module used to promise something stronger, and the promise is gone. Until
+v0.5.0 the contributor list stopped at 25 accounts, which fitted in one REST
+page and one detail query, so a repository cost *exactly* two points and one
+request and the pre-flight was a **comparison**: a run that started could
+finish.
 
-Checking up front is the whole point. A run that discovers exhaustion halfway
-through has already spent the budget it had, produced a file that is part
-measurement and part absence, and given the operator nothing to distinguish the
-two - the repositories at the end of the inventory look exactly like
-repositories that could not be read. Refusing to start costs one free request
-and leaves the quota intact for a smaller run or a later one.
+`docs/adr/0006-collect-every-contributor.md` removed the limit. A repository's
+cost now depends on how many contributors it has, which nobody knows until the
+request that reveals it has been spent. The check is therefore a **lower
+bound**: it refuses a run that cannot afford even the minimum, and passing is
+**necessary but not sufficient**.
+
+Inventing an average contributor count and multiplying by it was considered and
+rejected. It would produce a number indistinguishable in shape from the old
+guarantee and unequal to it in meaning, and a check that reports more
+confidence than it has is the failure mode this repository has already been
+caught by three times.
+
+What the check still buys
+-------------------------
+The common case it was built for is unchanged: a token with little or nothing
+left this hour is refused before it spends an hour producing a file that is
+part measurement and part absence, with nothing to distinguish the two - the
+repositories at the end of the inventory looking exactly like repositories that
+could not be read. Refusing to start costs one free request.
 
 The endpoint used for the check does not count against either budget.
 
-No reserve is held back, so the budgets run to zero and a 2,500-repository
-inventory is exactly the largest run a full hourly quota can do. Keeping a few
-points back so a later command still works would buy a convenience by refusing
-a run the token could actually have finished, which is the wrong trade for a
-tool whose job is the batch.
+No reserve is held back, so the budgets run to zero. Keeping a few points back
+so a later command still works would buy a convenience by refusing a run the
+token could actually have finished, which is the wrong trade for a tool whose
+job is the batch.
 """
 
 from __future__ import annotations
@@ -38,23 +55,29 @@ from github_metrics.errors import RateLimitExhaustedError
 
 LOGGER = logging.getLogger(__name__)
 
-POINTS_PER_REPOSITORY: Final = 2
-"""GraphQL points one repository costs.
+MIN_POINTS_PER_REPOSITORY: Final = 2
+"""GraphQL points one repository costs **at minimum**.
 
-One for `collect.repository`, measured against the live API. One for
-`collect.contributors`' detail query, which asks for up to
-`DEFAULT_CONTRIBUTOR_LIMIT` accounts as aliased single-object selections - no
-connection, so no `nodes`, so the cost formula prices it as one document
-rather than by how many accounts could come back.
+One for `collect.repository`, measured against the live API. One for the first
+chunk of `collect.contributors`' detail query, which asks for up to
+`DETAIL_CHUNK_SIZE` accounts as aliased single-object selections - no
+connection, so no `nodes`, so the cost formula prices each chunk as one
+document rather than by how many accounts could come back.
+
+A repository with more than `DETAIL_CHUNK_SIZE` contributors costs one further
+point per additional chunk, and that count is not known before the list is
+read. This is a floor.
 """
 
-REQUESTS_PER_REPOSITORY: Final = 1
-"""REST requests one repository costs: the contributors list, and nothing else.
+MIN_REQUESTS_PER_REPOSITORY: Final = 1
+"""REST requests one repository costs **at minimum**: one contributors page.
 
 The account details deliberately do not come from REST. Completing each
-account lazily would be one request per contributor - 26 per repository at
-the default limit - and a 200-repository inventory would exhaust the REST
-budget before it finished.
+account lazily would be one request per contributor, and any repository of
+consequence would exhaust the REST budget on its own.
+
+At `client.PER_PAGE` of 100 a repository costs one request per hundred
+contributors, so this too is a floor rather than a cost.
 """
 
 
@@ -64,9 +87,9 @@ class Budget:
 
     Attributes:
         repositories: How many repositories the run would collect.
-        required: GraphQL points the run needs.
+        required: GraphQL points the run needs **at least**.
         available: GraphQL points the token has left this hour.
-        requests_required: REST requests the run needs.
+        requests_required: REST requests the run needs **at least**.
         requests_available: REST requests the token has left this hour.
     """
 
@@ -78,7 +101,12 @@ class Budget:
 
     @property
     def affordable(self) -> bool:
-        """Whether the run fits in what is left of both budgets."""
+        """Whether the run's **minimum** fits in what is left of both budgets.
+
+        Necessary, not sufficient: a repository with many contributors costs
+        more than the minimum, and how many it has is not known here. See the
+        module docstring.
+        """
         return self.available >= self.required and self.requests_available >= self.requests_required
 
     @property
@@ -93,7 +121,11 @@ class Budget:
 
 
 def check_budget(client: GitHubClient, repositories: int) -> Budget:
-    """Confirm the run can finish before it starts.
+    """Refuse a run that cannot afford even its minimum cost.
+
+    This does **not** confirm the run can finish; no check here can, since a
+    repository's cost depends on a contributor count that reading the list is
+    what reveals. See the module docstring.
 
     Args:
         client: An authenticated client.
@@ -103,15 +135,16 @@ def check_budget(client: GitHubClient, repositories: int) -> Budget:
         The budget, for reporting.
 
     Raises:
-        RateLimitExhaustedError: If the remaining points cannot cover the run.
+        RateLimitExhaustedError: If the remaining budget cannot cover even the
+            minimum the run will spend.
     """
     available = client.graphql_points_remaining()
     requests_available = client.rate_limit_remaining()
     budget = Budget(
         repositories=repositories,
-        required=repositories * POINTS_PER_REPOSITORY,
+        required=repositories * MIN_POINTS_PER_REPOSITORY,
         available=available,
-        requests_required=repositories * REQUESTS_PER_REPOSITORY,
+        requests_required=repositories * MIN_REQUESTS_PER_REPOSITORY,
         requests_available=requests_available,
     )
 
@@ -119,7 +152,8 @@ def check_budget(client: GitHubClient, repositories: int) -> Budget:
         raise RateLimitExhaustedError(_shortfall_message(budget))
 
     LOGGER.debug(
-        "Budget: %d repositories need %d of %d GraphQL points and %d of %d REST requests",
+        "Budget: %d repositories need at least %d of %d GraphQL points "
+        "and at least %d of %d REST requests",
         repositories,
         budget.required,
         available,
@@ -153,6 +187,6 @@ def _shortfall_message(budget: Budget) -> str:
             f"{budget.requests_available} remain (short by {budget.request_shortfall})"
         )
     return (
-        f"{budget.repositories} repositories need " + " and ".join(parts) + ". "
+        f"{budget.repositories} repositories need at least " + " and ".join(parts) + ". "
         "Wait for the hourly reset, or collect fewer repositories per run"
     )

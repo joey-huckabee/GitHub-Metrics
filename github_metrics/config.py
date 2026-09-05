@@ -10,6 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from github_metrics.errors import MissingCredentialsError
+from github_metrics.geocache import default_cache_path
 
 LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +26,13 @@ class Settings:
     api_url: str = DEFAULT_API_URL
     geocoder_user_agent: str = DEFAULT_GEOCODER_USER_AGENT
     log_level: str = "INFO"
+    geocode_cache_path: Path | None = None
+    """Where resolved locations are remembered between runs.
+
+    `None` means no cache file, so a caller that wants one opts in. `from_env`
+    supplies the platform default, which is why the CLI always has one and a
+    directly-constructed `Settings` does not.
+    """
 
     @classmethod
     def from_env(cls, env_file: Path | None = None, token: str | None = None) -> Settings:
@@ -65,4 +73,24 @@ class Settings:
             api_url=os.getenv("GITHUB_API_URL", DEFAULT_API_URL).strip() or DEFAULT_API_URL,
             geocoder_user_agent=os.getenv("GEOCODER_USER_AGENT", DEFAULT_GEOCODER_USER_AGENT),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+            geocode_cache_path=_geocode_cache_path(),
         )
+
+
+def _geocode_cache_path() -> Path | None:
+    """Resolve where the geocode cache lives.
+
+    Returns:
+        The path from `GEOCODE_CACHE_PATH`, the platform default when that is
+        unset, or `None` when it is set to an empty value - which is how a
+        caller turns persistence off without deleting a file that a later run
+        would only rebuild.
+    """
+    configured = os.getenv("GEOCODE_CACHE_PATH")
+    if configured is None:
+        return default_cache_path()
+    stripped = configured.strip()
+    if not stripped:
+        LOGGER.debug("GEOCODE_CACHE_PATH is empty; geocoding will not be cached between runs")
+        return None
+    return Path(stripped).expanduser()

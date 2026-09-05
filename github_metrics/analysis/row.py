@@ -71,10 +71,12 @@ def build_block(
     stamped = tuple(
         replace(entry, scan_id=scan.scan_id, scan_date=scan.scan_date) for entry in contributors
     )
-    # Counts what was collected, not what exists: the list is truncated at
-    # DEFAULT_CONTRIBUTOR_LIMIT, ranked by commits descending. METRICS.md says
-    # so, because a total that silently means something narrower than its name
-    # is the kind of number that survives review.
+    # Counts what was collected, not what exists. Since v0.5.0 that is every
+    # contributor GitHub returns, but GitHub itself links only the first 500
+    # author email addresses to accounts and serves counts it has cached, so
+    # the narrower wording stays: a total that silently means something other
+    # than its name is the kind of number that survives review. METRICS.md
+    # records both ceilings.
     total = sum(entry.contribution or 0 for entry in stamped)
 
     return ContributorBlock(contributors=stamped, contribution_total=total)

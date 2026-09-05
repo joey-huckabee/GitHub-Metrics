@@ -57,6 +57,23 @@ class Coordinates:
         """Render as a JSON-ready mapping."""
         return {"latitude": self.latitude, "longitude": self.longitude}
 
+    @classmethod
+    def from_mapping(cls, payload: dict[str, Any]) -> Coordinates:
+        """Rebuild from what `to_mapping` produced.
+
+        Args:
+            payload: A mapping as `to_mapping` renders one. Absent keys read
+                as `None`, which is the unresolved state rather than a defect:
+                a cache written by an older version is worth reading.
+
+        Returns:
+            The coordinates.
+        """
+        return cls(
+            latitude=_optional_float(payload.get("latitude")),
+            longitude=_optional_float(payload.get("longitude")),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class Address:
@@ -142,6 +159,63 @@ class Address:
             "internal_location": self.internal_location.to_mapping(),
         }
 
+    @classmethod
+    def from_mapping(cls, payload: dict[str, Any]) -> Address:
+        """Rebuild from what `to_mapping` produced.
+
+        The inverse of `to_mapping`, and the reason the geocode cache can
+        store an address as JSON and read it back as the same three-state
+        value. Component names are taken from the dataclass rather than
+        listed again, so a field added to this class round-trips without a
+        second edit - the rule `to_header` and `keys` both follow.
+
+        Args:
+            payload: A mapping as `to_mapping` renders one.
+
+        Returns:
+            The address. A key the payload does not carry reads as `None`,
+            which is "not known" - so a cache file written before a component
+            existed degrades to unresolved for that component rather than
+            failing to load.
+        """
+        components = {
+            item.name: _optional_str(payload.get(item.name))
+            for item in fields(cls)
+            if item.name != "internal_location"
+        }
+        location = payload.get("internal_location")
+        return cls(
+            **components,
+            internal_location=Coordinates.from_mapping(
+                location if isinstance(location, dict) else {}
+            ),
+        )
+
+
+def _optional_str(value: object) -> str | None:
+    """Read a cached component, keeping `""` and `None` distinct.
+
+    `""` means the lookup ran and the component does not exist at that
+    resolution; `None` means nothing is known. Collapsing them would undo the
+    distinction the whole address type exists to preserve.
+    """
+    if value is None:
+        return None
+    return str(value)
+
+
+def _optional_float(value: object) -> float | None:
+    """Read a cached coordinate, keeping `None` distinct from `0.0`.
+
+    0,0 is a real position in the Gulf of Guinea, so a coercion that turned an
+    absent coordinate into a zero would plot rather than announce itself.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
 
 @dataclass(frozen=True, slots=True)
 class Contributor:
@@ -224,9 +298,11 @@ class ContributorBlock:
     Attributes:
         contributors: The records, most commits first.
         contribution_total: Sum of `contribution` over `contributors`. Counts
-            what was collected rather than what exists — the list is truncated
-            at `DEFAULT_CONTRIBUTOR_LIMIT` — and `docs/METRICS.md` says so.
-            `0` for a repository that genuinely has none.
+            what was collected rather than what exists: every contributor
+            GitHub returns, which is not every contributor a repository has
+            had — GitHub links only the first 500 author email addresses to
+            accounts. `docs/METRICS.md` says so. `0` for a repository that
+            genuinely has none.
         foreign_contribution: Commits by contributors foreign to the United
             States. **Undefined**; always `None` until `docs/METRICS.md`
             settles the rule.

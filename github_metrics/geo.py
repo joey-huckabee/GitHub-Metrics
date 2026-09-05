@@ -64,20 +64,29 @@ across a portfolio but rarely byte-for-byte: `San Francisco, CA`,
 and Nominatim would answer them identically. Folding them into one cache entry
 turns three seconds into one, and the `query` each contributor records is
 still the string that contributor's own location produced.
+
+The cache also **survives the run**. `geocache.py` owns the file - this module
+reaches the network and never parses a file format, which is the structural
+rule of the package applied to its slowest component - and what expires, and
+what is deliberately never written, is documented there and in
+`docs/adr/0007-persistent-geocode-cache.md`. Since contributor collection is
+unbounded, a scan's geocoding cost is the number of locations *never seen
+before* rather than the number of distinct locations in the inventory.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+import threading
 import unicodedata
-from functools import lru_cache
 from typing import Any, Final
 
 from geopy.exc import GeocoderServiceError
 from geopy.extra.rate_limiter import RateLimiter
 from geopy.geocoders import Nominatim
 
+from github_metrics.geocache import GeocodeCache
 from github_metrics.model.contributor import Address, Coordinates
 
 LOGGER = logging.getLogger(__name__)
@@ -100,8 +109,6 @@ ERROR_WAIT_SECONDS: Final = 5.0
 """Pause before a retry. Long enough to be worth making, short enough to bound
 the cost of a location that will never resolve at `MAX_RETRIES` times this."""
 
-CACHE_SIZE: Final = 4096
-"""Distinct locations held per run. Well above what an inventory produces."""
 
 LANGUAGE: Final = "en"
 """Forces one spelling per place. See the module docstring."""
@@ -225,15 +232,36 @@ def _state_code(components: dict[str, Any]) -> str:
 
 
 class Geocoder:
-    """Resolve free-text locations to structured addresses, once each."""
+    """Resolve free-text locations to structured addresses, once each.
 
-    def __init__(self, user_agent: str, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> None:
+    Two caches sit behind one lookup, and they hold different things.
+
+    The **in-process** cache holds every outcome for the length of the run,
+    including service failures, so that eight workers asking about the same
+    unreachable location wait once rather than eight times.
+
+    The **persistent** cache holds only answers the gazetteer actually gave.
+    A service failure is never written to it: an outage recorded as
+    "unresolved" would be read back on every later run and never re-asked,
+    publishing an unresolved address for a place that resolves perfectly well.
+    See `docs/adr/0007-persistent-geocode-cache.md`.
+    """
+
+    def __init__(
+        self,
+        user_agent: str,
+        timeout: int = DEFAULT_TIMEOUT_SECONDS,
+        cache: GeocodeCache | None = None,
+    ) -> None:
         """Create a geocoder bound to a Nominatim user agent.
 
         Args:
             user_agent: Identifies this tool to Nominatim, as its policy
                 requires. A shared or absent agent is what gets blocked.
             timeout: Seconds one lookup may take.
+            cache: Where resolved locations are remembered between runs.
+                `None` gives an in-memory cache that never persists, so a
+                library caller opts in to a file rather than acquiring one.
         """
         locator = Nominatim(user_agent=user_agent, timeout=timeout)
         # The policy limit belongs here rather than at the call sites: there is
@@ -246,6 +274,13 @@ class Geocoder:
             error_wait_seconds=ERROR_WAIT_SECONDS,
             swallow_exceptions=False,
         )
+        self.cache = cache if cache is not None else GeocodeCache(None)
+        # Guards both caches. It covers check-then-ask rather than only the
+        # store, so that two workers asking about one location at the same
+        # moment produce one request rather than two - which is the difference
+        # between honouring one request per second and exceeding it.
+        self._lock = threading.Lock()
+        self._pending: dict[str, Address] = {}
 
     def locate(self, location: str) -> Address:
         """Resolve one location string.
@@ -256,7 +291,9 @@ class Geocoder:
         Returns:
             The address it resolved to. A blank location returns an empty
             `Address`; a location that resolved to nothing returns one
-            carrying only `query`, so the two remain distinguishable.
+            carrying only `query`, so the two remain distinguishable. A cached
+            answer is indistinguishable from a fresh one, which is what lets
+            the cache be deleted without changing any output.
         """
         cleaned = _normalise(location)
         if not cleaned:
@@ -267,9 +304,8 @@ class Geocoder:
         resolved = self._resolve(cleaned.casefold())
         return resolved.with_query(cleaned)
 
-    @lru_cache(maxsize=CACHE_SIZE)  # noqa: B019 - one geocoder per run; cache dies with it
     def _resolve(self, key: str) -> Address:
-        """Ask the gazetteer once per distinct location.
+        """Ask the gazetteer once per distinct location, or recall the answer.
 
         Args:
             key: A normalised, case-folded location.
@@ -278,6 +314,38 @@ class Geocoder:
             The address, with `query` set to `key`; callers replace it with the
             spelling they asked about.
         """
+        with self._lock:
+            remembered = self._pending.get(key)
+            if remembered is not None:
+                return remembered
+
+            stored = self.cache.get(key)
+            if stored is not None:
+                self._pending[key] = stored
+                return stored
+
+            address, matched, persist = self._ask(key)
+            self._pending[key] = address
+            if persist:
+                self.cache.put(key, address, matched=matched)
+            return address
+
+    def _ask(self, key: str) -> tuple[Address, bool, bool]:
+        """Perform one lookup and classify what came back.
+
+        The three outcomes are separated here and nowhere else. `locate`
+        returns the same `Address` for the last two, because a contributor
+        record must not reveal whether a gazetteer was reachable - but the
+        cache has to tell them apart, because only one of them is a fact about
+        the location.
+
+        Args:
+            key: A normalised, case-folded location.
+
+        Returns:
+            The address, whether the gazetteer matched it, and whether the
+            answer may be persisted.
+        """
         try:
             match = self._geocode(key, addressdetails=True, language=LANGUAGE)
         except GeocoderServiceError:
@@ -285,13 +353,15 @@ class Geocoder:
             # one line per distinct location is the useful cardinality - a
             # cache hit does not repeat it.
             LOGGER.warning("Geocoding failed for the normalised location %r", key)
-            return Address(query=key)
+            # Not persisted: this says nothing about the location, and writing
+            # it would make one outage permanent for every location it touched.
+            return Address(query=key), False, False
 
         if match is None:
             LOGGER.debug("No match for the normalised location %r", key)
-            return Address(query=key)
+            return Address(query=key), False, True
 
-        return _address(key, match)
+        return _address(key, match), True, True
 
 
 def _address(query: str, match: Any) -> Address:

@@ -299,18 +299,33 @@ assertion about named people that nothing has measured.
 
 ### What the total counts
 
-`contribution_total` is the sum over the contributors this tool collected, not
-over every contributor the repository has ever had. The list is truncated at
-**25 accounts**, ranked by commits descending, which is what
-`DEFAULT_CONTRIBUTOR_LIMIT` fixes.
+`contribution_total` is the sum over the contributors this tool collected,
+ranked by commits descending. **Every contributor GitHub attributes to the
+repository is collected**; `DEFAULT_CONTRIBUTOR_LIMIT` is `None` and no
+truncation is applied by this tool. Up to v0.4.1 the list stopped at 25
+accounts, and totals from those runs are not comparable with totals from this
+one — see [ADR-0006](adr/0006-collect-every-contributor.md).
 
-That is a narrower thing than the name suggests, so it is stated here rather
-than left to be discovered. The truncation is logged at DEBUG when it bites,
-which is what makes a total reconcilable against GitHub's own figure later.
-The limit is fixed rather than configurable: GitHub ranks the list by
-contribution, so the first 25 accounts carry the great majority of a
-repository's commits, while the tail is long enough that collecting all of it
-would let one very large repository set the cost of an entire run.
+The wording still says **collected** rather than "every contributor the
+repository has ever had", because GitHub itself bounds the list in two ways
+this tool does not control:
+
+- **The 500-email ceiling.** GitHub identifies contributors by author email
+  address and links only the **first 500 email addresses** to accounts. Beyond
+  that, contributions arrive as *anonymous* entries carrying no account. This
+  tool does not request them (`anon` is left unset, which is GitHub's default),
+  so the list contains only contributors that resolve to a real account. A
+  repository with more than 500 distinct author emails therefore reports a
+  total below its true commit count, and no request shape available here
+  changes that.
+- **Cached counts.** The endpoint serves data that may be a few hours old,
+  because GitHub caches contributor aggregation. A total is a point-in-time
+  measurement of GitHub's view, not of the git history.
+
+Both are properties of the source rather than choices made here, which is why
+the definition is "what was collected" and why that phrase has to stay. The
+count actually collected is logged at DEBUG per repository, which is what makes
+a total reconcilable against GitHub's own figure later.
 
 `contribution_total` is `0` for a repository that genuinely has no
 contributors. It is never "unknown": a repository whose contributor list could
@@ -356,6 +371,71 @@ everything built on it — and it does so **silently**, yielding an id that is
 close to the right one rather than an error. GitHub account ids are comfortably
 below that today and nothing guarantees they stay there. A string has no such
 ceiling, and nothing arithmetic is ever done with an account id.
+
+### What geocoding is for
+
+Geocoding is the most expensive thing a scan does — one request per second,
+per distinct location — so what it buys is stated here in full rather than
+left to be inferred from the code.
+
+#### The question it exists to answer
+
+A contributor's `location` is free text that the account holder typed. The
+contributor block exists to support a **residency determination**: whether a
+given contributor is resident outside the United States, which is the `foreign`
+field, and downstream of that the `foreign_contribution` and `foreign_percent`
+aggregates. Those three are **TBD** — no rule for them is defined in this
+repository and nothing computes them — but the input that any such rule needs
+is a *structured, comparable* location rather than a string.
+
+That is the whole purpose. Geocoding converts
+
+    "Bengaluru/SF"      ->  country_code "in", state "Karnataka", city "Bengaluru"
+    "Austin, TX"        ->  country_code "us", state_code "US-TX", city "Austin"
+    "she/her"           ->  query only; nothing resolved
+    (no location)       ->  every field null; never asked
+
+so that a rule can be written against `country_code` instead of against
+prose. Without it, `foreign` could only ever be a substring match over
+free text, which fails in both directions: `Georgia` is a US state and a
+country, `Vancouver` is in Canada and in Washington, and an account writing
+`SF` or `Bay Area` names a country nowhere in the string.
+
+#### Why the components and not just a country
+
+A residency rule may need to be finer than national. The address carries
+fourteen components so that a rule keyed on state, county or city is possible
+without re-running the slowest part of the pipeline. `country_code` is the
+field a rule **should** key on where national residency is the question: it is
+ISO 3166-1 alpha-2, it carries no language, and it does not shift when a
+country is renamed in one dataset before another.
+
+#### What it does not claim
+
+- **It is not a claim about a person.** It records what an account published
+  and what a gazetteer said that string resolves to. An account may publish a
+  former home, an employer's headquarters, a joke, or nothing.
+- **It is not verification.** Nothing here corroborates a self-reported
+  location against any other source, and nothing should read it as having
+  done so.
+- **It makes no `foreign` determination.** That field is `null` and no code in
+  this repository sets it. Geocoding prepares the input for a rule that lives
+  elsewhere; it does not apply one.
+
+The three-state address is what keeps those honest: "never asked", "asked and
+unresolved" and "matched" stay distinguishable precisely so that a downstream
+rule can decline to judge the first two rather than treating an absent
+location as evidence of anything.
+
+#### What it costs, and what is cached
+
+One request per distinct normalised location, paced at one per second by
+Nominatim's usage policy. Because contributor locations repeat heavily across
+a portfolio, the cost is the number of *distinct* locations rather than the
+number of contributors, and results persist between runs in an on-disk cache
+so that a second scan over the same inventory pays only for places it has
+never seen. See [ADR-0007](adr/0007-persistent-geocode-cache.md) for the cache,
+its expiry policy and the conditions under which it should become a database.
 
 ### Addresses
 

@@ -138,3 +138,41 @@ def test_with_query_carries_every_other_field() -> None:
         if item.name == "query":
             continue
         assert getattr(copied, item.name) == getattr(original, item.name), item.name
+
+
+@pytest.mark.requirement("L3-MET-020")
+def test_from_mapping_recovers_every_declared_field() -> None:
+    """The inverse of `to_mapping`, compared against the dataclass itself.
+
+    Like `with_query`, this is checked against the declared fields rather than
+    a list, so a field added to `Address` cannot round-trip silently wrong.
+    """
+    populated = Address(
+        **{
+            item.name: f"value-{item.name}"
+            for item in fields(Address)
+            if item.name != "internal_location"
+        },
+        internal_location=Coordinates(latitude=1.5, longitude=-2.5),
+    )
+
+    assert Address.from_mapping(populated.to_mapping()) == populated
+
+
+@pytest.mark.requirement("L3-MET-020")
+def test_from_mapping_reads_an_absent_key_as_unknown() -> None:
+    """A cache written before a component existed degrades, rather than fails."""
+    restored = Address.from_mapping({"query": "austin, tx", "city": "Austin"})
+
+    assert restored.query == "austin, tx"
+    assert restored.city == "Austin"
+    assert restored.country is None
+    assert restored.internal_location == Coordinates(None, None)
+
+
+@pytest.mark.requirement("L3-MET-020")
+def test_from_mapping_refuses_to_invent_a_coordinate() -> None:
+    """A non-numeric coordinate reads as absent, never as Null Island."""
+    restored = Address.from_mapping({"internal_location": {"latitude": "north", "longitude": None}})
+
+    assert restored.internal_location == Coordinates(None, None)

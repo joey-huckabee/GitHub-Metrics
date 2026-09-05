@@ -8,6 +8,145 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.5.0] - 2026-09-05
+
+Every contributor, and a geocode cache that outlives the run.
+
+The two go together. Collecting every contributor rather than the top 25 is
+what the downstream residency analysis needs, and it is only affordable to
+repeat because resolved locations now persist between runs.
+
+### Changed
+
+- **`DEFAULT_CONTRIBUTOR_LIMIT` is `None`: a scan collects every contributor**
+  GitHub attributes to an account, rather than the first 25 by commits. The old
+  limit was inherited from the `contributors` command v0.2.0 retired and had
+  never been chosen for the current design. It decided what
+  `contribution_total` counted - and therefore what `foreign_percent` and
+  `adversarial_percent` will mean - which makes it a measurement decision
+  rather than a tuning knob, and the accounts it dropped were exactly the long
+  tail a residency analysis is trying to characterise.
+  [ADR-0006](docs/adr/0006-collect-every-contributor.md).
+
+  **`contribution_total` from v0.4.1 and earlier is not comparable with
+  `contribution_total` from this release.** Nothing in a document records which
+  limit produced it; `scan_id` distinguishes runs and this note distinguishes
+  the rule.
+
+  GitHub's own ceiling remains and is now documented rather than worked around:
+  only the first 500 author email addresses in a repository link to accounts,
+  so a repository past that reports a total below its true commit count.
+- **The REST contributor list is paginated at 100 per page** (`client.PER_PAGE`),
+  the endpoint's maximum. PyGithub defaults to 30, which was invisible while 25
+  fitted in one page and is the difference between 5 requests and 17 for a
+  500-contributor repository.
+- **The aliased contributor-detail query is chunked** at `DETAIL_CHUNK_SIZE`.
+  Not for cost - the formula counts connections and this document has none, so
+  a chunk costs one point whatever it carries - but for the **ten-second
+  processing window**: GitHub terminates a query it cannot finish in time, and
+  an unbounded alias count fails on exactly the largest repositories.
+- **The budget pre-flight is a floor rather than a guarantee.**
+  `POINTS_PER_REPOSITORY` and `REQUESTS_PER_REPOSITORY` are now
+  `MIN_POINTS_PER_REPOSITORY` and `MIN_REQUESTS_PER_REPOSITORY`, and passing
+  the check is necessary but no longer sufficient - a repository's real cost
+  depends on a contributor count nothing knows until the list is read.
+
+  Estimating instead, by multiplying an assumed average, was considered and
+  rejected: it would produce a number shaped exactly like the old guarantee and
+  unequal to it in meaning. A check that reports more confidence than it has is
+  the failure this project has already been caught by three times.
+
+### Fixed
+
+- **A bot in a contributor list aborted the entire scan.** Not a regression in
+  this release - it would have done the same in v0.4.1 - but the first live run
+  this project has ever done hit it within seconds, on the seventh contributor
+  of the first repository tried.
+
+  `dependabot[bot]`, `github-actions[bot]` and a repository's own automation are
+  listed as contributors like anyone else, but GraphQL models them as `Bot`
+  rather than `User`, so `user(login:)` cannot resolve one. GitHub answers such
+  a document with **HTTP 200, the other forty-nine accounts resolved, `null`
+  for the bot, and a `NOT_FOUND` entry in the `errors` array**. PyGithub maps a
+  lone `NOT_FOUND` to `UnknownObjectException`; `graphql.execute` read that as
+  "the repository does not exist"; and the resulting `RepositoryNotFoundError`
+  is not a `ContributorCollectionError`, so it escaped the runner's
+  per-repository handling and ended the run. **No CSV, no documents, exit 1**,
+  and an error blaming the inventory for a repository that was fine.
+
+  Two fixes, because there were two faults:
+
+  - `execute` gained `tolerate_missing`, which the contributor-detail query
+    opts into and nothing else does. That document names no repository, so a
+    `NOT_FOUND` in it cannot mean one; the unresolved alias comes back `null`
+    and the rest of the chunk is kept. A tolerated document's failure is also
+    never classified as `RepositoryNotFoundError`, which was sending operators
+    to fix inventories that were correct.
+  - `get_account_details` now raises `ContributorCollectionError` for every
+    failure. `execute` raises errors that are not that type, and the runner
+    catches only that type for the contributor half - so *any* detail failure,
+    not just a bot, could end a whole run. The contract was always a row and no
+    document; nothing enforced it.
+
+  Nine regression tests, built from the payload the live API actually returned.
+  `NousResearch/hermes-agent` has three bots in its contributor list.
+
+### Added
+
+- **A geocode cache that survives the run**, at the platform cache directory
+  or wherever `GEOCODE_CACHE_PATH` points. A re-run over a stable inventory now
+  pays approximately nothing for the slowest part of a scan.
+  [ADR-0007](docs/adr/0007-persistent-geocode-cache.md).
+
+  Expiry differs by outcome, and that is the decision rather than a detail. A
+  **match** is trusted for 365 days - places do not move, and `country_code` is
+  ISO 3166-1 alpha-2, so the year is there to pick up gazetteer improvements
+  rather than to guard against staleness. A **miss** is trusted for 30 days,
+  because a miss is a statement about coverage and coverage grows. A **service
+  failure is never written at all**: it says nothing about the location, and
+  persisting one would let a single outage poison those locations permanently,
+  with every later run reading "unresolved" from the cache and never asking
+  again. A failure still memoises in-process, so eight workers do not each wait
+  out the same dead lookup.
+- `github_metrics.geocache`, which owns the cache file's format, expiry and
+  atomic write. Separate from `geo.py` because collection may not touch a disk
+  format: `geo` opens sockets and parses nothing, `geocache` parses and opens
+  nothing, and the CLI joins them.
+- `Address.from_mapping` and `Coordinates.from_mapping`, the inverse of
+  `to_mapping`, keeping `""` distinct from `None` and a coordinate of `0.0`
+  distinct from an absent one across the file boundary.
+- `GEOCODE_CACHE_PATH`, documented in `.env.example` and the README. An empty
+  value turns persistence off.
+- `docs/METRICS.md` gains **"What geocoding is for"** - the residency question
+  it exists to answer, why the components and not just a country, and what it
+  explicitly does not claim.
+
+### Notes
+
+- No output key, column or value shape changed. What changed is how many
+  contributor records a document carries, and therefore `contribution_total`.
+- **The point at which the cache should become a table is measured, not
+  estimated.** An entry is about 510 bytes; resident memory is 2.1x the file;
+  loading costs about four times saving. Review at 10 MB (~20,000 locations),
+  move by 50 MB - and the binding constraint is **load time**, not memory,
+  which is the opposite of what the first estimate assumed. The table is in
+  [ADR-0007](docs/adr/0007-persistent-geocode-cache.md) and `ROADMAP.md`.
+- **Verified against the live API for the first time.** One scan of
+  `NousResearch/hermes-agent` (241,787 stars, 3,310 contributor identities):
+  396 accounts collected in 186 s cold, 42 s on a warm cache, with byte-identical
+  addresses between the two.
+- **The GraphQL cost is now measured rather than calculated**, which
+  `ROADMAP.md` has carried as an open item since v0.2.0. Asked via
+  `rateLimit { cost }`: the repository query costs **1** point, and the aliased
+  detail query costs **1** point at 1, 10 *and* 50 aliases. `DETAIL_CHUNK_SIZE`
+  therefore costs points rather than saving them, and exists purely for the
+  ten-second processing window.
+- That run also showed the pre-flight floor understating a real repository by
+  4.5x - 9 GraphQL points actually spent against a floor of 2 - which is the
+  behaviour ADR-0006 describes, observed.
+- 660 tests, `make mutants` catches 30 of 30, and the trace matrix covers 187
+  of 187 L2 and L3 requirements.
+
 ## [0.4.1] - 2026-09-04
 
 The findings v0.4.0's own analysis could not see. **No output changed**: not a

@@ -96,15 +96,19 @@ The document is the CSV row — the same twenty fields, same names, same order
 table. That is why one command produces both rather than two commands producing
 half each.
 
-Collection costs **two GraphQL points and one REST request per repository**,
-and the run confirms the token can cover both budgets before collecting
-anything. A repository that cannot be read still produces a row, carrying its
-identity with every measurement empty, and produces no document; the run exits
-4 naming which ones failed.
+**Every contributor** GitHub attributes to an account is collected, so a
+repository costs **at least** two GraphQL points and one REST request, and more
+as its contributor list grows. The run confirms the token can cover that
+minimum before collecting anything, which refuses an impossible run but does
+not promise that a run which starts will finish. A repository that cannot be
+read still produces a row, carrying its identity with every measurement empty,
+and produces no document; the run exits 4 naming which ones failed.
 
 Contributor locations are geocoded through Nominatim, which permits one request
-per second. Locations are cached per run, but a first run over a large
-inventory is measured in hours rather than minutes.
+per second, so a **first** run over a large inventory is measured in hours. The
+results are cached to disk between runs, so a second run over the same
+inventory pays only for locations it has never seen. `GEOCODE_CACHE_PATH` moves
+that file; deleting it costs time and loses no measurement.
 
 Logs go to **stderr**, which keeps stdout clean —
 `github-metrics scan inventory.csv --format json` writes a clean file even at
@@ -122,6 +126,7 @@ All configuration is read from the environment, or from a `.env` file
 | `GITHUB_TOKEN` | yes | — | Token used for all API calls |
 | `GITHUB_API_URL` | no | `https://api.github.com` | Point at GitHub Enterprise |
 | `GEOCODER_USER_AGENT` | no | `github-metrics` | User-Agent sent to Nominatim |
+| `GEOCODE_CACHE_PATH` | no | platform cache dir | Where resolved locations are remembered between runs; empty turns it off |
 | `LOG_LEVEL` | no | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
 ### Logging

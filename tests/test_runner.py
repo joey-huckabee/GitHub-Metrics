@@ -271,7 +271,7 @@ def test_a_run_that_does_not_fit_is_refused_before_it_starts() -> None:
         check_budget(client, 400)
 
     message = str(caught.value)
-    assert "400 repositories need 800 GraphQL points" in message
+    assert "400 repositories need at least 800 GraphQL points" in message
     assert "only 50 remain" in message
     assert "short by 750" in message
 

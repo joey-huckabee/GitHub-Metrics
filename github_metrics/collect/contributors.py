@@ -10,16 +10,22 @@ by author in one query. `GET /repos/{owner}/{repo}/contributors` is the only
 route that answers the question, so the list is one REST request against a
 budget the rest of a run barely touches.
 
-**The details come from GraphQL, in one query for the whole list.** The REST
+**The details come from GraphQL, in aliased documents.** The REST
 contributors payload is a minimal account object - login, id, avatar - and
 carries no name, company or location. Reading those through PyGithub would
-complete each account lazily, which is **one REST request per contributor**:
-at a limit of 25 that is 26 requests per repository, so a 200-repository
-inventory exhausts REST's 5,000-per-hour budget before it finishes. Aliasing
-the accounts into a single GraphQL document asks for all of them at once, and
-because every alias selects a single object rather than a connection, the
+complete each account lazily, which is **one REST request per contributor**,
+so any repository of consequence would exhaust REST's 5,000-per-hour budget on
+its own. Aliasing the accounts into a GraphQL document asks for many at once,
+and because every alias selects a single object rather than a connection, the
 document has no `nodes` selection and stays at the cheap end of the cost
 formula.
+
+Since v0.5.0 collects every contributor rather than the first 25, that
+document is issued in chunks of `DETAIL_CHUNK_SIZE`. The reason is the
+**ten-second processing window** rather than cost: GitHub prices a query by
+its connections, this one has none, so a chunk costs one point whether it
+carries five aliases or fifty - but a query GitHub cannot finish in ten
+seconds is terminated, and an unbounded alias count is a bet against that.
 
 That is the same reasoning `collect/repository.py` applies to the metrics
 query, for the same reason: the expensive shape is the one that prices by how
@@ -33,11 +39,33 @@ into the list instead, which needs no escaping and cannot collide.
 
 What a missing account means
 ----------------------------
-An account can be deleted or suspended between the REST list and the GraphQL
-lookup, and GitHub answers that alias with `null` rather than failing the
-document. The contributor is still recorded, with the login as its name and
-nothing resolved, because its `contribution` is a real measurement of this
-repository and dropping the record would quietly reduce `contribution_total`.
+Some logins in the REST list do not resolve to a `User`:
+
+- **A bot.** `dependabot[bot]`, `github-actions[bot]` and a repository's own
+  automation appear in the contributors list like anyone else, but GraphQL
+  models them as `Bot` rather than `User`, so `user(login:)` does not find
+  them. These are common - a large repository is more likely to have one than
+  not.
+- **A deleted or suspended account**, between the REST list being read and the
+  detail lookup being made.
+
+GitHub reports both by returning `null` for that alias **and** adding a
+`NOT_FOUND` entry to the response's `errors` array, with HTTP 200 and the other
+forty-nine accounts resolved correctly beside it.
+
+That second half was assumed away until a live run proved otherwise, and it
+cost the whole scan: PyGithub maps a lone `NOT_FOUND` to
+`UnknownObjectException`, `graphql.execute` read that as "the repository does
+not exist", and the resulting `RepositoryNotFoundError` is not a
+`ContributorCollectionError` - so it escaped the runner's per-repository
+handling and aborted the entire run, producing no CSV at all. One bot in one
+repository's contributor list was enough. Hence `tolerate_missing`, which says
+that in this document, and only in this document, a `NOT_FOUND` is an answer
+about one account rather than about the repository.
+
+The contributor is still recorded, with the login as its name and nothing
+resolved, because its `contribution` is a real measurement of this repository
+and dropping the record would quietly reduce `contribution_total`.
 """
 
 from __future__ import annotations
@@ -50,7 +78,7 @@ from github.GithubException import GithubException
 
 from github_metrics.client import GitHubClient
 from github_metrics.collect.graphql import execute
-from github_metrics.errors import ContributorCollectionError
+from github_metrics.errors import CollectionError, ContributorCollectionError
 from github_metrics.model.contributor import Address, Contributor
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -60,14 +88,30 @@ if TYPE_CHECKING:  # pragma: no cover
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_CONTRIBUTOR_LIMIT: Final = 25
-"""Contributors inspected per repository, ranked by commits.
+DEFAULT_CONTRIBUTOR_LIMIT: Final[int | None] = None
+"""Contributors inspected per repository, ranked by commits. `None` is all.
 
-Fixed rather than configurable. GitHub orders the list by contribution
-descending, so the first 25 accounts carry the great majority of a
-repository's commits, while the tail is long enough that collecting all of it
-would let a run's cost be set by its largest repository. `contribution_total`
-counts what was collected, and `docs/METRICS.md` says so.
+This was 25 until v0.5.0, carried over from the `contributors` command v0.2.0
+retired and never chosen for the current design. It decided what
+`contribution_total` counted and therefore what every percentage derived from
+it would mean, which made it a measurement decision wearing a tuning knob's
+clothes - and the accounts it dropped were exactly the long tail the
+downstream residency analysis needs. See
+`docs/adr/0006-collect-every-contributor.md`.
+
+The parameter survives so a library caller can still bound a run. Nothing in
+the CLI sets it.
+"""
+
+DETAIL_CHUNK_SIZE: Final = 50
+"""Accounts asked about in one aliased detail document.
+
+Not a cost control - GitHub prices a query by its connections and this one has
+none, so it costs a point whatever it carries. It is a **timeout** control:
+GitHub terminates any query it has not processed in ten seconds, and several
+hundred aliased account lookups in one document is not a safe bet against
+that. Fifty keeps every document far inside the window regardless of how large
+the repository is.
 """
 
 
@@ -109,18 +153,26 @@ def get_contributor_accounts(
     owner: str,
     repoid: str,
     *,
-    limit: int = DEFAULT_CONTRIBUTOR_LIMIT,
+    limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT,
 ) -> list[ContributorAccount]:
     """Fetch the ranked contributor list for one repository.
+
+    Reads every page unless `limit` says otherwise. `anon` is deliberately not
+    requested, which is GitHub's default: past the first 500 author email
+    addresses GitHub stops linking commits to accounts and reports the rest as
+    anonymous entries carrying no login, and an entry with no account is one
+    this tool can neither look up nor attribute. `docs/METRICS.md` records that
+    ceiling as a property of the source.
 
     Args:
         client: An authenticated client.
         owner: The owner as the inventory wrote it.
         repoid: The repository name as the inventory wrote it.
         limit: How many contributors to keep, ranked by commits descending.
+            `None` keeps every one GitHub returns.
 
     Returns:
-        Up to `limit` accounts, most commits first.
+        The accounts, most commits first.
 
     Raises:
         ContributorCollectionError: The list could not be read.
@@ -128,15 +180,18 @@ def get_contributor_accounts(
     slug = f"{owner}/{repoid}"
     try:
         repository = client.repository(slug)
-        # PyGithub's paginated list is untyped, so the slice is too.
-        accounts: list[NamedUser] = list(repository.get_contributors()[:limit])
+        # PyGithub's paginated list is untyped, so what comes out of it is too.
+        paginated = repository.get_contributors()
+        accounts: list[NamedUser] = list(paginated if limit is None else paginated[:limit])
     except GithubException as exc:
         raise ContributorCollectionError(f"{slug}: could not read contributors: {exc}") from exc
 
-    if len(accounts) == limit:
+    if limit is not None and len(accounts) == limit:
         # The aggregate that follows counts what was collected, not what
         # exists. Saying so at DEBUG is what makes a total reconcilable later.
         LOGGER.debug("%s: contributor list truncated at the limit of %d", slug, limit)
+    else:
+        LOGGER.debug("%s: %d contributors listed", slug, len(accounts))
 
     return [
         ContributorAccount(
@@ -162,28 +217,65 @@ def get_account_details(
         slug: The repository the accounts came from, for messages.
 
     Returns:
-        Login to the account's detail payload. An account GitHub answered with
-        `null` - deleted or suspended since the list was read - is absent.
+        Login to the account's detail payload. An account GitHub answered
+        with `null` - a bot, or deleted or suspended since the list was
+        read - is absent.
+
+    Raises:
+        ContributorCollectionError: A chunk could not be read. Raised as
+            this type specifically so the runner degrades the repository to
+            a row without a document rather than abandoning the run.
     """
     if not accounts:
         return {}
 
-    variables = {f"login{index}": account.login for index, account in enumerate(accounts)}
-    data = execute(
-        client,
-        _details_query(len(accounts)),
-        variables,
-        description=f"contributor detail for {slug}",
-    )
-
     details: dict[str, dict[str, Any]] = {}
-    for index, account in enumerate(accounts):
-        payload = data.get(f"u{index}")
-        if isinstance(payload, dict):
-            details[account.login] = payload
-        else:
-            LOGGER.debug("%s: no detail for %s; the account may be gone", slug, account.login)
+    # Chunked for the ten-second processing window, not for cost. Aliases are
+    # numbered within their chunk, so no document grows with the repository.
+    for start in range(0, len(accounts), DETAIL_CHUNK_SIZE):
+        chunk = accounts[start : start + DETAIL_CHUNK_SIZE]
+        variables = {f"login{index}": account.login for index, account in enumerate(chunk)}
+        try:
+            data = execute(
+                client,
+                _details_query(len(chunk)),
+                variables,
+                description=f"contributor detail for {slug} ({start + 1}-{start + len(chunk)})",
+                # A login that does not resolve to a `User` is an expected
+                # answer here, not a failed query. This document names no
+                # repository, so a NOT_FOUND in it cannot mean one.
+                tolerate_missing=True,
+            )
+        except CollectionError as exc:
+            # Translated rather than propagated. `execute` raises errors
+            # that are not `ContributorCollectionError`, and the runner
+            # only catches that one for the contributor half - so an
+            # untranslated failure here escapes the per-repository
+            # handling and takes the entire run down with it, producing no
+            # CSV at all. The contract is a row and no document.
+            raise ContributorCollectionError(
+                f"{slug}: could not read contributor detail: {exc}"
+            ) from exc
+        for index, account in enumerate(chunk):
+            payload = data.get(f"u{index}")
+            if isinstance(payload, dict):
+                details[account.login] = payload
+            else:
+                LOGGER.debug("%s: no detail for %s; the account may be gone", slug, account.login)
+
+    LOGGER.debug(
+        "%s: detail for %d of %d accounts in %d queries",
+        slug,
+        len(details),
+        len(accounts),
+        _chunk_count(len(accounts)),
+    )
     return details
+
+
+def _chunk_count(accounts: int) -> int:
+    """How many detail queries `accounts` accounts need."""
+    return -(-accounts // DETAIL_CHUNK_SIZE)
 
 
 def get_contributors(
@@ -192,7 +284,7 @@ def get_contributors(
     repoid: str,
     *,
     geocoder: Geocoder | None = None,
-    limit: int = DEFAULT_CONTRIBUTOR_LIMIT,
+    limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT,
 ) -> list[Contributor]:
     """Collect the contributor block for one repository.
 
@@ -204,6 +296,7 @@ def get_contributors(
             is left unresolved, which stays distinguishable from a lookup that
             found nothing.
         limit: How many contributors to keep, ranked by commits descending.
+            `None`, the default, keeps every one GitHub returns.
 
     Returns:
         The contributors, most commits first. The run identity is not stamped

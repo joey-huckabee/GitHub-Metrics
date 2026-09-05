@@ -6,39 +6,74 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Planning for v0.6.0. **No code changed**; this is the design for the next
-release, written up before it is built, per the rule that nothing is
-implemented before it is defined.
+Nothing yet.
+
+## [0.5.1] - 2026-09-05
+
+Documentation, planning and one CI dependency. **No functional code changed** —
+`github_metrics/` is untouched, and the 660 tests are the same 660.
 
 ### Added
 
 - **[`docs/API-LIMITS.md`](docs/API-LIMITS.md)** — every GitHub and Nominatim
   ceiling, what it costs, and the ways around it. Figures are marked measured
-  or documented. Includes the workarounds that do **not** work, recorded so
-  they are not retried.
+  or documented, and the workarounds that do **not** work are recorded so they
+  are not retried.
 - **[`docs/SCAN-PROCESS.md`](docs/SCAN-PROCESS.md)** — the run end to end,
   written to be read adversarially: every place a value can be wrong, absent,
-  or mean something other than it appears to, and a numbered list of ten known
+  or mean something other than it appears to, ending in ten numbered known
   deficiencies.
 - **[ADR-0008](docs/adr/0008-statistics-json.md)** — `statistics.json`, a third
   artifact carrying completeness, exclusion reasons, bot impact, concentration
-  and geographic bounds. `contribution_total` is deliberately **not** adjusted
-  for bots; both figures are published and the analysis chooses.
+  and geographic bounds.
 - **[ADR-0009](docs/adr/0009-rate-limit-exhaustion-policy.md)** —
-  `--on-exhaustion {fail,wait,partial}`, defaulting to `fail`. The important
-  half is that a partial run says so in the data: exit 9,
-  `budget.incomplete_because_exhausted`, and a row for every named repository
-  including those never attempted.
-- The no-reply email recovery route, verified against the API:
-  `275304381+hakanpak@users.noreply.github.com` embeds GitHub's own account id
-  and login. Measured, it takes coverage from 396 people / 87.0% of commits to
-  1,163 / 90.3%.
+  `--on-exhaustion {fail,wait,partial}`.
+- **[ADR-0010](docs/adr/0010-optional-commit-history-attribution.md)** —
+  `--deep-attribution`, an opt-in walk of commit history for the repositories
+  where the contributor list is not enough, with a threshold that recommends it
+  rather than escalating automatically.
+- **The geocode cache is now documented for users**, not only in an ADR: its
+  default location per platform, how to move, disable or clear it, and the fact
+  that deleting it loses no measurement.
+- **A section in the user guide on how many contributors you actually get**,
+  with the measured 396-of-3,310 people against 87% of commits, so the sample
+  is understood before a conclusion is drawn from it.
 
 ### Changed
 
-- `ROADMAP.md`: v0.6.0 is now "Knowing how good the data is"; Persistence moves
-  to v0.7.0.
-- The docs index lists ADRs 0005 through 0009, which had fallen behind.
+- **`--on-exhaustion` will default to `wait`, not `fail`.** Reversed on review
+  before implementation. Defaulting to `fail` optimises for the caller who
+  already knows their inventory is too large — precisely the caller who does
+  not need protecting — and makes the first large scan anyone attempts a
+  refusal. This will change the default behaviour of `scan`, and only for runs
+  that previously produced nothing usable.
+- **Maintainer coverage is dropped from the plan, not deferred.** There is no
+  consistent way to determine who a maintainer is: `collaborators` needs push
+  access unavailable on third-party repositories, `CODEOWNERS` is authoritative
+  but present on a minority, public org membership is opt-in and is not
+  maintainership, and top-N-by-commits is a proxy that would be dishonest to
+  label. A field absent for most repositories is not comparable across a
+  portfolio, which was the only reason to collect it. The concentration figures
+  answer the underlying question without naming anyone.
+- `ROADMAP.md`: v0.6.0 revised, and v0.7.0 realigned — the persistence schema
+  now has a third artifact and a run-level table to hold, and `tool_version` is
+  partly answered by `statistics.json`.
+- `SonarSource/sonarqube-scan-action` from 6 to 8. v8's breaking change is that
+  `skipSignatureVerification` defaults to `false`, so the scanner's OpenPGP
+  signature is verified on download.
+
+### Fixed
+
+- **A CI check that could not fail, found while verifying that bump.**
+  Dependabot pull requests do not receive repository secrets, so the SonarCloud
+  workflow took its documented skip path and **reported success without
+  scanning** — a green tick that was no evidence the bumped action worked. The
+  bump was verified on the push to `main` instead, where the scan really runs
+  (`skipSignatureVerification: false`, signature downloaded, `✓ GPG signature
+  verification passed`). The workflow now says so in a comment, beside the
+  coverage-path guard and the quality-gate read that exist for the same reason.
+  That is the fourth instance in this project of a check reporting success when
+  it could not actually check.
 
 ## [0.5.0] - 2026-09-05
 

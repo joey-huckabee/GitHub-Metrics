@@ -450,8 +450,16 @@ to be opt-out on very large inventories.
 An inventory larger than one hour's quota cannot be scanned today.
 [ADR-0009](adr/0009-rate-limit-exhaustion-policy.md).
 
-`fail` stays the default so nothing changes silently. `wait` sleeps to the
-reset and continues. `partial` collects what fits and stops.
+**`wait` is the default**: a run larger than one hour's quota sleeps to the
+reset and finishes. `fail` restores today's refuse-up-front behaviour and is
+what a CI job with a step timeout should pass. `partial` collects what fits and
+stops.
+
+This **changes the default behaviour of `scan`**, deliberately. No run that
+succeeds today behaves differently - a run inside the budget never reaches the
+policy - so the change is visible only on runs that previously produced nothing
+usable. Defaulting to `fail` would make the first large scan anyone attempts a
+refusal, and the tool's job is the batch.
 
 The important half is not the flag but that **a partial run says so in the
 data**: exit 9, `budget.incomplete_because_exhausted` in `statistics.json`, and
@@ -472,19 +480,40 @@ deferred.
   adversarially: every place a value can be wrong, absent, or mean something
   other than it appears to, plus a numbered list of known deficiencies.
 
-### Open, and needing a decision
+### `--deep-attribution`, for the question sampling cannot answer
 
-**How are maintainers identified?** The weakest part of the plan.
-`GET /repos/{o}/{r}/collaborators` requires push access and is unavailable for
-any repository you do not own. `CODEOWNERS` is public and authoritative but
-often absent. Public org membership is opt-in and is not maintainership. Top-N
-by commits is a proxy, and calling a proxy "maintainers" is the kind of
-invented value this project refuses elsewhere.
+Two questions are asked of this data, and they need different coverage. *Where
+does this project's work come from?* is answered well by 90% of commits. *Is
+there any adversarial contributor here?* is not answered at all by it - a
+single one-commit account is exactly what a sample omits.
 
-Proposal: report `maintainers.source` (`codeowners`, `org_public_members`,
-`unavailable`), never fall back to a proxy, and say `unavailable` honestly.
-Whether "are the maintainers and their work fully captured" is answerable then
-depends on the repository, and the file should say which.
+Walking `defaultBranchRef.target.history` attributes every commit to an account
+and is not subject to the 500-email ceiling. Measured, it costs ~321 GraphQL
+points and 321 round trips for one 32,005-commit repository, against 9 points
+on the default path - roughly **35x**, growing with commit count. Unusable as a
+default, viable for a watchlist.
+
+So: **`--deep-attribution`, off by default**, plus a warning after each
+repository when unattributed commits exceed `--deep-attribution-threshold`
+(default 10%), naming the estimated cost. The measured repository sits at 13%,
+so the recommendation fires on a real case. Escalating automatically was
+rejected - it would spend an hour's quota on a decision the user did not make.
+[ADR-0010](adr/0010-optional-commit-history-attribution.md).
+
+### Dropped: maintainer coverage
+
+An earlier draft proposed reporting whether the maintainers and their work were
+fully captured. **There is no consistent way to determine who a maintainer
+is**, so it is dropped rather than deferred: `collaborators` needs push access
+we do not have on third-party repositories, `CODEOWNERS` is authoritative but
+present on a minority, public org membership is opt-in and is not
+maintainership, and top-N-by-commits is a proxy that would be dishonest to
+label. A field that is absent for most repositories is not comparable across a
+portfolio, which was the only reason to collect it.
+
+The concentration figures - `top_1_share`, `top_5_share`, `bus_factor` - answer
+the underlying question without naming anyone. Reasoning in
+[ADR-0008](adr/0008-statistics-json.md).
 
 ---
 
@@ -492,9 +521,17 @@ depends on the repository, and the file should say which.
 
 Capture results in **SQLite**, behind an interface that allows the store to be
 swapped for **PostgreSQL** later without changing the collection code. One
-schema for both artifacts: a document is the row plus its contributor block, so
-splitting repository and contributor persistence into separate versions - as an
-earlier draft of this roadmap did - would design the same join twice.
+schema for all three artifacts: a document is the row plus its contributor
+block, so splitting repository and contributor persistence into separate
+versions - as an earlier draft of this roadmap did - would design the same join
+twice.
+
+**v0.6.0 adds a third artifact and changes what this has to hold.**
+`statistics.json` is per scan rather than per repository, so the schema needs a
+run-level table beside the row-level one - which is also where the geocode
+cache folds in. That is a larger schema than this section was written for, and
+it is a better one: a stored scan can then answer "was this row measured
+completely" without a second source.
 
 The schema has to be designed before it is written, not after. `scan_id` and
 `scan_date` already exist as per-run identifiers precisely so that stored rows
@@ -507,12 +544,17 @@ Points to settle:
   both
 - How a metric definition change is recorded, so old and new rows are not
   silently compared
-- **How a stored row is attributed to a tool version.** Nothing in the output
-  carries one: `RepositoryMetrics.tool_version` did until v0.2.0 removed that
-  type with the `contributors` command, and `SoftwareRow` has no equivalent. A
-  row is attributable to a *run* and not to the code that made it, which
-  matters more once rows outlive the release that produced them. Adding a
-  column is a change to the output contract and wants an ADR.
+- **How a stored row is attributed to a tool version.** Partly answered by
+  v0.6.0: `statistics.json` carries `tool_version` for the run, so a stored row
+  is attributable through its `scan_id`. What remains is whether the *row*
+  should carry one directly, which is a change to the CSV contract and still
+  wants an ADR. Relevant now that `contribution_total` has meant three
+  different populations across v0.4.1, v0.5.0 and a `--deep-attribution` run.
+- **How the two attribution methods are kept apart.** A repository scanned with
+  `--deep-attribution` has a larger contributor set and a larger
+  `contribution_total` than the same repository scanned normally. Storing both
+  without recording `attribution.method` would let them be compared as though
+  they measured the same thing.
 - **Folding the geocode cache in.** v0.5.0 shipped it as a JSON file rather
   than waiting for this store, because unbounded contributor collection was
   unusable without it. This store will already hold addresses, so the cache

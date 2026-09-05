@@ -121,8 +121,6 @@ what lets a `foreign_percent` carry an honest denominator.
 `count`, `commits`, `contribution_excluding_bots`, the detection methods used,
 and the list itself. Measured example: 3 bots, 289 commits.
 
-**Maintainers** — see the open question below.
-
 **Concentration and distribution** — cheap, and directly answers "where does
 this project's work come from"
 
@@ -157,26 +155,34 @@ nothing about any person.
 * Bad: a third artifact is a third thing to keep consistent; it is generated
   from the same in-memory outcomes as the other two, which is the mitigation
 
-## Open questions
+## Maintainer coverage is deliberately not reported
 
-**How are maintainers identified?** This is unresolved and is the weakest part
-of the design. With a read-only token on a third-party repository:
+An earlier draft proposed a `maintainers` block answering "are the maintainers
+and their work fully captured". **It is dropped**, because no route to the
+answer is consistent enough to publish:
 
-- `GET /repos/{o}/{r}/collaborators` **requires push access** — unavailable for
-  any repository you do not own. Not viable.
-- `CODEOWNERS` is public, parseable, and authoritative where it exists — but
-  most repositories do not have one.
-- Public organisation members are visible, but membership is not maintainership
-  and public membership is opt-in.
-- Top-N contributors by commits is a **proxy, not a fact**, and labelling it
-  "maintainers" would be exactly the kind of invented value this project
-  refuses elsewhere.
+- `GET /repos/{o}/{r}/collaborators` **requires push access**, which a
+  read-only token on a third-party repository does not have. Not viable at all.
+- `CODEOWNERS` is public and authoritative *where it exists*, and most
+  repositories do not have one. A field populated for a minority and empty for
+  the rest is not comparable across a portfolio, which is the only reason to
+  collect it.
+- Public organisation membership is opt-in and is not maintainership.
+- Top-N contributors by commits would always work, and is a **proxy, not a
+  fact**. Labelling it "maintainers" is exactly the kind of invented value this
+  project refuses elsewhere — the same defect as reverse-geocoding a country
+  centroid into a county.
 
-**Proposal:** report `maintainers.source` alongside the data (`codeowners`,
-`org_public_members`, or `unavailable`), never fall back to a contributor-count
-proxy, and emit `unavailable` honestly when there is no public source. Whether
-`maintainers.fully_captured` can be answered at all then depends on the
-repository, and the file should say which.
+The choice was therefore between a field that is absent for most repositories
+and a field that is a guess. Both are worse than not answering, so
+`statistics.json` does not answer it and does not reserve a key for it. If a
+consistent public source appears, this decision can be revisited with an ADR of
+its own.
+
+What *is* reported serves the underlying question better anyway: the
+concentration figures — `top_1_share`, `top_5_share`, `bus_factor` — describe
+where a project's work is concentrated without needing to name anyone a
+maintainer.
 
 ## More Information
 
@@ -186,3 +192,5 @@ repository, and the file should say which.
   the no-reply recovery
 * [ADR-0006](0006-collect-every-contributor.md) for why the contributor list is
   unbounded and why the budget is a floor
+* [ADR-0010](0010-optional-commit-history-attribution.md) for the opt-in deep
+  dive, and the threshold at which this file recommends it

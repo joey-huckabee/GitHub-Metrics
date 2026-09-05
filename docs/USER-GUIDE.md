@@ -469,6 +469,40 @@ a CSV and a folder of documents collected minutes apart could not be joined or
 grouped by the run that measured them — which is the only reason those columns
 exist.
 
+### How many contributors you actually get
+
+**Every contributor GitHub attributes to an account**, ranked by commits. There
+is no limit and no flag; up to v0.4.1 the list stopped at 25, and totals from
+those runs are not comparable with these.
+
+There is still a ceiling, and it is GitHub's rather than this tool's. GitHub
+links only the **first 500 author email addresses** in a repository to
+accounts; past that, contributions arrive as anonymous entries with no account,
+no login and no location, which this tool does not request because there is
+nothing it could do with them.
+
+What that means in practice, measured on a large repository:
+
+| | People | Commits |
+|---|---|---|
+| Collected | 396 — 12% | 27,828 — **87%** |
+| Beyond the ceiling | 2,914 — 88% | 4,155 — 13% |
+
+**Read that table before drawing a conclusion from `contribution_total`.** Most
+of the *people* are missing, but they are the long tail — about 1.4 commits
+each — so most of the *work* is present. If your question is "where does this
+project's work come from", 87% is a strong sample. If it is "did this
+particular person contribute", the answer may simply not be in the data.
+
+Bots are in the list too, and their commits are counted in `contribution_total`
+like anyone else's. One measured repository had three, holding 289 commits
+between them.
+
+`docs/SCAN-PROCESS.md` documents every such caveat, and `docs/API-LIMITS.md`
+the ceilings behind them.
+
+### What a scan costs
+
 The price is that every run pays for contributor pages and for geocoding.
 Nominatim permits one request per second, so a **first** run over a few hundred
 repositories takes hours. Locations repeat heavily, so the cost is the number
@@ -630,6 +664,24 @@ code:
 Collection is synchronous. To run it in the background, put it in your own
 thread or task — the package does not impose a concurrency model on the
 program embedding it.
+
+## Before you trust a number
+
+Three documents exist for this, and they are worth reading before an analysis
+rather than after one:
+
+| Question | Read |
+|---|---|
+| What exactly does a scan do, and where can it mislead me? | [`SCAN-PROCESS.md`](SCAN-PROCESS.md) |
+| Why can't I have all the contributors? | [`API-LIMITS.md`](API-LIMITS.md) |
+| What does this field mean precisely? | [`METRICS.md`](METRICS.md) |
+
+The short version: the output is a **sample with bounds that the artifacts do
+not yet state**. GitHub links only the first 500 author email addresses to
+accounts, bots are counted like people, and fewer than half of contributors
+publish a location at all — so any percentage over `country_code` has a large
+unknown in it. `SCAN-PROCESS.md` ends with a numbered list of ten known
+deficiencies; quantifying them per repository is what v0.6.0 is for.
 
 ## What ingestion does not tell you
 

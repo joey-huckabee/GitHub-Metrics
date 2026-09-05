@@ -30,40 +30,55 @@ built to prevent, arriving by a different door.
 
 ## Decision Drivers
 
-* A large inventory must be able to complete unattended
+* A large inventory must be able to complete unattended, **without the caller
+  having to know in advance that it is large**
 * A partial result must be **unmistakably** partial, in the output and in the
   exit status, never only in a log line
-* Today's behaviour must not change silently
-* Waiting must be a choice, not a surprise — an hour of sleeping is not
-  something a tool should decide on a user's behalf
+* A run that is going to pause must say so before it pauses, not while it is
+  paused
 
 ## Considered Options
 
-* **Keep failing** — rejected; it is the capability gap being reported.
-* **Always wait** — rejected as a *default*: a run could block for hours
-  without having been asked to. Offered as a mode.
-* **Always emit partial results** — rejected as a default: it turns a hard stop
-  into a quiet incompleteness, which is worse than failing.
-* **A policy flag with all three** — chosen.
+* **Keep failing by default** — rejected. It is the capability gap being
+  reported, and it makes the common case the one that needs a flag: an
+  inventory large enough to matter is exactly the one a user wants to finish.
+  Kept as a mode.
+* **Wait by default** — chosen.
+* **Emit partial results by default** — rejected: it turns a hard stop into a
+  quiet incompleteness, which is worse than either failing or waiting. Kept as
+  a mode.
+* **No flag, one behaviour** — rejected; all three are legitimate in different
+  contexts (unattended batch, CI with a time limit, exploratory run).
 
 ## Decision Outcome
 
-Chosen: **`--on-exhaustion {fail,wait,partial}`, defaulting to `fail`.**
-
-`fail` is today's behaviour, so no existing invocation changes meaning. The
-other two are opt-in, and both announce themselves up front.
+Chosen: **`--on-exhaustion {fail,wait,partial}`, defaulting to `wait`.**
 
 | Mode | On exhaustion | Exit | Artifacts |
 |---|---|---|---|
-| `fail` *(default)* | stop immediately | 5 | whatever was written before the stop |
-| `wait` | sleep to the hourly reset, continue | 0–4 as usual | complete |
+| `wait` *(default)* | sleep to the hourly reset, continue | 0–4 as usual | complete |
+| `fail` | stop immediately | 5 | whatever was written before the stop |
 | `partial` | stop collecting, write everything gathered | **9** (new) | complete for what was collected |
+
+**This changes the default behaviour of `scan`**, and that is deliberate rather
+than incidental. A run that used to fail now finishes; no run that used to
+succeed behaves differently, because a run inside the budget never reaches the
+policy at all. The change is therefore only visible on runs that previously
+produced nothing usable.
+
+The alternative — defaulting to `fail` so that nothing changed — was written
+into a draft of this ADR and rejected on review. It optimises for a caller who
+already knows their inventory exceeds an hour's quota, which is precisely the
+caller who does not need the protection: they can pass a flag. Defaulting to
+`fail` means the *first* time anyone scans a large inventory they get a refusal
+and have to discover a flag, and the tool's job is the batch.
 
 ### The pre-flight changes shape rather than being bypassed
 
 Today the pre-flight *refuses*. Under `wait` or `partial` it must not, because
-refusing is the thing being opted out of. It becomes a **warning that names the
-consequence** before anything is spent:
+refusing is the thing being opted out of — and since `wait` is the default,
+**the refusal is no longer the default outcome**. It becomes a **warning that
+names the consequence** before anything is spent:
 
 ```
 WARNING  4,120 repositories need at least 8,240 GraphQL points; 5,000 remain.
@@ -100,22 +115,37 @@ is simply shorter, and a shorter file is indistinguishable from a shorter
 inventory. With it, the row count always equals the accepted reference count
 and the empty rows say which repositories were not reached.
 
-### Why `wait` is not the default
+### What makes waiting safe enough to be the default
 
-Completing is usually the intent, which is a real argument for it. But a
-default that can block for hours is a default that surprises someone, and the
-surprise is unbounded: a 20,000-repository inventory would sleep through four
-resets. `fail` surprises nobody, and the warning tells a user which flag they
-want the first time they hit the ceiling.
+A default that can block for hours needs to be defensible, and three things
+make it so:
+
+1. **It announces itself before it blocks.** The pre-flight already knows the
+   run does not fit and says so, with an estimate of how long the run will take
+   and how many pauses it expects, before spending anything.
+2. **It is interruptible and loses nothing.** Ctrl-C during a wait leaves the
+   rows already collected on disk and the geocode cache saved, because the
+   cache is written in a `finally` block. A cancelled `wait` degrades to
+   roughly what `partial` would have produced.
+3. **It reports progress while paused.** An INFO line naming the resume time,
+   repeated as the wait continues, so a run that looks hung can be told from
+   one that is.
+
+Without all three, `fail` would be the better default. With them, the case for
+refusing a run the token could have finished is weak.
 
 ## Consequences
 
-* Good: an inventory of any size can be scanned to completion
+* Good: an inventory of any size can be scanned to completion, by default
 * Good: partial results become a first-class, self-describing outcome instead
   of a truncated file
 * Good: exit 9 lets a pipeline branch on "incomplete but usable"
-* Bad: `wait` can run for many hours; the warning and a periodic INFO line
-  saying when it will resume are the mitigation
+* Bad: **the default can now run for many hours.** A CI job with a step
+  timeout will hit it rather than failing fast, and `--on-exhaustion fail` is
+  what such a job should pass. This is called out in the CLI reference and the
+  user guide rather than left to be discovered
+* Bad: a default behaviour change is a contract change, recorded in the
+  changelog as such
 * Bad: a new exit code is a change to a documented contract, and codes are
   permanent once issued
 * Bad: `wait` holds a token idle across a reset; a token used elsewhere

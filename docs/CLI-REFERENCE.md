@@ -335,6 +335,7 @@ inventories `validate` takes, mixed freely.
 | `--format {csv,json,console}` | `csv` | Form of the tabular artifact. The documents are always JSON. |
 | `--fields a,b,c` | all | Columns the tabular artifact emits, always in canonical order. |
 | `--workers N` | `min(repositories, 8)` | Concurrent collections. |
+| `--on-exhaustion {wait,fail,partial}` | `wait` | What to do when the hourly budget runs out. `wait` sleeps to the reset and continues; `fail` stops, as every release before v0.6.0 did; `partial` keeps what was collected, marks the rest unmeasured and exits 9. |
 | `--recover-anonymous` / `--no-recover-anonymous` | on | Link contributors GitHub left anonymous whose no-reply email names their account. Costs a page per hundred identities — 34 requests for a large repository against 4 — and raised one measured repository from 11.9% to 34.2% of contributors and 87.0% to 90.3% of commits. |
 | `--strict` | off | Abort on the first bad input reference. |
 
@@ -465,8 +466,9 @@ half failed, which is why the run also warns.
 | `0` | Every reference was collected |
 | `3` | An input reference was rejected; the rest were collected |
 | `4` | A repository could not be collected, or has moved |
-| `5` | The remaining budget could not cover the run; nothing was collected |
+| `5` | The budget could not cover the run under `--on-exhaustion fail` |
 | `6` | A source could not be read |
+| `9` | The budget ran out and `--on-exhaustion partial` stopped the run. Every named repository still has a row; the ones never reached are marked |
 | `7`, `8` | No token, or a token GitHub rejected |
 
 Severity-ordered, highest applicable wins. `4` beats `3`: both still wrote a
@@ -590,7 +592,10 @@ click and are listed for completeness rather than chosen. See
 | `6` | Aborted: the input could not be read | no | `validate` |
 | `7` | Aborted: no GitHub token supplied | no | API commands |
 | `8` | Aborted: GitHub rejected the token | no | API commands |
+| `9` | Degraded: stopped early on an exhausted budget | yes, marked incomplete | `scan` |
 
-The 3-4 against 5-6 split is the load-bearing part: **3 and 4 still produced a
-usable result; 5 and 6 did not.** A caller can test `$? -ge 3` for "something
+The 3-4 against 5-6 split is the load-bearing part: **3, 4 and 9 still produced
+a usable result; 5 and 6 did not.** 9 sits above 4 because an unreadable
+repository still produced everything it could, while a stopped run has
+repositories it never looked at. A caller can test `$? -ge 3` for "something
 was wrong" and `$? -ge 5` for "nothing usable came out".

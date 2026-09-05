@@ -408,9 +408,35 @@ repositories per run
 
 **"At least" is the operative phrase.** Every contributor is collected, so a
 repository with a long contributor list costs more than the minimum, and
-nothing knows that count until the list has been read. The check refuses a run
-that obviously cannot finish; it does not promise that a run which starts
-will.
+nothing knows that count until the list has been read.
+
+### And from v0.6.0 it does not refuse
+
+A run that does not fit **waits for the hourly reset and carries on**, so an
+inventory of any size finishes unattended. Only runs that previously produced
+nothing usable behave differently: a run inside its budget never reaches this
+at all.
+
+```bash
+# Sleeps through resets until it finishes. The default.
+github-metrics scan big-inventory.csv
+
+# Refuses up front, as every release before v0.6.0 did. What a CI job
+# with a step timeout wants.
+github-metrics scan big-inventory.csv --on-exhaustion fail
+
+# Collects what fits and stops, exiting 9.
+github-metrics scan big-inventory.csv --on-exhaustion partial
+```
+
+`wait` announces itself before it blocks, and a run interrupted mid-wait keeps
+everything already collected — the geocode cache is saved in a `finally`.
+
+**A partial run says so in the data, not only in the status.** Every named
+repository still gets a row, and the ones never reached are marked rather than
+omitted: a shorter file cannot be told from a shorter inventory.
+`statistics.json` carries `budget.incomplete_because_exhausted`, which is the
+field to check before treating a CSV as complete.
 
 Nothing was collected and nothing was spent. That is better than the
 alternative: a run that runs out halfway has already spent its quota and left
@@ -760,6 +786,7 @@ token.
 | `3` | Some input references were rejected | yes |
 | `4` | A repository could not be collected, or has moved | yes |
 | `5` | The budget could not cover the run | no |
+| `9` | Stopped early on an exhausted budget | yes, marked incomplete |
 | `6` | A source could not be read | no |
 | `7` | No token supplied | no |
 | `8` | GitHub rejected the token | no |

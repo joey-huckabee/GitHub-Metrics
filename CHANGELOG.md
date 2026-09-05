@@ -85,8 +85,57 @@ First half of v0.6.0: the scan now says how good its own data is.
   each. "Where does this project's work come from" is answered well at 87%;
   "did this person contribute" is not answered at all. `docs/METRICS.md` says
   so where the fields are defined.
-- Still to come in v0.6.0: `--on-exhaustion` and `--deep-attribution`.
-- 722 tests, trace matrix 201 of 201.
+- Still to come in v0.6.0: `--deep-attribution`.
+- 736 tests, trace matrix 208 of 208.
+
+### Added (`--on-exhaustion`)
+
+- **`--on-exhaustion {wait,fail,partial}`**, so an inventory larger than one
+  hour's budget can be scanned at all. Until now the pre-flight simply refused
+  it. [ADR-0009](docs/adr/0009-rate-limit-exhaustion-policy.md).
+- **Exit 9**, for a run that stopped early. Its own status because "incomplete
+  but usable" differs from every other outcome: the artifacts are well-formed
+  and every named repository has a row, but some were never attempted. It sits
+  **above** 4, because an unreadable repository still produced everything it
+  could while a stopped run has repositories it never looked at.
+- **A partial run says so in the data**, not only in the status:
+  `budget.incomplete_because_exhausted` in `statistics.json`, and a row for
+  every named repository with the unreached ones marked. Without that last
+  part a partial CSV is merely shorter, and a shorter file cannot be told from
+  a shorter inventory.
+- `budget.waits` records how many hourly resets a run slept through, and
+  `budget.exhausted` is set even when `wait` recovered from it.
+
+### Changed
+
+- **`scan` now waits for the hourly reset by default instead of refusing.**
+  This changes the default behaviour, deliberately, and only for runs that
+  previously produced nothing usable: a run inside its budget never reaches the
+  policy at all. Defaulting to `fail` optimised for the caller who already
+  knows their inventory is too large — exactly the caller who can pass a flag —
+  and made the first large scan anyone attempts a refusal.
+
+  `--on-exhaustion fail` restores the old behaviour and is what a CI job with a
+  step timeout should pass.
+- The pre-flight **warns instead of refusing** under `wait` and `partial`,
+  naming the consequence before anything is spent. A run about to sleep for an
+  hour should say so while someone is watching.
+
+### Notes
+
+- **Checking the budget costs almost nothing.** Asking the API before every
+  repository would add a round trip to a run that already makes several per
+  repository, so the guard spends a local estimate and verifies only within
+  twenty repositories' worth of the limit. The estimate is deliberately a
+  *floor* — it subtracts the per-repository minimum, which a real repository
+  exceeds — so it reaches the margin early rather than walking into a wall.
+- **One sleep per exhaustion, not eight.** The lock covers the whole
+  check-and-act sequence rather than the counter, and the thread that wakes
+  re-reads the budget so the others are released against a real number. Waking
+  into a still-empty budget waits again: another process may share the token.
+- Every wait is bounded at an hour plus a margin. A reset time in the far
+  future is a clock disagreement, not a real wait, and sleeping on it would
+  hang a run with nothing to explain it.
 
 ### Added (no-reply recovery)
 

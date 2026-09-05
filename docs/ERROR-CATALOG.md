@@ -254,8 +254,11 @@ GraphQL binds first.
 **Resolution**: The message names which budget is short and by how much. Wait
 for the hourly reset, or split the inventory.
 
-Raised **before** collection starts, and the pre-flight is a **floor rather
-than a guarantee**: since v0.5.0 collects every contributor, a repository's real
+Raised **before** collection starts under `--on-exhaustion fail`, and **during**
+it when the budget runs out mid-run. The other two policies do not raise at all:
+`wait` sleeps to the reset and continues, `partial` stops and exits 9.
+
+The pre-flight is a **floor rather than a guarantee**: since v0.5.0 collects every contributor, a repository's real
 cost depends on a contributor count nothing knows until the list is read. A run
 whose minimum fits can still exhaust the budget partway through. See
 `docs/adr/0006-collect-every-contributor.md`.

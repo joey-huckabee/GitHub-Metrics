@@ -28,6 +28,7 @@ only its status code and scope headers matter.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from github import Auth, Github
@@ -129,13 +130,29 @@ class GitHubClient:
             the safe failure: it refuses a run rather than letting one start
             on a number nothing confirmed.
         """
+        remaining, _ = self.graphql_budget()
+        return remaining
+
+    def graphql_budget(self) -> tuple[int, datetime | None]:
+        """Return the GraphQL points remaining and when the hour resets.
+
+        The reset time is what `--on-exhaustion wait` sleeps until, and it
+        comes from the same free query as the remaining count, so knowing when
+        to wake costs nothing extra.
+
+        Returns:
+            Points remaining and the reset instant. Remaining is `0` if the
+            field could not be read - the safe failure, since it refuses a run
+            rather than letting one start on a number nothing confirmed - and
+            the reset is `None` when GitHub did not give one.
+        """
         _, payload = self.graphql(GRAPHQL_BUDGET_QUERY, {})
         limit = payload.get("data", {}).get("rateLimit") or {}
         remaining = limit.get("remaining")
         if remaining is None:
             LOGGER.warning("GraphQL rate limit could not be read; treating it as spent")
-            return 0
-        return int(remaining)
+            return 0, None
+        return int(remaining), _reset_at(limit.get("resetAt"))
 
     def rate_limit_snapshot(self) -> tuple[dict[str, Any], dict[str, Any]]:
         """Fetch the rate-limit endpoint, headers included.
@@ -222,3 +239,23 @@ class GitHubClient:
     def __exit__(self, *_: object) -> None:
         """Close the client on context exit."""
         self.close()
+
+
+def _reset_at(value: Any) -> datetime | None:
+    """Parse GitHub's `resetAt`, which is ISO-8601 with a `Z` suffix.
+
+    Args:
+        value: The field as GitHub returned it.
+
+    Returns:
+        The instant, or `None` when it is absent or unparseable. `None` rather
+        than a guess: a caller waiting for a reset needs to fall back to a
+        bounded sleep rather than to a time nothing supplied.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        LOGGER.warning("GraphQL rate limit reset time %r could not be read", value)
+        return None

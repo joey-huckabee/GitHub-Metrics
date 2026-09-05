@@ -22,9 +22,15 @@ from github_metrics.analysis.releases import describe_bands as describe_release_
 from github_metrics.analysis.row import build_block, build_empty_row, build_row
 from github_metrics.analysis.statistics import build_repository_statistics
 from github_metrics.client import GitHubClient
-from github_metrics.collect.budget import check_budget
+from github_metrics.collect.budget import (
+    MIN_POINTS_PER_REPOSITORY,
+    MIN_REQUESTS_PER_REPOSITORY,
+    Budget,
+    check_budget,
+)
 from github_metrics.collect.credentials import verify_credentials
-from github_metrics.collect.runner import Outcome, collect_all
+from github_metrics.collect.exhaustion import BudgetGuard, ExhaustionPolicy
+from github_metrics.collect.runner import CollectionOptions, Outcome, collect_all
 from github_metrics.config import Settings
 from github_metrics.errors import (
     DocumentDirectoryError,
@@ -32,6 +38,7 @@ from github_metrics.errors import (
     InvalidCredentialsError,
     MissingCredentialsError,
     OutputDestinationError,
+    RateLimitExhaustedError,
 )
 from github_metrics.geo import Geocoder
 from github_metrics.geocache import GeocodeCache
@@ -83,6 +90,16 @@ EXIT_NO_CREDENTIALS = 7
 
 EXIT_BAD_CREDENTIALS = 8
 """Aborted: GitHub rejected the token that was supplied."""
+
+EXIT_INCOMPLETE = 9
+"""Degraded: the budget ran out and `--on-exhaustion partial` stopped the run.
+
+Its own status because "incomplete but usable" is a different thing from every
+other outcome: the artifacts are well-formed and every named repository has a
+row, but some of those rows were never attempted. A pipeline that would accept
+a degraded run and reject an aborted one needs to tell them apart without
+parsing anything.
+"""
 
 
 class InputError(click.ClickException):
@@ -279,6 +296,17 @@ def main(
     help="Concurrent collections. Defaults to min(repositories, 8).",
 )
 @click.option(
+    "--on-exhaustion",
+    type=click.Choice([policy.value for policy in ExhaustionPolicy]),
+    default=ExhaustionPolicy.WAIT.value,
+    show_default=True,
+    help=(
+        "What to do when the hourly budget runs out. 'wait' sleeps to the reset "
+        "and continues; 'fail' stops; 'partial' keeps what was collected and "
+        "exits 9."
+    ),
+)
+@click.option(
     "--recover-anonymous/--no-recover-anonymous",
     default=True,
     show_default=True,
@@ -299,12 +327,14 @@ def main(
 # flags into an options object to satisfy a counter would hide the interface
 # from the place it is declared.
 def scan_command(  # noqa: PLR0913, PLR0917
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     ctx: click.Context,
     sources: tuple[str, ...],
     output: Path | None,
     output_format: str,
     fields: str | None,
     workers: int | None,
+    on_exhaustion: str,
     recover_anonymous: bool,
     strict: bool,
 ) -> None:
@@ -349,6 +379,7 @@ def scan_command(  # noqa: PLR0913, PLR0917
         resolved.repositories,
         workers=workers,
         recover_anonymous=recover_anonymous,
+        policy=ExhaustionPolicy(on_exhaustion),
     )
     outcomes = run.outcomes
     rows = [
@@ -374,6 +405,10 @@ def scan_command(  # noqa: PLR0913, PLR0917
 
     # Severity-ordered, highest applicable wins: an unreadable repository is
     # worse news than a rejected input row, and both still produced a file.
+    if any(not outcome.attempted for outcome in outcomes):
+        # Above 4: an unreadable repository still produced everything it could,
+        # while this run has repositories it never looked at.
+        ctx.exit(EXIT_INCOMPLETE)
     if any(not outcome.ok for outcome in outcomes):
         ctx.exit(EXIT_REPOSITORY_UNFETCHABLE)
     if resolved.issues:
@@ -418,6 +453,7 @@ def _collect(
     *,
     workers: int | None,
     recover_anonymous: bool = True,
+    policy: ExhaustionPolicy = ExhaustionPolicy.WAIT,
 ) -> CollectionRun:
     """Check the budget, then collect. Nothing named means nothing to spend."""
     if not references:
@@ -441,29 +477,22 @@ def _collect(
 
     try:
         with GitHubClient(settings) as client:
-            budget = check_budget(client, len(references))
-            LOGGER.info(
-                "Budget: at least %d of %d GraphQL points and at least %d of %d "
-                "REST requests for %d repositories",
-                budget.required,
-                budget.available,
-                budget.requests_required,
-                budget.requests_available,
-                budget.repositories,
-            )
+            budget = _preflight(client, len(references), policy=policy)
+            guard = BudgetGuard(client, policy, available=budget.available)
             outcomes = collect_all(
                 client,
                 references,
                 max_workers=workers,
                 geocoder=geocoder,
-                recover_anonymous=recover_anonymous,
+                options=CollectionOptions(recover_anonymous=recover_anonymous),
+                guard=guard,
             )
             return CollectionRun(
                 outcomes=outcomes,
                 # Spend is measured by difference against the API's own
                 # counters rather than estimated from the cost model, so it
                 # includes anything the model does not know about.
-                budget=_spend(client, budget.available),
+                budget=_spend(client, budget.available, guard=guard, policy=policy),
                 geocoding=_geocoding(geocoder),
             )
     finally:
@@ -473,7 +502,79 @@ def _collect(
         cache.save()
 
 
-def _spend(client: GitHubClient, graphql_before: int) -> BudgetStatistics:
+def _preflight(client: GitHubClient, repositories: int, *, policy: ExhaustionPolicy) -> Budget:
+    """Check the budget, and decide whether falling short is fatal.
+
+    Under `fail` this refuses a run that cannot afford its minimum, which is
+    what every release before v0.6.0 did. Under `wait` or `partial` refusing
+    would be the thing being opted out of, so the shortfall becomes a warning
+    that names the consequence **before** anything is spent - a run about to
+    sleep for an hour should say so while the operator is still watching.
+
+    Args:
+        client: An authenticated client.
+        repositories: How many the run would collect.
+        policy: What the run will do when the budget runs out.
+
+    Returns:
+        The budget, whether or not it covers the run.
+
+    Raises:
+        RateLimitExhaustedError: Under `fail`, when it does not.
+    """
+    try:
+        budget = check_budget(client, repositories)
+    except RateLimitExhaustedError:
+        if policy is ExhaustionPolicy.FAIL:
+            raise
+        budget = Budget(
+            repositories=repositories,
+            required=repositories * MIN_POINTS_PER_REPOSITORY,
+            available=client.graphql_points_remaining(),
+            requests_required=repositories * MIN_REQUESTS_PER_REPOSITORY,
+            requests_available=client.rate_limit_remaining(),
+        )
+        if policy is ExhaustionPolicy.WAIT:
+            LOGGER.warning(
+                "%d repositories need at least %d GraphQL points and %d remain. "
+                "--on-exhaustion=wait: this run will pause for the hourly reset "
+                "at least once and may take hours",
+                budget.repositories,
+                budget.required,
+                budget.available,
+            )
+        else:
+            LOGGER.warning(
+                "%d repositories need at least %d GraphQL points and %d remain. "
+                "--on-exhaustion=partial: this run is expected to stop early, "
+                "report the repositories it did not reach as unmeasured, and "
+                "exit %d",
+                budget.repositories,
+                budget.required,
+                budget.available,
+                EXIT_INCOMPLETE,
+            )
+        return budget
+
+    LOGGER.info(
+        "Budget: at least %d of %d GraphQL points and at least %d of %d "
+        "REST requests for %d repositories",
+        budget.required,
+        budget.available,
+        budget.requests_required,
+        budget.requests_available,
+        budget.repositories,
+    )
+    return budget
+
+
+def _spend(
+    client: GitHubClient,
+    graphql_before: int,
+    *,
+    guard: BudgetGuard | None = None,
+    policy: ExhaustionPolicy = ExhaustionPolicy.WAIT,
+) -> BudgetStatistics:
     """Measure what the run cost, in the one currency that can be measured.
 
     GraphQL is measured by difference against its own `rateLimit` field,
@@ -493,6 +594,10 @@ def _spend(client: GitHubClient, graphql_before: int) -> BudgetStatistics:
     return BudgetStatistics(
         graphql_points_spent=max(0, graphql_before - graphql_after),
         graphql_remaining=graphql_after,
+        policy=policy.value,
+        exhausted=guard.exhausted if guard else False,
+        incomplete=guard.stopped if guard else False,
+        waits=guard.waits if guard else 0,
     )
 
 

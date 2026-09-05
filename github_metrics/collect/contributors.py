@@ -71,6 +71,7 @@ and dropping the record would quietly reduce `contribution_total`.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
@@ -304,6 +305,7 @@ def get_contributors(
     *,
     geocoder: Geocoder | None = None,
     limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT,
+    extra: Sequence[ContributorAccount] = (),
 ) -> list[Contributor]:
     """Collect the contributor block for one repository.
 
@@ -316,6 +318,10 @@ def get_contributors(
             found nothing.
         limit: How many contributors to keep, ranked by commits descending.
             `None`, the default, keeps every one GitHub returns.
+        extra: Accounts recovered from elsewhere - `collect.anonymous` rescues
+            them from no-reply addresses - to collect alongside the listed
+            ones. Their detail comes from the same aliased query, so they cost
+            no extra request beyond the chunk they land in.
 
     Returns:
         The contributors, most commits first. The run identity is not stamped
@@ -325,7 +331,11 @@ def get_contributors(
         ContributorCollectionError: The contributor list could not be read.
     """
     slug = f"{owner}/{repoid}"
-    accounts = get_contributor_accounts(client, owner, repoid, limit=limit)
+    listed = get_contributor_accounts(client, owner, repoid, limit=limit)
+    # Recovered accounts join the ranking rather than being appended: they are
+    # ordinary contributors that one endpoint declined to name, and a
+    # concentration figure computed over an unsorted list would be wrong.
+    accounts = sorted([*listed, *extra], key=lambda account: account.contribution, reverse=True)
     details = get_account_details(client, accounts, slug=slug)
 
     contributors = [

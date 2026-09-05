@@ -101,7 +101,7 @@ def test_contributor_coverage_reports_the_identities_github_knows_of() -> None:
         "collected": 2,
         "coverage_percent": 2.0,
         "breakdown": {
-            "linked_by_github": 2,
+            "linked_by_github": 100,
             "recovered_from_noreply": 0,
             "anonymous_unrecoverable": 0,
             "unresolvable_accounts": 0,
@@ -409,17 +409,17 @@ def test_the_breakdown_accounts_for_every_identity() -> None:
     """It sums to `identities`, so a reader can check it rather than trust it."""
     gaps = IdentityGaps(
         identities=3310,
-        unrecoverable=Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=2900),
-        recovered=15,
+        unrecoverable=Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=2150),
+        recovered=765,
         unresolvable=0,
     )
 
-    found = gaps.breakdown(collected=410)
+    found = gaps.breakdown(collected=1132)
 
     assert found == {
         "linked_by_github": 395,
-        "recovered_from_noreply": 15,
-        "anonymous_unrecoverable": 2900,
+        "recovered_from_noreply": 765,
+        "anonymous_unrecoverable": 2150,
         "unresolvable_accounts": 0,
     }
     assert sum(found.values()) == gaps.identities
@@ -482,3 +482,36 @@ def test_anonymous_commits_are_unknown_rather_than_zero() -> None:
 
     assert found["people"] == 99
     assert found["commits"] is None
+
+
+@pytest.mark.requirement("L3-STA-009")
+def test_the_breakdown_counts_identities_even_when_accounts_are_fewer() -> None:
+    """One person committing under two no-reply addresses is two identities.
+
+    Counting recovered *accounts* here instead would leave the breakdown short
+    of `identities` by however many people had a second git configuration —
+    observed as 28 on a real repository, which is exactly the kind of quiet
+    arithmetic drift the sum invariant exists to catch.
+    """
+    gaps = IdentityGaps(
+        identities=100,
+        unrecoverable=Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=60),
+        # 40 addresses that collapse into 35 accounts.
+        recovered=40,
+    )
+
+    found = gaps.breakdown(collected=35)
+
+    assert found["recovered_from_noreply"] == 40
+    assert sum(found.values()) == 100
+
+
+@pytest.mark.requirement("L3-STA-009")
+def test_the_breakdown_never_goes_negative_on_inconsistent_input() -> None:
+    """A remainder computed from counts that disagree must not publish nonsense."""
+    gaps = IdentityGaps(
+        identities=10,
+        unrecoverable=Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=99),
+    )
+
+    assert gaps.breakdown(collected=1)["linked_by_github"] == 0

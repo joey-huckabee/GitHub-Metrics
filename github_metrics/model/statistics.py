@@ -169,7 +169,9 @@ class IdentityGaps:
             which case what was collected is all that is known.
         unrecoverable: Identities beyond GitHub's email ceiling that no API
             resolves, with their commits.
-        recovered: Identities rescued from a no-reply address.
+        recovered: **Identities** rescued from a no-reply address, not the
+            accounts they collapse into. The breakdown is of identities,
+            and one account can hold several addresses.
         unresolvable: Logins GitHub listed that GraphQL could not resolve.
     """
 
@@ -187,22 +189,32 @@ class IdentityGaps:
         because accounts were deleted is a property of its age. The components
         say which.
 
+        Everything here is counted in **identities**, meaning author email
+        addresses, because that is what `identities` counts. One person
+        committing under two addresses is two of them, and the collected
+        *account* count is therefore smaller than the parts that make it up.
+        Mixing the two units is what would stop this adding up.
+
         Args:
-            collected: Contributors that reached the document.
+            collected: Contributors that reached the document. Used only as a
+                fallback when no census was taken.
 
         Returns:
             Counts that **sum to `identities`**, so the breakdown can be
-            checked rather than trusted.
+            checked rather than trusted. `linked_by_github` is derived as the
+            remainder for exactly that reason - it is the one category nothing
+            counts directly, and deriving it means the total cannot drift.
         """
-        recovered = min(self.recovered, collected)
         unrecoverable = self.unrecoverable.people if self.unrecoverable else 0
+        total = self.identities if self.identities is not None else collected
         return {
             # Within GitHub's 500-author-email ceiling, so an account was
-            # linked and the detail query could resolve it.
-            "linked_by_github": collected - recovered,
+            # linked and the detail query resolved it. The remainder, so the
+            # breakdown always accounts for every identity.
+            "linked_by_github": max(0, total - self.recovered - unrecoverable - self.unresolvable),
             # Beyond the ceiling, but publishing a no-reply address carrying
             # GitHub's own account id and login.
-            "recovered_from_noreply": recovered,
+            "recovered_from_noreply": self.recovered,
             # Beyond the ceiling with a real email. GitHub exposes no
             # email-to-user lookup, so no API reaches these.
             "anonymous_unrecoverable": unrecoverable,

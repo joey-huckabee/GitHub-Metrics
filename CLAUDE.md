@@ -224,6 +224,15 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   — they preserve every runtime string exactly — so they stay until there
   is a reason to touch those lines. Do not add more, and do not reshape prose
   to avoid a dash.
+
+  **Refined in v0.6.0: the safe set is what cp1252 can encode, which is not
+  all of Unicode.** A box-drawing character (U+2502) in a docstring made
+  vulture report `Unable to parse file ... 'charmap' codec can't encode` as a
+  *warning* and skip the file entirely - a dead-code check that silently
+  stopped checking. An em-dash survives because cp1252 has one at 0x97; box
+  drawing, arrows and most symbols have no mapping at all. So: dashes and
+  accented text in prose are fine and stay, but **draw diagrams in ASCII**.
+  Markdown is unaffected - nothing lints it with the locale encoding.
 - **When editing files programmatically on Windows, write bytes or pass
   `newline="\n"`.** `Path.write_text()` translates `\n` to `os.linesep`, which
   rewrites the whole file with CRLF and turns a ten-line change into a

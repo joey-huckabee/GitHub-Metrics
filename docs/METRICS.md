@@ -659,8 +659,59 @@ cost.
 **The census counts people, not their commits.** Reading how many commits the
 anonymous tail holds needs every page of that list, which is the expensive
 thing the census avoids. `exclusions[].commits` is therefore `null` rather than
-`0` for `anonymous_no_account`: zero would claim the tail contributed nothing,
-which for a large repository is false by thousands of commits.
+`0` for `anonymous_no_account` — unless `--recover-anonymous` walked those
+pages, in which case the figure is measured. Zero would claim the tail
+contributed nothing, which for a large repository is false by thousands of
+commits.
+
+### An identity is an email address, not a person
+
+GitHub's contributors endpoint identifies people by **author email**, so one
+human with two git configurations is two identities. Observed directly in one
+repository: the same display name against `ebraun@o2.pl` and
+`chris.szafranek@zalando.de`.
+
+Two consequences, and both are stated rather than smoothed over:
+
+- **`identities` over-counts people** by an unknown margin. It is still the
+  right denominator, because it is what GitHub attributes commits to, and
+  because no cheaper figure is closer to the truth.
+- **`collected` counts accounts** while `identities` counts addresses, so
+  `coverage_percent` mixes units and is a **lower bound** on person-level
+  coverage. Measured: 765 recovered identities collapsed into 737 accounts, so
+  28 people had committed under two addresses.
+
+`breakdown` is counted entirely in identities for this reason — mixing the two
+is exactly what would stop it adding up.
+
+### Recovering accounts from no-reply addresses
+
+`--recover-anonymous` (on by default) walks the anonymous tail and links the
+entries whose email carries GitHub's own no-reply format:
+
+```
+69859316+dk96-os@users.noreply.github.com
+│        └── login
+└── databaseId
+```
+
+That is GitHub's construction rather than a heuristic, and it round-trips —
+`user(login: "dk96-os")` returns `databaseId 69859316`. Measured on
+`NousResearch/hermes-agent`:
+
+| | Contributors | Commits |
+|---|---|---|
+| Without recovery | 395 of 3,310 — 11.9% | 27,845 of 32,016 — 87.0% |
+| **With recovery** | **1,132 of 3,310 — 34.2%** | **28,904 of 32,016 — 90.3%** |
+
+The remaining 2,150 identities publish real addresses. **GitHub exposes no
+email-to-user lookup**, deliberately, so no API resolves them and nothing here
+guesses: attributing commits to a login inferred from a display name would put
+a real person's name against work that may not be theirs.
+
+**The cost is a page per hundred identities** — 34 requests for that repository
+against the 4 an ordinary collection takes. `--no-recover-anonymous` turns it
+off for a large inventory, at the price of the coverage above.
 
 ### `contributors.breakdown`
 
@@ -695,7 +746,7 @@ either collected, or carrying one of these reasons.
 
 | `reason` | Recoverable | Meaning |
 |---|---|---|
-| `anonymous_recovered_noreply` | **recovered** | Beyond the 500-email ceiling, but publishing a `NNN+login@users.noreply.github.com` address, from which GitHub's own account id and login can be read. Recovered and collected from v0.6.0, so this bucket records how many the recovery rescued. |
+| `anonymous_recovered_noreply` | **recovered** | Beyond the 500-email ceiling, but publishing a `NNN+login@users.noreply.github.com` address, from which GitHub's own account id and login can be read. These **are** in the document; the bucket records how many the recovery rescued. Counted in identities, so it exceeds the number of accounts when someone used two addresses. |
 | `anonymous_no_account` | no | Beyond the ceiling, publishing a real address. GitHub exposes no email-to-user lookup, so no API resolves these. |
 | `account_unresolvable` | no | A login GitHub reported that GraphQL then could not resolve — deleted or suspended between the two calls. |
 

@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from github_metrics.client import GitHubClient
+from github_metrics.collect.anonymous import AnonymousTally, collect_anonymous
 from github_metrics.collect.census import count_identities
 from github_metrics.collect.contributors import (
     DEFAULT_CONTRIBUTOR_LIMIT,
@@ -63,6 +64,9 @@ class Outcome:
             from a repository that has none.
         error: Why there is no metadata, or `None` on success.
         contributor_error: Why there are no contributors, or `None`.
+        anonymous: What the anonymous tail contained, when it was walked.
+            `None` when recovery was not asked for, which is why the exclusion
+            it feeds reports commits as unknown rather than zero.
         identities: Every contributor identity GitHub reports, anonymous ones
             included, or `None` when the census was skipped or failed.
 
@@ -78,6 +82,7 @@ class Outcome:
     contributors: tuple[Contributor, ...] = ()
     error: CollectionError | None = None
     contributor_error: CollectionError | None = None
+    anonymous: AnonymousTally | None = None
     identities: int | None = None
 
     @property
@@ -103,6 +108,7 @@ def collect_all(
     geocoder: Geocoder | None = None,
     contributor_limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT,
     census: bool = True,
+    recover_anonymous: bool = True,
 ) -> list[Outcome]:
     """Collect every reference, concurrently, in input order.
 
@@ -119,6 +125,10 @@ def collect_all(
         census: Count every contributor identity GitHub reports, including
             anonymous ones, at one extra REST request per repository. On by
             default, because without it coverage cannot be stated honestly.
+        recover_anonymous: Walk the anonymous tail and collect the accounts
+            whose no-reply addresses name them. Costs a page per hundred
+            identities - 34 requests for a large repository against 4 - which
+            is why it can be turned off for a large inventory.
 
     Returns:
         One outcome per reference, in the order given.
@@ -138,13 +148,17 @@ def collect_all(
             LOGGER.warning("%s could not be collected: %s", reference.full_name, exc)
             return Outcome(reference=reference, error=exc)
 
+        tally: AnonymousTally | None = None
         try:
+            if recover_anonymous:
+                tally = collect_anonymous(client, reference.owner, reference.repoid)
             contributors = get_contributors(
                 client,
                 reference.owner,
                 reference.repoid,
                 geocoder=geocoder,
                 limit=contributor_limit,
+                extra=tally.recovered if tally else (),
             )
         except ContributorCollectionError as exc:
             # The measurements survive; only the document is lost. Warned
@@ -167,6 +181,7 @@ def collect_all(
             reference=reference,
             metadata=metadata,
             contributors=tuple(contributors),
+            anonymous=tally,
             identities=identities,
         )
 

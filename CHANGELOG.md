@@ -6,7 +6,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Documentation
+
+- **The results database is cancelled, and the reasoning is recorded.**
+  v0.7.0 had been scoped as SQLite persistence since the earliest roadmap
+  drafts. Its three claims - faster, queryable, historical - were each checked
+  against measured numbers before the work started, and none survives: nothing
+  in a scan is disk-bound (the measured 186 s cold against 42 s warm is the
+  geocode cache, which already exists), the artifacts are uniform enough to
+  query as a set (one top-level key order and one CSV header across all four
+  collection routes, verified), and a directory of dated scans already is the
+  history. See [ADR-0012](docs/adr/0012-no-results-database.md).
+- **v0.7.0 through v0.9.0 replace it**, split so each is one idea:
+  `--resume` for an interrupted run, which is the only part that saves API
+  budget and needs no new storage; a querying guide, so "we did not build a
+  database" is an answer rather than a gap; and moving the **geocode cache**
+  to SQLite, gated on the measured 10 MB threshold rather than on a date.
+- **Conditional requests are rejected rather than deferred.** `API-LIMITS.md`
+  had ETags queued for four releases as pairing "naturally with the persistence
+  work". They make REST cheaper, and REST is not the binding constraint - an
+  hour's quota buys ~555 repositories on GraphQL against ~1,000 on REST, and
+  GraphQL has no conditional requests at all.
+- **ADR-0007's stated reason for choosing JSON is withdrawn.** It chose JSON
+  over SQLite partly because v0.7.0's store would be the permanent home. There
+  is no such home; the decision stands on its measured size and load figures,
+  which were always the load-bearing half, and the eventual move is now into a
+  store belonging to the cache alone.
+
+No behaviour changed.
 
 ## [0.6.2] - 2026-09-06
 

@@ -56,6 +56,7 @@ without its alternatives cannot be reviewed later.
 | [0009](adr/0009-rate-limit-exhaustion-policy.md) | `--on-exhaustion` for runs larger than one hour's quota — **proposed** |
 | [0010](adr/0010-optional-commit-history-attribution.md) | `--deep-attribution`: walk commit history when the contributor list is not enough |
 | [0011](adr/0011-one-degraded-exit-status.md) | One degraded exit status, and the retirement of exit 9 |
+| [0012](adr/0012-no-results-database.md) | No results database; the artifacts are the store |
 
 ## The one structural rule
 

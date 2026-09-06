@@ -618,6 +618,7 @@ a key that does not exist and pointed at one that does.
 | `owner` | `str` | The owner as the input named it, matching the CSV row. | **Settled** |
 | `name` | `str` | The repository name, matching the CSV row. | **Settled** |
 | `url` | `str` | Its canonical address, matching the CSV row. | **Settled** |
+| `attempted` | `bool` | Whether collection was tried at all. `false` only when the run stopped early and never reached it - a **budget** problem, where `collected: false` is an **inventory** problem. Both produce an identity-only row, and the row has no field that could tell them apart. | **Settled** |
 | `collected` | `bool` | Whether the repository's metrics were read. `false` means the row carries identity and no measurements. | **Settled** |
 | `documented` | `bool` | Whether a per-repository document was written. `false` with `collected` true means the metrics survived but the contributor list did not — the one case where a complete-looking row has no document beside it. | **Settled** |
 

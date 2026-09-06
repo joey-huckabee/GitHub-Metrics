@@ -42,6 +42,7 @@ from github_metrics.model.statistics import (
     ExclusionReason,
     Geography,
     IdentityGaps,
+    RepositoryState,
     RepositoryStatistics,
 )
 
@@ -62,8 +63,7 @@ def build_repository_statistics(
     row: SoftwareRow,
     contributors: Sequence[Contributor],
     *,
-    collected: bool,
-    documented: bool,
+    state: RepositoryState,
     commits_total: int | None = None,
     gaps: IdentityGaps | None = None,
     attribution: AttributionMethod = AttributionMethod.CONTRIBUTOR_LIST,
@@ -75,8 +75,8 @@ def build_repository_statistics(
             three identity arguments, because the statistics entry and the CSV
             row describe the same repository and must not disagree about which.
         contributors: The records collected, most commits first.
-        collected: Whether metrics were read.
-        documented: Whether a document was written.
+        state: How far this repository got - attempted, collected,
+            documented.
         commits_total: Commits on the default branch, when known.
         gaps: What the contributor list did not yield. Omitted when nothing
             widened the count, in which case what was collected is all that is
@@ -95,8 +95,9 @@ def build_repository_statistics(
         owner=row.owner,
         name=row.name,
         url=row.url,
-        collected=collected,
-        documented=documented,
+        attempted=state.attempted,
+        collected=state.collected,
+        documented=state.documented,
         attribution=attribution,
         commits_total=commits_total,
         commits_attributed=attributed,

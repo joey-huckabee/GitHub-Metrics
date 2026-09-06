@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 19
 - L2 requirements: 87
-- L3 requirements: 127
-- Verified L2+L3: 214 of 214 (100.0%)
+- L3 requirements: 129
+- Verified L2+L3: 216 of 216 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -121,6 +121,8 @@ through their children, so counting them too would count the same work twice.
 | L3-CNF-003 | L2-OUT-001 | `tests/test_conformance.py::test_every_fixture_the_suite_needs_is_present`<br>`tests/test_conformance.py::test_the_replay_covers_every_request_the_scan_makes`<br>`tests/test_conformance.py::test_the_run_reaches_no_network_at_all` | Implemented |
 | L3-CNF-004 | L2-ATT-001 | `tests/test_conformance.py::test_the_deep_route_artifacts_are_unchanged`<br>`tests/test_conformance.py::test_the_deep_route_records_the_method_that_produced_it` | Implemented |
 | L3-CNF-005 | L2-ATT-002 | `tests/test_conformance.py::test_both_routes_find_the_same_bots` | Implemented |
+| L3-CNF-006 | L2-EXH-002 | `tests/test_conformance.py::test_a_partial_run_says_so_in_the_statistics`<br>`tests/test_conformance.py::test_a_partial_run_still_accounts_for_every_repository`<br>`tests/test_conformance.py::test_an_unattempted_repository_is_not_a_failed_one` | Implemented |
+| L3-CNF-007 | L2-STA-001 | `tests/test_conformance.py::test_an_account_is_recovered_from_a_no_reply_address`<br>`tests/test_conformance.py::test_the_anonymous_route_artifacts_are_unchanged`<br>`tests/test_conformance.py::test_the_unreachable_tail_reports_its_commits` | Implemented |
 
 ### COL: COL
 
@@ -197,7 +199,7 @@ through their children, so counting them too would count the same work twice.
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
 | L2-EXH-001 | L1-EXH-001 | L3-EXH-001 | _(none)_ | Implemented |
-| L2-EXH-002 | L1-EXH-001 | L3-EXH-002 | _(none)_ | Implemented |
+| L2-EXH-002 | L1-EXH-001 | L3-CNF-006, L3-EXH-002 | _(none)_ | Implemented |
 | L2-EXH-003 | L1-EXH-001 | L3-EXH-003 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
@@ -458,7 +460,7 @@ through their children, so counting them too would count the same work twice.
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-STA-001 | L1-STA-001 | L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004, L3-STA-007, L3-STA-009 | _(none)_ | Implemented |
+| L2-STA-001 | L1-STA-001 | L3-CNF-007, L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004, L3-STA-007, L3-STA-009 | _(none)_ | Implemented |
 | L2-STA-002 | L1-STA-001 | L3-STA-005 | _(none)_ | Implemented |
 | L2-STA-003 | L1-STA-001 | L3-STA-006, L3-STA-008 | _(none)_ | Implemented |
 

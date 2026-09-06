@@ -155,6 +155,31 @@ class Exclusion:
 
 
 @dataclass(frozen=True, slots=True)
+class RepositoryState:
+    """How far a repository got.
+
+    Three flags that are only meaningful together, and that a caller sets
+    from one place - the outcome the collection produced. Read in order
+    they narrow: was it tried, was it read, did it produce a document.
+
+    Attributes:
+        attempted: Whether collection was tried at all. `False` only when
+            the run stopped early and never reached it.
+
+            Distinct from `collected` on purpose. Both produce an
+            identity-only row and the row has no field that could tell
+            them apart - but they call for different responses: one is a
+            budget problem, the other an inventory problem.
+        collected: Whether the repository's metrics were read.
+        documented: Whether a per-repository document was written.
+    """
+
+    attempted: bool = True
+    collected: bool = False
+    documented: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class IdentityGaps:
     """What the contributor list did not yield, before the document was built.
 
@@ -352,6 +377,14 @@ class RepositoryStatistics:
         owner: The owner as the input named it.
         name: The repository name.
         url: Its canonical address, matching the row's.
+        attempted: Whether collection was tried at all. `False` only when the
+            run stopped early and never reached this repository.
+
+            Distinct from `collected` on purpose. Both produce an
+            identity-only row, and the row has no field that could tell them
+            apart - but they call for different responses: one is a budget
+            problem, the other an inventory problem, and collapsing them sends
+            someone to fix the wrong thing.
         collected: Whether metrics were read.
         documented: Whether a document was written.
         attribution: How the contributors were determined.
@@ -373,6 +406,7 @@ class RepositoryStatistics:
     owner: str = ""
     name: str = ""
     url: str = ""
+    attempted: bool = True
     collected: bool = False
     documented: bool = False
     attribution: AttributionMethod = AttributionMethod.CONTRIBUTOR_LIST
@@ -392,6 +426,7 @@ class RepositoryStatistics:
             "owner": self.owner,
             "name": self.name,
             "url": self.url,
+            "attempted": self.attempted,
             "collected": self.collected,
             "documented": self.documented,
             "attribution": {"method": self.attribution.value},
@@ -535,8 +570,6 @@ class ScanStatistics:  # pylint: disable=too-many-instance-attributes
             artifact of this tool records one.
         duration_seconds: Wall-clock time of the whole run.
         repositories_named: References accepted from the input.
-        repositories_not_attempted: Named but never attempted, because the run
-            stopped early. Zero unless the budget was exhausted.
         budget: What the run spent and whether it finished.
         geocoding: What the geocoder did.
         repositories: One entry per named reference, in input order, so the
@@ -549,7 +582,6 @@ class ScanStatistics:  # pylint: disable=too-many-instance-attributes
     tool_version: str = ""
     duration_seconds: float = 0.0
     repositories_named: int = 0
-    repositories_not_attempted: int = 0
     budget: BudgetStatistics = field(default_factory=BudgetStatistics)
     geocoding: GeocodingStatistics = field(default_factory=GeocodingStatistics)
     repositories: tuple[RepositoryStatistics, ...] = ()
@@ -559,7 +591,11 @@ class ScanStatistics:  # pylint: disable=too-many-instance-attributes
         """Render as a JSON-ready mapping."""
         collected = sum(1 for entry in self.repositories if entry.collected)
         documented = sum(1 for entry in self.repositories if entry.documented)
-        attempted = len(self.repositories) - self.repositories_not_attempted
+        # Derived from the entries rather than tracked separately, so the two
+        # cannot disagree. `repositories_not_attempted` was a field nothing
+        # ever set, which made every skipped repository read as a failed one.
+        not_attempted = sum(1 for entry in self.repositories if not entry.attempted)
+        attempted = len(self.repositories) - not_attempted
         return {
             "scan_id": jsonable(self.scan_id),
             "scan_date": jsonable(self.scan_date),
@@ -570,7 +606,7 @@ class ScanStatistics:  # pylint: disable=too-many-instance-attributes
                 "collected": collected,
                 "documented": documented,
                 "failed": attempted - collected,
-                "not_attempted": self.repositories_not_attempted,
+                "not_attempted": not_attempted,
             },
             "budget": self.budget.to_mapping(),
             "geocoding": self.geocoding.to_mapping(),

@@ -71,7 +71,21 @@ REPOSITORIES = [
     # - 333 commits is four pages, against 321 for the repository this feature
     # was measured on. 15 contributor identities, none anonymous.
     ("hukkin", "tomli"),
+    # The anonymous set. The only small repository found with a recoverable
+    # no-reply address: 156 linked accounts, 5 anonymous, 1 of them carrying
+    # `NNN+login@users.noreply.github.com`. That one entry is the whole reason
+    # it is here - it is the only fixture exercising the recovery path, and the
+    # other four exercise the bucket nothing can reach.
+    ("pypa", "virtualenv"),
 ]
+
+DEEP = {("hukkin", "tomli")}
+"""Which repositories get their commit history recorded.
+
+Only the deep set. A history is a page per hundred commits, so recording one
+for every fixture would put thirteen pages of `pypa/virtualenv` into a file
+nobody needs them in - the deep route is not what that repository is here for.
+"""
 
 
 class Recorder(GitHubClient):
@@ -172,15 +186,20 @@ def main() -> int:
             # The whole contributor path, so the aliased detail query is
             # recorded too - recording only the account list leaves the
             # replay with a hole exactly where the interesting data is.
-            get_contributors(recorder, owner, repoid)
             count_identities(recorder, owner, repoid)
-            collect_anonymous(recorder, owner, repoid)
-            walked = attribute_from_history(recorder, owner, repoid)
-            # And the detail query the *deep* route issues. It ranks by the
-            # history's own commit counts rather than the endpoint's, so the
-            # logins arrive in a different order and the recorded list-route
-            # query does not match it.
-            build_contributors(recorder, walked.accounts, slug=slug)
+            # In the runner's order, and with the runner's arguments. The
+            # recovered accounts join the list before the detail query is
+            # built, so recording that query without them produces chunks of
+            # different logins and the replay finds no match.
+            tally = collect_anonymous(recorder, owner, repoid)
+            get_contributors(recorder, owner, repoid, extra=tally.recovered)
+            if (owner, repoid) in DEEP:
+                walked = attribute_from_history(recorder, owner, repoid)
+                # And the detail query the *deep* route issues. It ranks by the
+                # history's own commit counts rather than the endpoint's, so
+                # the logins arrive in a different order and the recorded
+                # list-route query does not match it.
+                build_contributors(recorder, walked.accounts, slug=slug)
             print(f"   {len(recorder.contributors.get(slug, []))} contributors")
 
         spent = budget - recorder.graphql_points_remaining()

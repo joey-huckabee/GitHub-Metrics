@@ -6,6 +6,44 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.6.1] - 2026-09-05
+
+**A conformance suite.** No behaviour changed for a caller except one counting
+bug the suite itself found; what changed is what the project can prove about
+its own output.
+
+Every other test here checks a *decision*. None checked the **contract** - that
+a known input keeps producing identical output - and that is the gap the last
+two releases kept falling into. Four defects were found by running against the
+live API and none by the unit suite; the clearest was a coverage breakdown
+summing to 3,282 against 3,310, arithmetic drift in a published number that
+only a golden file would have shown.
+
+Four inventories, real API traffic recorded from GitHub, and every artifact
+committed byte for byte:
+
+| Fixture | Covers |
+|---|---|
+| `inventory.csv` | The default path, and a valid reference to an absent repository |
+| `inventory-deep.csv` | `--deep-attribution`, and a repository with a bot |
+| `inventory-anonymous.csv` | An anonymous tail, and an account recovered from a no-reply address |
+| (partial run) | A budget that runs out: exit 9, and every repository still accounted for |
+
+### Fixed
+
+- **`repositories.not_attempted` was a field nothing ever set.** It is
+  documented, it is in every `statistics.json`, and it was always `0` - so a
+  repository the run never reached was counted as one that **failed**. Two
+  different problems (a budget problem and an inventory problem), reported as
+  one, sending a reader to fix the wrong thing.
+
+  Found by the partial-run fixture within minutes of it existing, which is a
+  fair account of why the suite was worth building. The counts are now derived
+  from the per-repository entries so they cannot disagree, and each entry
+  carries `attempted` of its own.
+
 ### Added
 
 - **A second conformance inventory for `--deep-attribution`**, with its own

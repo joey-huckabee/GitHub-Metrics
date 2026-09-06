@@ -1,0 +1,214 @@
+{
+  "scan_id": "00000000-0000-4000-8000-000000000001",
+  "scan_date": "2026-01-01 00:00:00+00:00",
+  "tool_version": "0.6.0",
+  "duration_seconds": 0.14,
+  "repositories": {
+    "named": 1,
+    "collected": 1,
+    "documented": 1,
+    "failed": 0,
+    "not_attempted": 0
+  },
+  "budget": {
+    "graphql_points_spent": 0,
+    "rest_requests_spent": null,
+    "graphql_remaining": 5000,
+    "rest_remaining": null,
+    "exhaustion_policy": "wait",
+    "exhausted": false,
+    "incomplete_because_exhausted": false,
+    "waits": 0
+  },
+  "geocoding": {
+    "cache_loaded": 95,
+    "cache_expired_on_load": 0,
+    "cache_hits": 101,
+    "lookups": 0,
+    "matched": 0,
+    "unmatched": 0,
+    "service_failures": 0
+  },
+  "warnings": [],
+  "repository_statistics": [
+    {
+      "owner": "pypa",
+      "name": "virtualenv",
+      "url": "https://github.com/pypa/virtualenv",
+      "attempted": true,
+      "collected": true,
+      "documented": true,
+      "attribution": {
+        "method": "contributor_list"
+      },
+      "commits": {
+        "total": 1250,
+        "attributed": 1246,
+        "coverage_percent": 99.68
+      },
+      "contributors": {
+        "identities": 161,
+        "collected": 157,
+        "coverage_percent": 97.52,
+        "breakdown": {
+          "linked_by_github": 156,
+          "recovered_from_noreply": 1,
+          "anonymous_unrecoverable": 4,
+          "unresolvable_accounts": 0
+        },
+        "truncated_by_github": true
+      },
+      "exclusions": [
+        {
+          "reason": "anonymous_recovered_noreply",
+          "people": 1,
+          "commits": null
+        },
+        {
+          "reason": "anonymous_no_account",
+          "people": 4,
+          "commits": 4
+        },
+        {
+          "reason": "no_location_published",
+          "people": 56,
+          "commits": 326
+        },
+        {
+          "reason": "location_unresolved",
+          "people": 2,
+          "commits": 3
+        }
+      ],
+      "bots": {
+        "count": 4,
+        "commits": 218,
+        "logins": [
+          "pre-commit-ci[bot]",
+          "dependabot[bot]",
+          "github-actions[bot]",
+          "google-labs-jules[bot]"
+        ],
+        "contribution_excluding_bots": 1028
+      },
+      "concentration": {
+        "top_1_percent": 58.03,
+        "top_5_percent": 78.81,
+        "top_10_percent": 82.91,
+        "bus_factor": 1,
+        "gini": 0.8434
+      },
+      "geography": {
+        "countries": {
+          "us": {
+            "people": 20,
+            "commits": 777
+          },
+          "gb": {
+            "people": 13,
+            "commits": 27
+          },
+          "cz": {
+            "people": 3,
+            "commits": 13
+          },
+          "de": {
+            "people": 10,
+            "commits": 13
+          },
+          "fi": {
+            "people": 2,
+            "commits": 13
+          },
+          "fr": {
+            "people": 7,
+            "commits": 11
+          },
+          "cn": {
+            "people": 5,
+            "commits": 9
+          },
+          "in": {
+            "people": 3,
+            "commits": 5
+          },
+          "pl": {
+            "people": 4,
+            "commits": 5
+          },
+          "ru": {
+            "people": 3,
+            "commits": 5
+          },
+          "ca": {
+            "people": 3,
+            "commits": 4
+          },
+          "kr": {
+            "people": 4,
+            "commits": 4
+          },
+          "nl": {
+            "people": 2,
+            "commits": 4
+          },
+          "nz": {
+            "people": 2,
+            "commits": 4
+          },
+          "ch": {
+            "people": 2,
+            "commits": 3
+          },
+          "no": {
+            "people": 2,
+            "commits": 3
+          },
+          "pt": {
+            "people": 3,
+            "commits": 3
+          },
+          "au": {
+            "people": 2,
+            "commits": 2
+          },
+          "es": {
+            "people": 2,
+            "commits": 2
+          },
+          "il": {
+            "people": 1,
+            "commits": 2
+          },
+          "mx": {
+            "people": 1,
+            "commits": 2
+          },
+          "tw": {
+            "people": 1,
+            "commits": 2
+          },
+          "lt": {
+            "people": 1,
+            "commits": 1
+          },
+          "my": {
+            "people": 1,
+            "commits": 1
+          },
+          "pk": {
+            "people": 1,
+            "commits": 1
+          },
+          "ua": {
+            "people": 1,
+            "commits": 1
+          }
+        },
+        "distinct_countries": 26,
+        "commits_with_known_location_percent": 73.6,
+        "commits_with_unknown_location_percent": 26.4
+      }
+    }
+  ]
+}

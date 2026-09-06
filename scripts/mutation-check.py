@@ -209,11 +209,8 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation(
         "results come back in completion order",
         "github_metrics/collect/runner.py",
-        "        outcomes = list(pool.map(one, references))",
-        "        outcomes = sorted(\n"
-        "            (one(reference) for reference in references),\n"
-        "            key=lambda outcome: outcome.reference.repoid,\n"
-        "        )",
+        "                references,\n            )",
+        "                sorted(references, key=lambda item: item.repoid),\n            )",
         "two runs of one inventory would stop being diffable",
     ),
     Mutation(

@@ -111,7 +111,7 @@ contributor pages are bulk.
 | `test_the_deep_route_records_the_method_that_produced_it` | `attribution.method`, without which the two routes could be diffed as though comparable |
 | `test_both_routes_find_the_same_bots` | The two bot-detection mechanisms agree |
 | `test_every_fixture_the_suite_needs_is_present` | A missing fixture fails here rather than inside a comparison |
-| `test_a_partial_run_still_accounts_for_every_repository` | A stopped run's artifacts, and exit 9 |
+| `test_a_partial_run_still_accounts_for_every_repository` | A stopped run's artifacts, and the degraded status |
 | `test_a_partial_run_says_so_in_the_statistics` | `incomplete_because_exhausted`, and that the counts still add up |
 | `test_an_unattempted_repository_is_not_a_failed_one` | Two states that call for different responses |
 | `test_the_anonymous_route_artifacts_are_unchanged` | The tail, and what was rescued from it |

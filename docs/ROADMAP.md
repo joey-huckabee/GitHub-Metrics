@@ -462,7 +462,8 @@ usable. Defaulting to `fail` would make the first large scan anyone attempts a
 refusal, and the tool's job is the batch.
 
 The important half is not the flag but that **a partial run says so in the
-data**: exit 9, `budget.incomplete_because_exhausted` in `statistics.json`, and
+data**: the degraded status, `budget.incomplete_because_exhausted` in
+`statistics.json`, and
 **a row for every named repository including those never attempted**. Without
 that last part a partial CSV is merely shorter, and a shorter file cannot be
 told from a shorter inventory.
@@ -640,45 +641,54 @@ look like defects are not "fixed" back into defects.
 
 ### A cost that is calculated rather than measured
 
-`MIN_POINTS_PER_REPOSITORY` is 2 - one metrics query, one detail chunk. The
-first was measured against the live API: `collect.repository` sends one
-document and the response reports a cost of 1. The second follows from
-GitHub's documented cost formula, which prices a query by its connections, and
-has never been confirmed. The formula says an aliased document of single-object
-`user(login:)` selections has no connections and therefore costs the minimum of
-1 however many aliases it carries - which is also why chunking that query for
-the ten-second window costs points rather than being free.
+**Settled in v0.6.1.** Every figure the budget rests on was asked of the live
+API with `rateLimit { cost }` and is tabulated in
+[API-LIMITS.md](API-LIMITS.md). The formula was right: an aliased document of
+single-object `user(login:)` selections costs 1 whether it carries 1 alias or
+50, so `MIN_POINTS_PER_REPOSITORY` of 2 is a true floor rather than a hopeful
+one.
 
-This repository's own convention is that a cost is measured rather than
-assumed, so this is a departure recorded rather than a rule quietly relaxed. It
-matters less than it did, because v0.5.0 already downgraded the pre-flight from
-a guarantee to a floor - but it matters in a new way: the floor is now what
-decides whether a run is refused outright, so an understated per-chunk cost
-makes an unaffordable run look affordable.
-
-**Settling it** is the same one-scan check as before, and now also worth
-reading for how the *chunked* detail query is priced against a repository with
-several hundred contributors.
-
-One scan of two or three repositories with a real token at `LOG_LEVEL=DEBUG`,
-reading the cost the API reports back.
+Kept because measuring it moved the problem rather than removing it. The
+counter-intuitive consequence only became visible once the numbers were real:
+`DETAIL_CHUNK_SIZE` **costs** points rather than saving them - 396 accounts in
+8 chunks costs 8 points where one document would cost 1 - and chunking earns
+that solely by staying inside the ten-second window. And the floor understates
+a large repository by about five times in both currencies, which is what a
+floor is for, but it means 5,000 points buys roughly 550 repositories of that
+size rather than 2,500.
 
 ### Nothing has run against the live API
 
-There are 611 tests. Exactly one is marked `integration`, and **both** CI
-workflows deselect it, so the only test that touches GitHub has never run in
-CI - or anywhere else on record.
+**Settled in v0.6.0, and it found things.** The scan of
+`NousResearch/hermes-agent` was the first traffic this project ever sent, and
+three of the four assumptions this entry named held. The fourth was not among
+them, and neither were the failures:
 
-The stubs are faithful to what the API is *documented* to return, which is not
-the same as what it returns. Four things in particular are assumed rather than
-observed: that PyGithub's paginated contributor list slices the way the code
-expects, that the aliased GraphQL document comes back keyed as `u0`, `u1`, …,
-that Nominatim's component keys appear as mapped, and what a large repository
-does to the pace of a run.
+- A `[bot]` contributor **crashed the entire run**. GraphQL answered HTTP 200
+  with a null user and a lone `NOT_FOUND`, PyGithub mapped that to
+  `UnknownObjectException`, and the code read it as "repository not found" -
+  an exception no contributor handler was watching for.
+- `check_budget` was validating against **a number that never moves**. REST's
+  `/rate_limit` reported 5,000 while the token actually held 4,988 GraphQL
+  points, because GraphQL and REST keep separate budgets and only GraphQL's own
+  `rateLimit` field reports the GraphQL one.
+- REST spend turned out to be **unmeasurable** in a run that also uses GraphQL:
+  a GraphQL response clobbers PyGithub's `rate_limiting`. It is published as
+  `null` rather than guessed.
 
-**Settling it:** either a scheduled workflow holding a token, or a documented
-pre-release check run by hand. The second is cheaper and honest; the first
-catches drift in an API nobody controls.
+None of these were reachable by a stub faithful to the documentation, which is
+the entry's original point, demonstrated.
+
+What replaced it is stronger than one integration test: `tests/conformance/`
+replays **recorded live traffic** through the whole CLI and compares artifacts
+byte for byte, so the shapes this entry worried about - the contributor list's
+slicing, the `u0`, `u1`, … aliasing, Nominatim's component keys - are now
+checked on every run of the suite, offline and for free. See
+[CONFORMANCE.md](CONFORMANCE.md).
+
+The residue is drift: a recording is a snapshot, and an API nobody controls can
+change under it without any test going red. That is the argument for a
+scheduled live workflow, and it is still not done.
 
 ### `DEFAULT_CONTRIBUTOR_LIMIT` is inherited, not chosen
 

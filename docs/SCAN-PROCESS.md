@@ -214,10 +214,10 @@ has no positions, so an absent file says it on its own. This is why the counts
 differ and why that difference is information rather than a bug.
 
 **Where this can mislead you:** a repository whose contributors failed produces
-a **complete-looking row** and no document, and the run still **exits 0**. The
-only signals today are a stderr warning and the `Wrote N documents` line being
-lower than the row count. If you are consuming the CSV alone, you cannot tell.
-That gap is on the v0.6.0 list.
+a **complete-looking row** and no document. Since v0.6.2 the run exits `4`
+rather than `0`, and `statistics.json` records `collected: true` with
+`documented: false` for it - so a consumer reading the CSV alone still cannot
+tell, but nothing now reports the run as clean.
 
 ---
 
@@ -229,7 +229,7 @@ Severity-ordered; the **highest applicable** wins.
 |---|---|---|
 | 0 | clean | yes |
 | 3 | some input rows rejected | yes |
-| 4 | some repository unreadable | yes |
+| 4 | a usable file, with something missing from it | yes |
 | 5 | budget exhausted or refused | no |
 | 6 | input unreadable | no |
 | 7 / 8 | no token / rejected token | no |
@@ -248,7 +248,7 @@ Open, and listed so an analyst finds them rather than discovering them in the da
 | 1 | 500-email ceiling not reported anywhere in the output | a truncated repository is indistinguishable from a complete one | v0.6.0 `statistics.json` |
 | 2 | `contribution_total` includes bot commits | inflates human contribution | v0.6.0 reports it separately; total stays raw by decision |
 | 3 | No commit-coverage figure | no way to know 87% from 100% | v0.6.0; `--deep-attribution` reaches 100% for a watchlist |
-| 4 | Contributors failing does not change the exit code | a degraded run exits 0 | open |
+| 4 | ~~Contributors failing does not change the exit code~~ | a degraded run exited 0 | **closed in v0.6.2** |
 | 5 | Pre-flight is a floor | a run can start and not finish | by design; v0.6.0 waits for the reset by default |
 | 6 | `foreign` / `adversarial` always `null` | no residency determination is made here | by design; a separate stage |
 | 7 | Location published by only ~44% of contributors | every geographic percentage has a large unknown | inherent; v0.6.0 quantifies it |

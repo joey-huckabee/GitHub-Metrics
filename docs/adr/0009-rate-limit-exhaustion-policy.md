@@ -58,7 +58,7 @@ Chosen: **`--on-exhaustion {fail,wait,partial}`, defaulting to `wait`.**
 |---|---|---|---|
 | `wait` *(default)* | sleep to the hourly reset, continue | 0–4 as usual | complete |
 | `fail` | stop immediately | 5 | whatever was written before the stop |
-| `partial` | stop collecting, write everything gathered | **9** (new) | complete for what was collected |
+| `partial` | stop collecting, write everything gathered | **4** | complete for what was collected |
 
 **This changes the default behaviour of `scan`**, and that is deliberate rather
 than incidental. A run that used to fail now finishes; no run that used to
@@ -91,7 +91,7 @@ and for `partial`:
 ```
 WARNING  --on-exhaustion=partial: this run is expected to stop early. Roughly
          2,500 of 4,120 repositories will be collected; the rest will be
-         reported as unmeasured and the run will exit 9.
+         reported as unmeasured and the run will exit 4.
 ```
 
 "Roughly" is deliberate. The estimate uses the floor, which understates, so the
@@ -102,7 +102,11 @@ message must not promise a number it cannot hold.
 This is the part that matters more than the flag. A run that stopped early
 records it **in three places**, so no consumer can miss it:
 
-1. **Exit status 9**, distinct from every existing code.
+1. **Exit status 4**, the degraded status. This originally specified a new
+   code, 9, and that was wrong: it sat above the documented `$? -ge 5`
+   boundary while producing a usable file, so a caller following the
+   published advice would have discarded it. Retired in v0.6.2 - see
+   [ADR-0011](0011-one-degraded-exit-status.md).
 2. **`statistics.json`** — `budget.exhausted: true`,
    `budget.incomplete_because_exhausted: true`, and the count of repositories
    never attempted ([ADR-0008](0008-statistics-json.md)).
@@ -139,7 +143,8 @@ refusing a run the token could have finished is weak.
 * Good: an inventory of any size can be scanned to completion, by default
 * Good: partial results become a first-class, self-describing outcome instead
   of a truncated file
-* Good: exit 9 lets a pipeline branch on "incomplete but usable"
+* Good: a pipeline can branch on "incomplete but usable" - through the
+  degraded status, and `statistics.json` for which kind
 * Bad: **the default can now run for many hours.** A CI job with a step
   timeout will hit it rather than failing fast, and `--on-exhaustion fail` is
   what such a job should pass. This is called out in the CLI reference and the
@@ -167,6 +172,7 @@ refusing a run the token could have finished is weak.
 ## More Information
 
 * [`API-LIMITS.md`](../API-LIMITS.md) §5 for what a run of *N* repositories costs
-* [ADR-0004](0004-exit-code-scheme.md) for the severity ordering exit 9 joins
+* [ADR-0004](0004-exit-code-scheme.md) for the severity ordering, and
+  [ADR-0011](0011-one-degraded-exit-status.md) for why exit 9 did not fit it
 * [ADR-0006](0006-collect-every-contributor.md) for why the pre-flight became a
   floor, which is what makes this necessary

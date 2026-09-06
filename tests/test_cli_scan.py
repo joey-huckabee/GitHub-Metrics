@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from github_metrics.cli import EXIT_REPOSITORY_UNFETCHABLE, EXIT_ROWS_REJECTED, main
+from github_metrics.cli import EXIT_DEGRADED, EXIT_ROWS_REJECTED, main
 from github_metrics.collect.budget import Budget
 from github_metrics.collect.repository import RepoMetaData
 from github_metrics.collect.runner import Outcome
@@ -464,7 +464,7 @@ def test_an_unreadable_repository_gets_a_row_but_no_document(
     _patch(monkeypatch, half)
     result = run("pypa/virtualenv", "ghost/missing", "--output", str(tmp_path))
 
-    assert result.exit_code == EXIT_REPOSITORY_UNFETCHABLE
+    assert result.exit_code == EXIT_DEGRADED
     rows = rows_of(tmp_path)
     assert len(rows) == 2
     # Identity kept, measurements empty. Empty rather than zero.
@@ -688,3 +688,85 @@ def test_the_geocode_cache_is_saved_even_when_the_run_fails(
     run("pypa/virtualenv", "--output", str(tmp_path))
 
     assert saved == ["saved"]
+
+
+@pytest.mark.requirement("L3-CLI-011")
+def test_a_run_that_lost_its_documents_does_not_report_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The defect this release exists for.
+
+    A repository whose contributors failed keeps a **complete-looking** row and
+    produces no document. Until v0.6.2 that run exited 0, so a pipeline
+    branching on status saw a clean scan while the document set was short - and
+    a consumer reading only the directory could not tell a repository with no
+    contributors from one whose contributors could not be read.
+    """
+
+    def partial(_client: Any, references: Any, **_kwargs: Any) -> list[Outcome]:
+        return [
+            Outcome(
+                reference=reference,
+                metadata=metadata(reference),
+                contributor_error=ContributorCollectionError(
+                    f"{reference.full_name}: could not read contributors"
+                ),
+            )
+            for reference in references
+        ]
+
+    _patch(monkeypatch, partial)
+    result = run("pypa/virtualenv", "--output", str(tmp_path))
+
+    assert result.exit_code == EXIT_DEGRADED
+    # The row is complete; only the document is missing. Both remain true.
+    assert rows_of(tmp_path)[0]["stars"] == "5041"
+    assert "Wrote 0 documents" in result.output
+
+
+@pytest.mark.requirement("L3-CLI-011")
+@pytest.mark.usefixtures("offline")
+def test_a_run_that_lost_nothing_still_reports_success(tmp_path: Path) -> None:
+    """The other half: widening the status must not make everything degraded."""
+    result = run("pypa/virtualenv", "--output", str(tmp_path))
+
+    assert result.exit_code == 0
+
+
+@pytest.mark.requirement("L3-CLI-011")
+def test_every_degraded_outcome_shares_one_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unreadable, unattempted and undocumented all exit 4.
+
+    The degraded band is only 3 and 4 wide, so a third code would have to sit
+    above the aborted ones and break `$? -ge 5` for every caller - which is
+    exactly what exit 9 did until it was retired. Which kind of incompleteness
+    occurred is in `statistics.json`, not in the status.
+    """
+    kinds = {
+        "unreadable": lambda reference: Outcome(
+            reference=reference,
+            error=RepositoryNotFoundError(f"{reference.full_name}: gone"),
+        ),
+        "unattempted": lambda reference: Outcome(reference=reference, attempted=False),
+        "undocumented": lambda reference: Outcome(
+            reference=reference,
+            metadata=metadata(reference),
+            contributor_error=ContributorCollectionError("no contributors"),
+        ),
+    }
+
+    for name, build in kinds.items():
+        target = tmp_path / name
+        target.mkdir()
+
+        def collect(
+            _client: Any, references: Any, _build: Any = build, **_kw: Any
+        ) -> list[Outcome]:
+            return [_build(reference) for reference in references]
+
+        _patch(monkeypatch, collect)
+        result = run("pypa/virtualenv", "--output", str(target))
+
+        assert result.exit_code == EXIT_DEGRADED, f"{name} did not exit 4"

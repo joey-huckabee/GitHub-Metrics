@@ -32,6 +32,49 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is no such home; the decision stands on its measured size and load figures,
   which were always the load-bearing half, and the eventual move is now into a
   store belonging to the cache alone.
+- **Three L1 requirements were invisible to the trace matrix.** `L1-STA-001`,
+  `L1-EXH-001` and `L1-ATT-001` were written under a level-four heading, nested
+  inside the `L1-OUT` section; the generator's pattern for an L1 matches level
+  three only, so it never read them. The committed matrix counted 19
+  requirements against the document's 22, three categories lost their
+  `L1 -> L2` table, and their headings rendered as `STA: STA`. Nothing failed,
+  for two reasons: a category section without an L1 table is a legitimate shape
+  here - `COL`, `ROW` and `SRC` parent to L1s elsewhere - and `--check`
+  compared the matrix against the same parse that had dropped them. The three
+  now have their own sections, category titles and `**Verification Method**`
+  lines, and roll up to Implemented from children that were already covered.
+- **A parent link that does not resolve now fails the build.**
+  `build-trace-matrix.py` refused an L2 declaring no `**Parent**:` line, but
+  never checked that the parent it named was one the generator had read, so an
+  orphaned subtree rendered normally beneath a requirement that appeared
+  nowhere. `tests/test_trace_matrix.py` holds the documents and the generator
+  to the same view of what exists.
+- **Every category now has a title, and every requirement sits in the section
+  its id names.** Four categories rendered in the matrix as the bare code -
+  `CNF: CNF`, `COL: COL`, `ROW: ROW`, `SRC: SRC` - because titles were read
+  from the tables of categories, `L3.md` has no such table, and the L2 table
+  only mirrored L1's. Titles now come from the `## <LEVEL>-<CODE>:` section
+  headings instead, which every category necessarily has, and the tables stay
+  as reader documentation held to them by a test. Writing the four missing
+  headings turned up the same misfiling that hid the L1 fault: `L2-COL-001`
+  and `L2-ROW-001` sat inside `## L2-LOG`, `L2-SCR-003` and `L2-SCR-004`
+  inside `## L2-CON`, and five `L3-CLI` entries were spread across `OUT`,
+  `MET` and `CNF`. All are re-filed - no identifier changed, and the matrix
+  content is identical, because it groups by category rather than by document
+  order.
+- **Two convention statements now describe what the documents actually do.**
+  `L1.md` said a category code came from its own table, which stopped being
+  true once `SRC`, `COL` and `ROW` appeared at L2 and `CNF` at L3; each level
+  names its categories in its own section headings, and the table covers the
+  document it sits in. `L3.md` wrote the parent link as `L2-<CAT>-<NNN>` with
+  the requirement's own category, implying the two must match. They need not,
+  and this is ordinary rather than exceptional: a category names what a
+  requirement is about, not what it derives from, so every `CNF` entry parents
+  outside its category and so does `L2-CLI-006`, where the `bands` command
+  derives from the scoring requirement. Nothing enforces a match, deliberately
+  - the rule would have to end "unless the derivation genuinely crosses",
+  which is not a rule. What the generator checks instead is that the parent
+  resolves.
 
 No behaviour changed.
 

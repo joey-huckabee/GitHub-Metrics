@@ -161,7 +161,28 @@ it from markers, and CI runs it with `--check`. A document that records its own
 status will eventually claim coverage the tests do not provide.
 
 A marker naming an id that no document declares is a **hard error**, so a typo
-in a marker fails the build rather than quietly reading as untested.
+in a marker fails the build rather than quietly reading as untested. So is a
+`**Parent**:` link naming a requirement the generator did not read, and that
+check was added late: `L1-STA-001`, `L1-EXH-001` and `L1-ATT-001` were written
+under a level-four heading, the pattern for an L1 matches level three, and the
+matrix counted 19 of 22 for five releases. Every row beneath the three orphans
+kept rendering, and `--check` compared the file against the same parse that had
+dropped them, so nothing anywhere said so.
+
+Two document rules follow, and both are now tested rather than trusted:
+
+- **Requirement headings are level three in `L1.md` and level four in
+  `L2.md`.** An L3 is the one-line bolded form.
+- **A requirement lives in the `## <LEVEL>-<CODE>:` section its own id names.**
+  Nothing used to read those headings, so being under the wrong one cost
+  nothing until somebody believed it — `L1-STA-001` was inside `## L1-OUT`,
+  `L2-COL-001` and `L2-ROW-001` inside `## L2-LOG`, five `L3-CLI` entries were
+  scattered across three other sections, and `SRC` and `CNF` had no section at
+  all. They do now, and **category titles come from those headings**, across
+  all three documents. The tables of categories in `L1.md` and `L2.md` are
+  reader documentation held to the headings by a test; they are not what the
+  generator reads, because `L3.md` has no table and a third one would be the
+  parallel list that let `CNF: CNF` render in the first place.
 
 Requirements verified without a test (Inspection, Analysis, Demonstration) must
 declare **both** a verification method and an `**Evidence**` line naming the

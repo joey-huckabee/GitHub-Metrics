@@ -79,9 +79,8 @@ HORIZONTAL = r"[^\S\n]*"
 
 METHOD_LINE = re.compile(rf"^\*\*Verification Method\*\*:{HORIZONTAL}([^\n]+)$", re.MULTILINE)
 EVIDENCE_LINE = re.compile(rf"^\*\*Evidence\*\*:{HORIZONTAL}([^\n]+)$", re.MULTILINE)
-CATEGORY_ROW = re.compile(
-    rf"^\|{HORIZONTAL}`([A-Z]+)`{HORIZONTAL}\|{HORIZONTAL}([^|\n]+?){HORIZONTAL}\|{HORIZONTAL}$",
-    re.MULTILINE,
+CATEGORY_SECTION = re.compile(
+    rf"^##{HORIZONTAL}L[123]-([A-Z]+):{HORIZONTAL}([^\n]+?){HORIZONTAL}$", re.MULTILINE
 )
 METHOD_LETTER = re.compile(r"\b([TIAD])\b")
 
@@ -129,19 +128,24 @@ def _evidence(body: str) -> list[str]:
 
 
 def parse_categories() -> dict[str, str]:
-    """Read the category code/title tables from the L1 and L2 documents.
+    """Read category titles from the section headings of all three documents.
 
-    Titles come from the documents rather than from a table in this script, so
-    adding a category is a one-place edit.
+    The headings are the source rather than the tables of categories, because
+    a category cannot exist without one - a heading is how the document is
+    organised - whereas a table is a parallel list that falls behind silently.
+    It had: `L3.md` carries no table, so `CNF` had no title anywhere and the
+    matrix rendered it as `CNF: CNF`. The tables remain as reader
+    documentation, held to the headings by a test.
 
     Returns:
-        Category code mapped to its human-readable title.
+        Category code mapped to its human-readable title. Where the levels
+        title a category differently, L1 wins, then L2.
     """
     categories: dict[str, str] = {}
-    for doc in (L1_DOC, L2_DOC):
+    for doc in (L1_DOC, L2_DOC, L3_DOC):
         if not doc.exists():
             continue
-        for code, title in CATEGORY_ROW.findall(doc.read_text(encoding="utf-8")):
+        for code, title in CATEGORY_SECTION.findall(doc.read_text(encoding="utf-8")):
             categories.setdefault(code, title.strip())
     return categories
 
@@ -316,6 +320,34 @@ class Trace:
         return self.markers.get(req_id, []) or evidence
 
 
+def _reject_unresolvable_parents(doc: Path, parents: dict[str, str], declared: set[str]) -> None:
+    """Fail when a `**Parent**:` link names a requirement this parser never read.
+
+    A missing parent line is already refused, but a parent that merely fails to
+    parse is worse: `l2_by_parent` is a defaultdict, so the orphan and every
+    child below it keep rendering, and only the absent parent table says so -
+    which is indistinguishable from a category whose parents live elsewhere.
+    Three L1 requirements written under a level-four heading went five releases
+    that way.
+
+    Args:
+        doc: The document the links were read from, named in the message.
+        parents: Each requirement id mapped to the parent it declares.
+        declared: Every id the parent document actually yielded.
+
+    Raises:
+        SystemExit: If any parent is unresolvable.
+    """
+    orphans = sorted(
+        f"{req_id} -> {parent}" for req_id, parent in parents.items() if parent not in declared
+    )
+    if orphans:
+        raise SystemExit(
+            f"{doc.name}: parent links name requirements no document declares: "
+            + ", ".join(orphans)
+        )
+
+
 def load_trace() -> Trace:
     """Parse every input and roll status up from L3 to L1.
 
@@ -323,9 +355,12 @@ def load_trace() -> Trace:
         The assembled requirement graph.
 
     Raises:
-        SystemExit: If a test marker names a requirement no document declares.
-            Failing here is deliberate: a typo in a marker would otherwise read
-            as an untested requirement rather than as the mistake it is.
+        SystemExit: If a test marker names a requirement no document declares,
+            or if a parent link names one. Failing here is deliberate: a typo
+            in a marker would otherwise read as an untested requirement rather
+            than as the mistake it is, and a parent this parser never saw would
+            drop its whole subtree out of the forward trace while every row
+            below it still rendered.
     """
     l1 = parse_l1()
     l2 = parse_l2()
@@ -337,6 +372,9 @@ def load_trace() -> Trace:
         raise SystemExit(
             "test markers name requirements that no document declares: " + ", ".join(unknown)
         )
+
+    _reject_unresolvable_parents(L2_DOC, {k: v[0] for k, v in l2.items()}, set(l1))
+    _reject_unresolvable_parents(L3_DOC, {k: v[0] for k, v in l3.items()}, set(l2))
 
     l3_by_parent: dict[str, list[str]] = defaultdict(list)
     for req_id, (parent, _, _) in l3.items():

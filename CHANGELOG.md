@@ -62,6 +62,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `MET` and `CNF`. All are re-filed - no identifier changed, and the matrix
   content is identical, because it groups by category rather than by document
   order.
+- **Two convention statements now describe what the documents actually do.**
+  `L1.md` said a category code came from its own table, which stopped being
+  true once `SRC`, `COL` and `ROW` appeared at L2 and `CNF` at L3; each level
+  names its categories in its own section headings, and the table covers the
+  document it sits in. `L3.md` wrote the parent link as `L2-<CAT>-<NNN>` with
+  the requirement's own category, implying the two must match. They need not,
+  and this is ordinary rather than exceptional: a category names what a
+  requirement is about, not what it derives from, so every `CNF` entry parents
+  outside its category and so does `L2-CLI-006`, where the `bands` command
+  derives from the scoring requirement. Nothing enforces a match, deliberately
+  - the rule would have to end "unless the derivation genuinely crosses",
+  which is not a rule. What the generator checks instead is that the parent
+  resolves.
 
 No behaviour changed.
 

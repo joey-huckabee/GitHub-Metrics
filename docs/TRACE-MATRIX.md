@@ -20,7 +20,7 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 ## Coverage summary
 
-- L1 requirements: 19
+- L1 requirements: 22
 - L2 requirements: 87
 - L3 requirements: 130
 - Verified L2+L3: 217 of 217 (100.0%)
@@ -30,7 +30,13 @@ through their children, so counting them too would count the same work twice.
 
 ---
 
-### ATT: ATT
+### ATT: Attribution method
+
+**L1 → L2**
+
+| L1 ID | L2 Children | Test Artifacts | Status |
+|-------|-------------|----------------|--------|
+| L1-ATT-001 | L2-ATT-001, L2-ATT-002 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -193,7 +199,13 @@ through their children, so counting them too would count the same work twice.
 | L3-ERR-003 | L2-ERR-003 | `tests/test_csv_inventory.py::test_a_duplicate_alone_is_enough_to_trip_strict_mode`<br>`tests/test_csv_inventory.py::test_strict_mode_aborts_on_the_first_bad_row`<br>`tests/test_csv_inventory.py::test_strict_mode_accepts_a_clean_file_unchanged` | Implemented |
 | L3-ERR-004 | L2-ERR-004 | `tests/test_csv_inventory.py::test_error_codes_are_unique_across_the_taxonomy`<br>`tests/test_csv_inventory.py::test_every_ingest_failure_shares_one_base_class` | Implemented |
 
-### EXH: EXH
+### EXH: Budget exhaustion
+
+**L1 → L2**
+
+| L1 ID | L2 Children | Test Artifacts | Status |
+|-------|-------------|----------------|--------|
+| L1-EXH-001 | L2-EXH-001, L2-EXH-002, L2-EXH-003 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -455,7 +467,13 @@ through their children, so counting them too would count the same work twice.
 | L3-SRC-004 | L2-SRC-002 | `tests/test_resolve.py::test_counts_cover_every_kind_of_source`<br>`tests/test_resolve.py::test_sources_of_different_kinds_mix_in_the_order_written`<br>`tests/test_resolve.py::test_the_same_arguments_always_resolve_the_same_way` | Implemented |
 | L3-SRC-005 | L2-SRC-003 | `tests/test_resolve.py::test_a_repetition_across_two_files_is_caught`<br>`tests/test_resolve.py::test_a_repository_named_twice_is_collected_once`<br>`tests/test_resolve.py::test_repetition_ignores_case_as_github_does`<br>`tests/test_resolve.py::test_the_first_mention_is_the_one_that_survives` | Implemented |
 
-### STA: STA
+### STA: Scan statistics
+
+**L1 → L2**
+
+| L1 ID | L2 Children | Test Artifacts | Status |
+|-------|-------------|----------------|--------|
+| L1-STA-001 | L2-STA-001, L2-STA-002, L2-STA-003 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 

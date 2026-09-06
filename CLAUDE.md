@@ -161,7 +161,15 @@ it from markers, and CI runs it with `--check`. A document that records its own
 status will eventually claim coverage the tests do not provide.
 
 A marker naming an id that no document declares is a **hard error**, so a typo
-in a marker fails the build rather than quietly reading as untested.
+in a marker fails the build rather than quietly reading as untested. So is a
+`**Parent**:` link naming a requirement the generator did not read, and that
+check was added late: `L1-STA-001`, `L1-EXH-001` and `L1-ATT-001` were written
+under a level-four heading, the pattern for an L1 matches level three, and the
+matrix counted 19 of 22 for five releases. Every row beneath the three orphans
+kept rendering, and `--check` compared the file against the same parse that had
+dropped them, so nothing anywhere said so. **Requirement headings are level
+three in `L1.md` and level four in `L2.md`**; a new category needs a row in the
+table of categories too, or the matrix renders the bare code (`STA: STA`).
 
 Requirements verified without a test (Inspection, Analysis, Demonstration) must
 declare **both** a verification method and an `**Evidence**` line naming the

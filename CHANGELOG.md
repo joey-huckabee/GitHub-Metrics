@@ -32,6 +32,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is no such home; the decision stands on its measured size and load figures,
   which were always the load-bearing half, and the eventual move is now into a
   store belonging to the cache alone.
+- **Three L1 requirements were invisible to the trace matrix.** `L1-STA-001`,
+  `L1-EXH-001` and `L1-ATT-001` were written under a level-four heading, nested
+  inside the `L1-OUT` section; the generator's pattern for an L1 matches level
+  three only, so it never read them. The committed matrix counted 19
+  requirements against the document's 22, three categories lost their
+  `L1 -> L2` table, and their headings rendered as `STA: STA`. Nothing failed,
+  for two reasons: a category section without an L1 table is a legitimate shape
+  here - `COL`, `ROW` and `SRC` parent to L1s elsewhere - and `--check`
+  compared the matrix against the same parse that had dropped them. The three
+  now have their own sections, category titles and `**Verification Method**`
+  lines, and roll up to Implemented from children that were already covered.
+- **A parent link that does not resolve now fails the build.**
+  `build-trace-matrix.py` refused an L2 declaring no `**Parent**:` line, but
+  never checked that the parent it named was one the generator had read, so an
+  orphaned subtree rendered normally beneath a requirement that appeared
+  nowhere. `tests/test_trace_matrix.py` holds the documents and the generator
+  to the same view of what exists, from both ends.
 
 No behaviour changed.
 

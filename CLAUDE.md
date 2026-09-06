@@ -345,6 +345,19 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   `contribution_total` of zero, which nothing reading a directory of documents
   could tell from a repository that genuinely has none.
 
+- **There is no results database, and that is a decision** (ADR-0012). The
+  artifacts *are* the store: across all four collection routes there is
+  exactly one top-level document key order and one CSV header, so a
+  directory of scans is already a table a glob-reading engine can query.
+  A store was scoped as v0.7.0 for five releases and was measured against
+  its own three claims before being cancelled - it would not be faster
+  (nothing in a scan is disk-bound; the 186s-to-42s gap is the geocode
+  cache), it would not add queryability, and the history it would give is
+  what a directory of dated scans already is. Proposing one again needs new
+  evidence, not new enthusiasm. The two real problems underneath it are
+  `--resume` (v0.7.0) and moving the **cache** to SQLite (v0.9.0), and
+  neither is a results schema.
+
 - **Geocoding is paced at one request per second, and that is not politeness.**
   Nominatim's policy penalty is blocking the user agent, which fails every
   later run rather than the one that misbehaved, so `geo.py` enforces it with

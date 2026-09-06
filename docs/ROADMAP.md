@@ -518,50 +518,141 @@ the underlying question without naming anyone. Reasoning in
 
 ---
 
-## v0.7.0 — Persistence
+## Persistence, and why there is no longer a version for it
 
-Capture results in **SQLite**, behind an interface that allows the store to be
-swapped for **PostgreSQL** later without changing the collection code. One
-schema for all three artifacts: a document is the row plus its contributor
-block, so splitting repository and contributor persistence into separate
-versions - as an earlier draft of this roadmap did - would design the same join
-twice.
+v0.7.0 was **Persistence** from the earliest drafts of this file: results in
+SQLite behind a swappable interface, one schema for the row, the contributor
+block and the run statistics, with the geocode cache folded in. It was
+rewritten twice - once when v0.6.0 added `statistics.json` and changed what the
+schema would have to hold.
 
-**v0.6.0 adds a third artifact and changes what this has to hold.**
-`statistics.json` is per scan rather than per repository, so the schema needs a
-run-level table beside the row-level one - which is also where the geocode
-cache folds in. That is a larger schema than this section was written for, and
-it is a better one: a stored scan can then answer "was this row measured
-completely" without a second source.
+It is **not being built.** The case for it rested on three claims, and each was
+checked against measured numbers before the work started rather than after:
 
-The schema has to be designed before it is written, not after. `scan_id` and
-`scan_date` already exist as per-run identifiers precisely so that stored rows
-can be grouped by the run that produced them.
+| Claim | Why it fails |
+|---|---|
+| A store would be **faster** | Nothing in a scan is disk-bound. The measured run is 186 s cold and 42 s warm, and that gap is the geocode cache - which already exists. A 138 KB document is written once and is not measurable against network and Nominatim's one-per-second pacing |
+| A store makes the data **queryable** | The artifacts are already uniform enough to query as a set: across all four collection routes there is exactly **one** top-level key order and **one** CSV header. A directory of scans is a table, and an engine reading a glob of CSV or JSON answers cross-repository questions over it with no schema and no import |
+| A store gives the metrics a **history** | A directory of dated scans *is* that history, grouped by `scan_id` and `scan_date`. A schema adds indexes and joins, which matter at a scale this project has not reached - roughly 70 GB, or two years of weekly scans at 2,000 repositories |
+
+The third is the strongest and the most worth stating plainly: the reason to
+wait is not laziness. `METRICS.md` still has open **TBD** entries, and
+`contribution_total` has already meant three different populations across
+v0.4.1, v0.5.0 and a `--deep-attribution` run. A stored row would have to carry
+its metric-definition version, its tool version and its attribution method to
+stay comparable with a later one - three columns whose contents are still being
+decided. Designing that now buys a migration per decision.
+
+What the store would genuinely have bought is two things, and neither needs
+one. They are **v0.7.0** and **v0.9.0** below. **v0.8.0** is what stops the
+query answer above from being an exercise for the reader.
+
+The full argument, including the option to store only run-level statistics and
+the reason conditional requests were rejected with it, is
+[ADR-0012](adr/0012-no-results-database.md).
+
+---
+
+## v0.7.0 — Resuming an interrupted run
+
+`--resume`. The only change in this group that saves **API budget**, which is
+the only currency a scan is actually short of.
+
+A 2,000-repository inventory spends more than one hour's quota, so it already
+spans several rate-limit windows under `--on-exhaustion wait`. A run that dies
+in the third hour - a dropped connection, a killed terminal, a machine reboot -
+currently re-collects every repository from the beginning, at roughly 9 GraphQL
+points each. Nothing about that is recoverable today, and the artifacts from
+the dead run are complete and correct for everything it did reach.
+
+**No new storage is needed, because the output directory already records what
+finished.** A document exists only where the repository was fully collected -
+that is a documented invariant, not an accident of the implementation - and
+each one carries `scan_id` and `scan_date`. So a resumed run reads the output
+directory, skips the references that already have a document fresh enough, and
+collects the rest.
 
 Points to settle:
 
-- Whether history is append-only (every scan retained) or last-value-wins
-- Whether the CSV output remains primary, becomes an export of the database, or
-  both
-- How a metric definition change is recorded, so old and new rows are not
-  silently compared
-- **How a stored row is attributed to a tool version.** Partly answered by
-  v0.6.0: `statistics.json` carries `tool_version` for the run, so a stored row
-  is attributable through its `scan_id`. What remains is whether the *row*
-  should carry one directly, which is a change to the CSV contract and still
-  wants an ADR. Relevant now that `contribution_total` has meant three
-  different populations across v0.4.1, v0.5.0 and a `--deep-attribution` run.
-- **How the two attribution methods are kept apart.** A repository scanned with
-  `--deep-attribution` has a larger contributor set and a larger
-  `contribution_total` than the same repository scanned normally. Storing both
-  without recording `attribution.method` would let them be compared as though
-  they measured the same thing.
-- **Folding the geocode cache in.** v0.5.0 shipped it as a JSON file rather
-  than waiting for this store, because unbounded contributor collection was
-  unusable without it. This store will already hold addresses, so the cache
-  belongs here rather than beside it - and a JSON file stops being the right
-  shape well before it stops working. The trigger, and the reasoning behind
-  it, is below.
+- **What "fresh enough" means.** A `--resume-within` duration is the obvious
+  shape, but the default matters more than the flag: too long and a resumed run
+  silently mixes measurements from different days, too short and it does
+  nothing. The failure to avoid is a run that *looks* like one scan and is not.
+- **Whether a resumed run is one scan or two.** The documents already on disk
+  carry the *first* run's `scan_id`. Either the resumed run adopts it - and
+  `statistics.json` then describes a run that happened in two pieces - or the
+  scan identity changes and the directory holds two, which breaks the join the
+  CSV and documents rely on. This is the real design question in the release.
+- **How the CSV is completed.** Rows are positional and the file was written by
+  the dead run; the resumed run has to merge rather than append, in inventory
+  order rather than collection order.
+- **Whether a partial run's exit 4 should be resumable automatically.**
+  Probably not: silently continuing hides an exhausted budget from an operator
+  who asked to be told about it.
+- Whether `--resume` should refuse an output directory written by a different
+  tool version, since `contribution_total` has changed meaning across releases.
+
+---
+
+## v0.8.0 — Reading the results without a database
+
+Documentation and worked examples, not code. This is the release that makes
+"we did not build a database" an answer rather than a gap.
+
+[ADR-0012](adr/0012-no-results-database.md) argues that a directory of scans is
+already a queryable table, and backs it with the measured uniformity of the
+artifacts - one key order, one CSV header, across every collection route. What
+it does **not** yet have is the queries themselves. Until those are written and
+run against real output, the claim rests on the artifacts' shape rather than on
+anything demonstrated, and this file should not pretend otherwise.
+
+A `docs/QUERYING.md` covering, at minimum:
+
+- Reading one scan's CSV, and a glob of many, as a single relation
+- Reading the documents, including the nested `contributors` array, without
+  flattening them by hand
+- The cross-repository questions `statistics.json` was built to support -
+  concentration, geography, identity gaps, bot impact - asked across an
+  inventory rather than per repository
+- The longitudinal form of each: the same question over a directory of dated
+  scans, grouped by `scan_date`
+- **Joining the two artifacts**, which is the point of their sharing a
+  `scan_id`, and the one thing a reader is most likely to get wrong
+
+Points to settle:
+
+- **Which engine is documented.** DuckDB is the obvious candidate - it reads
+  CSV and JSON globs directly with no import step - but the examples should be
+  written so the *approach* survives if someone uses pandas or Polars instead.
+- **Whether the queries are tested.** An untested query in a document rots
+  exactly as fast as an untested claim, and this project has a conformance
+  suite with real artifacts sitting right there. Running the documented queries
+  against `tests/conformance/expected*/` would make them evidence. The cost is
+  a dev dependency on the engine, which is a real trade against a docs-only
+  release and should be decided deliberately.
+- Whether any of it belongs in `USER-GUIDE.md` instead, for the reader who has
+  just produced their first scan and wants one query rather than a reference.
+
+---
+
+## v0.9.0 — The geocode cache becomes a table
+
+**Gated on a measurement, not on a date.** This release happens when a real
+cache crosses the threshold below, and not before; scheduling it by version
+number would be building for a size nobody has yet reached.
+
+[ADR-0007](adr/0007-persistent-geocode-cache.md) chose JSON over SQLite partly
+because v0.7.0's store was going to be the permanent home, and a second
+database would have designed the same thing twice. **That reasoning is
+withdrawn** - there is no such store coming. The decision itself stands, on the
+measured figures that were always the load-bearing half, and the move it
+anticipated is now into a store of the cache's own rather than into a shared
+one. That is not the duplication ADR-0007 was avoiding, because there is
+nothing left to duplicate.
+
+The cache is also the one part of this whole area that was always a genuine
+fit: random access by key with expiry is what SQLite is for, where results want
+to be an append-only export.
 
 ### When the geocode cache should become a table
 
@@ -595,9 +686,8 @@ locations or all of them. That tax lands hardest on precisely the small re-runs
 the cache exists to make fast. Memory is mild by comparison at 2.1x, and the
 atomic whole-file rewrite costs a quarter of the load.
 
-The move is **into [v0.7.0](#v070--persistence)'s store, not a database of its
-own**, and SQLite answers the binding constraint directly: a run reads the keys
-it needs and parses nothing else, so start-up stops scaling with the cache.
+SQLite answers the binding constraint directly: a run reads the keys it needs
+and parses nothing else, so start-up stops scaling with the cache.
 
 For scale, a 200-repository inventory with unbounded contributors produces
 somewhere around eight to fifteen thousand distinct locations - so a serious
@@ -609,6 +699,21 @@ crosses it.
 inventory actually yields has not been observed against a real run, and belongs
 with the other things below that have never been checked against the live API.
 Everything in the table is measured.
+
+Points to settle:
+
+- **Whether `GEOCODE_CACHE_PATH` keeps its meaning**, including the documented
+  empty-value-disables-persistence behaviour, and what happens to a JSON cache
+  that already exists at that path. Silently ignoring it would throw away the
+  expensive part of somebody's setup.
+- Whether the migration is automatic on first run, or a command.
+- That `geocache.py` keeps owning the file and `geo.py` keeps owning the
+  socket. The structural rule does not relax because the format changed, and a
+  connection object is exactly the kind of thing that migrates into the wrong
+  module.
+- Whether expiry becomes a query predicate or stays a read-time check. A
+  predicate is faster and makes a cached miss and a fresh miss harder to keep
+  distinguishable, which ADR-0007 requires them to be.
 
 ---
 

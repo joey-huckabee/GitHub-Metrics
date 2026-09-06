@@ -45,6 +45,14 @@ thing twice — the exact argument that deferred this work, now applied to its
 shape rather than its schedule. The threshold at which that stops being true is
 recorded below and in `ROADMAP.md`.
 
+> **Amended by [ADR-0012](0012-no-results-database.md): that second reason is
+> withdrawn.** There is no v0.7.0 store - the results database was measured
+> against its own claims and not built. The decision here stands unchanged,
+> because it never rested on that argument: the size and load figures below
+> were always the load-bearing half, and they say JSON is the right shape at
+> today's scale. What changes is the destination. The move, when the
+> threshold is crossed, is into a store belonging to the cache alone.
+
 The file lives under the platform cache directory
 (`%LOCALAPPDATA%` on Windows, `$XDG_CACHE_HOME` or `~/.cache` elsewhere) and
 `GEOCODE_CACHE_PATH` overrides it. It is a cache: deleting it costs time and
@@ -117,7 +125,11 @@ file.
 * Good: an outage costs one run's resolution rather than every future run's
 * Bad: a cache file is new state on disk that a user may need to know about;
   `GEOCODE_CACHE_PATH` and a documented default are the mitigation
-* Bad: two persistence mechanisms exist until v0.7.0 folds this into the store
+* Bad: this is a second thing on disk beside the artifacts. It was written
+  expecting v0.7.0's store to absorb it;
+  [ADR-0012](0012-no-results-database.md) cancelled that store, so this is
+  now the only database this tool will have - and it stays a **cache**,
+  never a record of measurements
 
 ## When this should stop being a JSON file
 
@@ -159,12 +171,15 @@ ADR had it backwards:
    interrupted run cannot truncate the cache, and the cost is paid in full even
    by a run that added three entries.
 
-The move, when it comes, is **into v0.7.0's SQLite store rather than into a
-database of its own**. That store will already hold addresses; a second one
-would be the duplicate design this ADR avoided by not starting with SQLite.
-SQLite answers the first point directly and it is the one that matters: a run
-reads the keys it needs and parses nothing else, so start-up stops scaling with
-the cache at all.
+The move, when it comes, is **into a SQLite store of the cache's own**. This
+ADR originally said the opposite - into v0.7.0's shared store, on the grounds
+that a second database would duplicate a design.
+[ADR-0012](0012-no-results-database.md) cancelled that store, so there is
+nothing left to duplicate - and the cache was always the part of it that
+genuinely fitted: random access by key with expiry is what SQLite is for,
+where results want to be an append-only export. SQLite answers the first
+point directly and it is the one that matters: a run reads the keys it needs
+and parses nothing else, so start-up stops scaling with the cache at all.
 
 For scale: a 200-repository inventory with unbounded contributors produces
 somewhere around eight to fifteen thousand distinct locations, so a serious
@@ -182,4 +197,6 @@ not been observed against a real run - it belongs with the other things
 * `METRICS.md`, "What geocoding is for", for what the cached data feeds
 * [ADR-0006](0006-collect-every-contributor.md) for the change that made this
   necessary
-* `ROADMAP.md`, v0.7.0, for the store this eventually folds into
+* [ADR-0012](0012-no-results-database.md) for why the store this was
+  written against does not exist
+* `ROADMAP.md`, v0.9.0, for the move this eventually makes

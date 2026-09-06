@@ -196,8 +196,22 @@ warning that recommends it per repository when unattributed commits exceed
 ### 3.4 Conditional requests
 
 `ETag` / `If-None-Match` returning **304 does not count against the rate
-limit**. Over a stable inventory this makes re-runs nearly free on the REST
-side. Long-deferred; it pairs naturally with the persistence work.
+limit**, so re-scanning an unchanged repository could pay zero REST requests
+instead of the ~5 measured above.
+
+**Rejected, not deferred** - see [ADR-0012](adr/0012-no-results-database.md).
+It makes the resource that is not scarce cheaper. By the measured figures
+above, an hour's quota buys roughly **555** repositories on GraphQL against
+**1,000** on REST, so GraphQL binds first - and GraphQL has no conditional
+requests at all. Saving REST requests does not let one more repository be
+scanned.
+
+There is a second cost. A 304 says "unchanged"; it does not say what the
+value is, so the body has to be stored and replayed. A tool this careful
+about never publishing a number it cannot stand behind would be serving
+numbers it did not just measure. This entry previously read "pairs naturally
+with the persistence work", which is how it survived four releases without
+anyone checking whether it helped.
 
 ### 3.5 Continue past exhaustion rather than refusing
 

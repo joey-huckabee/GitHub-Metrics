@@ -117,7 +117,7 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-010 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_document_is_written_for_every_repository_that_was_read`<br>`tests/test_cli_scan.py::test_both_artifacts_of_one_run_carry_the_same_scan`<br>`tests/test_cli_scan.py::test_the_default_destination_is_a_githubmetrics_directory` | Implemented |
 | L3-CLI-011 | L2-CLI-001 | `tests/test_cli_scan.py::test_a_run_that_lost_its_documents_does_not_report_success`<br>`tests/test_cli_scan.py::test_a_run_that_lost_nothing_still_reports_success`<br>`tests/test_cli_scan.py::test_every_degraded_outcome_shares_one_status` | Implemented |
 
-### CNF: CNF
+### CNF: Conformance
 
 **L3 → Verification Artifacts**
 
@@ -131,7 +131,7 @@ through their children, so counting them too would count the same work twice.
 | L3-CNF-006 | L2-EXH-002 | `tests/test_conformance.py::test_a_partial_run_says_so_in_the_statistics`<br>`tests/test_conformance.py::test_a_partial_run_still_accounts_for_every_repository`<br>`tests/test_conformance.py::test_an_unattempted_repository_is_not_a_failed_one` | Implemented |
 | L3-CNF-007 | L2-STA-001 | `tests/test_conformance.py::test_an_account_is_recovered_from_a_no_reply_address`<br>`tests/test_conformance.py::test_the_anonymous_route_artifacts_are_unchanged`<br>`tests/test_conformance.py::test_the_unreachable_tail_reports_its_commits` | Implemented |
 
-### COL: COL
+### COL: Collection over an inventory
 
 **L2 → L3 → Verification Artifacts**
 
@@ -382,7 +382,7 @@ through their children, so counting them too would count the same work twice.
 | L3-OUT-011 | L2-OUT-010 | `tests/test_cli_scan.py::test_document_paths_are_nested_and_lower_cased`<br>`tests/test_documents.py::test_a_document_is_written_with_lf_endings`<br>`tests/test_documents.py::test_a_missing_root_is_created`<br>`tests/test_documents.py::test_a_root_that_is_a_file_is_refused`<br>`tests/test_documents.py::test_a_windows_reserved_name_needs_no_sanitising`<br>`tests/test_documents.py::test_nesting_removes_a_collision_that_flattening_would_create`<br>`tests/test_documents.py::test_the_default_root_is_used_when_none_is_named`<br>`tests/test_documents.py::test_the_path_is_lower_cased`<br>`tests/test_documents.py::test_the_path_is_nested_by_owner` | Implemented |
 | L3-OUT-012 | L2-OUT-011 | `tests/test_cli_scan.py::test_a_document_is_its_csv_row_then_the_contributor_block`<br>`tests/test_cli_scan.py::test_an_unresolved_address_is_null_throughout`<br>`tests/test_cli_scan.py::test_field_selection_does_not_reach_the_documents`<br>`tests/test_cli_scan.py::test_the_contributor_block_carries_the_run_identity`<br>`tests/test_contributor_model.py::test_a_github_id_survives_beyond_the_javascript_safe_integer`<br>`tests/test_contributor_model.py::test_every_declared_field_is_rendered_and_every_rendered_key_declared`<br>`tests/test_contributor_model.py::test_the_address_carries_country_and_country_code`<br>`tests/test_contributor_model.py::test_the_block_keys_are_derived_rather_than_restated`<br>`tests/test_contributor_model.py::test_two_blocks_do_not_share_one_address`<br>`tests/test_documents.py::test_a_document_is_the_row_then_the_block`<br>`tests/test_documents.py::test_a_document_keeps_json_types`<br>`tests/test_documents.py::test_a_repository_with_no_contributors_totals_zero`<br>`tests/test_documents.py::test_the_aggregates_are_document_keys_and_not_csv_columns`<br>`tests/test_documents.py::test_the_contributor_block_matches_the_documented_example` | Implemented |
 
-### ROW: ROW
+### ROW: Row assembly
 
 **L2 → L3 → Verification Artifacts**
 
@@ -447,7 +447,7 @@ through their children, so counting them too would count the same work twice.
 | L3-SCR-020 | L2-SCR-006 | `tests/test_popularity.py::test_the_band_tables_render_side_by_side`<br>`tests/test_popularity.py::test_the_budgets_are_ten_and_fifteen`<br>`tests/test_popularity.py::test_the_columns_are_the_budget_times_the_weight`<br>`tests/test_popularity.py::test_the_reference_row_is_reproduced` | Implemented |
 | L3-SCR-021 | L2-SCR-009 | `tests/test_total.py::test_a_normal_total_says_nothing_at_info`<br>`tests/test_total.py::test_a_perfect_repository_reaches_the_ceiling`<br>`tests/test_total.py::test_a_project_with_nothing_scores_nothing`<br>`tests/test_total.py::test_every_component_is_a_float`<br>`tests/test_total.py::test_exceeding_the_ceiling_is_reported_rather_than_clamped`<br>`tests/test_total.py::test_the_bonus_is_described_rather_than_printed`<br>`tests/test_total.py::test_the_ceiling_is_derived_from_the_components_not_typed`<br>`tests/test_total.py::test_the_ceiling_is_eighty_five`<br>`tests/test_total.py::test_the_five_scored_components_sum_to_seventy_five_without_the_bonus`<br>`tests/test_total.py::test_the_other_five_components_keep_their_values`<br>`tests/test_total.py::test_the_reference_row_is_reproduced` | Implemented |
 
-### SRC: SRC
+### SRC: Source resolution
 
 **L2 → L3 → Verification Artifacts**
 

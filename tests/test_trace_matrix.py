@@ -9,8 +9,9 @@ for five releases while every row beneath the three orphans still rendered
 correctly. Nothing failed, because nothing was looking.
 
 These tests hold the documents and the generator to the same view of what
-exists, from both ends: every id a document declares must be one the generator
-reads, and every parent link must resolve to a requirement it read.
+exists, from three directions: every id a document declares must be one the
+generator reads, every parent link must resolve to a requirement it read, and
+every requirement must sit in the section its own id names.
 """
 
 from __future__ import annotations
@@ -32,6 +33,14 @@ SCRIPT = ROOT / "scripts" / "build-trace-matrix.py"
 # agree with the bug.
 HEADING_ID = re.compile(r"^#+[^\S\n]+(L[123]-[A-Z]+-\d+)[^\S\n]*$", re.MULTILINE)
 L3_ENTRY = re.compile(r"^\*\*(L3-[A-Z]+-\d+)\*\*", re.MULTILINE)
+
+# A section heading, and the first thing on a line that announces a
+# requirement: a heading at any depth for L1 and L2, a bolded id for L3.
+SECTION_HEADING = re.compile(r"^##[^\S\n]+L[123]-([A-Z]+):")
+REQUIREMENT_START = re.compile(r"^(?:#+[^\S\n]+|\*\*)(L[123]-([A-Z]+)-\d+)")
+CATEGORY_ROW = re.compile(
+    r"^\|[^\S\n]*`([A-Z]+)`[^\S\n]*\|[^\S\n]*([^|\n]+?)[^\S\n]*\|[^\S\n]*$", re.MULTILINE
+)
 
 
 def _load_generator() -> ModuleType:
@@ -61,6 +70,30 @@ def _declared(doc: Path, level: str) -> set[str]:
 def _without(mapping: dict[str, Any], key: str) -> dict[str, Any]:
     """The mapping less one entry, standing in for a requirement that failed to parse."""
     return {name: value for name, value in mapping.items() if name != key}
+
+
+def _used_categories() -> set[str]:
+    """Every category code that a requirement id in any document uses."""
+    return {
+        req.split("-")[1]
+        for level in (GENERATOR.parse_l1(), GENERATOR.parse_l2(), GENERATOR.parse_l3())
+        for req in level
+    }
+
+
+def _misfiled(doc: Path) -> list[str]:
+    """Requirements whose id names a category other than the section holding them."""
+    section: str | None = None
+    wrong: list[str] = []
+    for line in doc.read_text(encoding="utf-8").split("\n"):
+        heading = SECTION_HEADING.match(line)
+        if heading:
+            section = heading.group(1)
+            continue
+        found = REQUIREMENT_START.match(line)
+        if found and found.group(2) != section:
+            wrong.append(f"{found.group(1)} sits in {doc.name} section {section}")
+    return wrong
 
 
 def test_every_l1_the_document_declares_is_one_the_generator_reads() -> None:
@@ -116,7 +149,35 @@ def test_every_l1_declares_a_verification_method() -> None:
     assert [req for req, (methods, _) in GENERATOR.parse_l1().items() if not methods] == []
 
 
-def test_every_l1_category_carries_a_title() -> None:
-    """Without a row in the table of categories the matrix renders `STA: STA`."""
-    codes = {req.split("-")[1] for req in GENERATOR.parse_l1()}
-    assert sorted(codes - set(GENERATOR.parse_categories())) == []
+def test_every_category_carries_a_title() -> None:
+    """A category with no title renders in the matrix as the bare code, `CNF: CNF`."""
+    assert sorted(_used_categories() - set(GENERATOR.parse_categories())) == []
+
+
+def test_every_requirement_sits_in_the_section_its_id_names() -> None:
+    """The document's own organisation, checked against the ids it organises.
+
+    This is the general form of the level-four heading fault. `L1-STA-001` was
+    not only at the wrong depth, it was inside `## L1-OUT`; `L2-COL-001` and
+    `L2-ROW-001` were inside `## L2-LOG`, and neither `SRC` nor `CNF` had a
+    section at all. A section heading is read by no tool, so filing a
+    requirement under the wrong one costs nothing until somebody believes it.
+    """
+    misfiled = [
+        entry
+        for doc in (GENERATOR.L1_DOC, GENERATOR.L2_DOC, GENERATOR.L3_DOC)
+        for entry in _misfiled(doc)
+    ]
+    assert misfiled == []
+
+
+def test_the_tables_of_categories_agree_with_the_section_headings() -> None:
+    """The tables are reader documentation; the headings are what the generator reads."""
+    titles = GENERATOR.parse_categories()
+    for doc, ids in (
+        (GENERATOR.L1_DOC, GENERATOR.parse_l1()),
+        (GENERATOR.L2_DOC, GENERATOR.parse_l2()),
+    ):
+        used = {req.split("-")[1] for req in ids}
+        table = dict(CATEGORY_ROW.findall(doc.read_text(encoding="utf-8")))
+        assert table == {code: titles[code] for code in used}

@@ -48,7 +48,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   never checked that the parent it named was one the generator had read, so an
   orphaned subtree rendered normally beneath a requirement that appeared
   nowhere. `tests/test_trace_matrix.py` holds the documents and the generator
-  to the same view of what exists, from both ends.
+  to the same view of what exists.
+- **Every category now has a title, and every requirement sits in the section
+  its id names.** Four categories rendered in the matrix as the bare code -
+  `CNF: CNF`, `COL: COL`, `ROW: ROW`, `SRC: SRC` - because titles were read
+  from the tables of categories, `L3.md` has no such table, and the L2 table
+  only mirrored L1's. Titles now come from the `## <LEVEL>-<CODE>:` section
+  headings instead, which every category necessarily has, and the tables stay
+  as reader documentation held to them by a test. Writing the four missing
+  headings turned up the same misfiling that hid the L1 fault: `L2-COL-001`
+  and `L2-ROW-001` sat inside `## L2-LOG`, `L2-SCR-003` and `L2-SCR-004`
+  inside `## L2-CON`, and five `L3-CLI` entries were spread across `OUT`,
+  `MET` and `CNF`. All are re-filed - no identifier changed, and the matrix
+  content is identical, because it groups by category rather than by document
+  order.
 
 No behaviour changed.
 

@@ -79,9 +79,8 @@ HORIZONTAL = r"[^\S\n]*"
 
 METHOD_LINE = re.compile(rf"^\*\*Verification Method\*\*:{HORIZONTAL}([^\n]+)$", re.MULTILINE)
 EVIDENCE_LINE = re.compile(rf"^\*\*Evidence\*\*:{HORIZONTAL}([^\n]+)$", re.MULTILINE)
-CATEGORY_ROW = re.compile(
-    rf"^\|{HORIZONTAL}`([A-Z]+)`{HORIZONTAL}\|{HORIZONTAL}([^|\n]+?){HORIZONTAL}\|{HORIZONTAL}$",
-    re.MULTILINE,
+CATEGORY_SECTION = re.compile(
+    rf"^##{HORIZONTAL}L[123]-([A-Z]+):{HORIZONTAL}([^\n]+?){HORIZONTAL}$", re.MULTILINE
 )
 METHOD_LETTER = re.compile(r"\b([TIAD])\b")
 
@@ -129,19 +128,24 @@ def _evidence(body: str) -> list[str]:
 
 
 def parse_categories() -> dict[str, str]:
-    """Read the category code/title tables from the L1 and L2 documents.
+    """Read category titles from the section headings of all three documents.
 
-    Titles come from the documents rather than from a table in this script, so
-    adding a category is a one-place edit.
+    The headings are the source rather than the tables of categories, because
+    a category cannot exist without one - a heading is how the document is
+    organised - whereas a table is a parallel list that falls behind silently.
+    It had: `L3.md` carries no table, so `CNF` had no title anywhere and the
+    matrix rendered it as `CNF: CNF`. The tables remain as reader
+    documentation, held to the headings by a test.
 
     Returns:
-        Category code mapped to its human-readable title.
+        Category code mapped to its human-readable title. Where the levels
+        title a category differently, L1 wins, then L2.
     """
     categories: dict[str, str] = {}
-    for doc in (L1_DOC, L2_DOC):
+    for doc in (L1_DOC, L2_DOC, L3_DOC):
         if not doc.exists():
             continue
-        for code, title in CATEGORY_ROW.findall(doc.read_text(encoding="utf-8")):
+        for code, title in CATEGORY_SECTION.findall(doc.read_text(encoding="utf-8")):
             categories.setdefault(code, title.strip())
     return categories
 

@@ -7,17 +7,17 @@
     "named": 3,
     "collected": 2,
     "documented": 2,
-    "failed": 1,
-    "not_attempted": 0
+    "failed": 0,
+    "not_attempted": 1
   },
   "budget": {
     "graphql_points_spent": 0,
     "rest_requests_spent": null,
-    "graphql_remaining": 5000,
+    "graphql_remaining": 40,
     "rest_remaining": null,
-    "exhaustion_policy": "wait",
-    "exhausted": false,
-    "incomplete_because_exhausted": false,
+    "exhaustion_policy": "partial",
+    "exhausted": true,
+    "incomplete_because_exhausted": true,
     "waits": 0
   },
   "geocoding": {
@@ -29,9 +29,7 @@
     "unmatched": 0,
     "service_failures": 0
   },
-  "warnings": [
-    "ghost/no-such-repository-conformance: not collected: [GM-COL-001] repository metadata for ghost/no-such-repository-conformance: Could not resolve to a Repository with the name 'ghost/no-such-repository-conformance'."
-  ],
+  "warnings": [],
   "repository_statistics": [
     {
       "owner": "octocat",
@@ -153,7 +151,7 @@
       "owner": "ghost",
       "name": "no-such-repository-conformance",
       "url": "https://github.com/ghost/no-such-repository-conformance",
-      "attempted": true,
+      "attempted": false,
       "collected": false,
       "documented": false,
       "attribution": {

@@ -1,5 +1,304 @@
 {
   "entries": {
+    "amsterdam": {
+      "address": {
+        "city": "Amsterdam",
+        "country": "Netherlands",
+        "country_code": "nl",
+        "county": "",
+        "formatted_address": "Amsterdam, North Holland, Netherlands",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 52.3730796,
+          "longitude": 4.8924534
+        },
+        "post_code": "",
+        "query": "amsterdam",
+        "state": "North Holland",
+        "state_code": "NL-NH",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "amsterdam, netherlands": {
+      "address": {
+        "city": "Amsterdam",
+        "country": "Netherlands",
+        "country_code": "nl",
+        "county": "",
+        "formatted_address": "Amsterdam, North Holland, Netherlands",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 52.3730796,
+          "longitude": 4.8924534
+        },
+        "post_code": "",
+        "query": "amsterdam, netherlands",
+        "state": "North Holland",
+        "state_code": "NL-NH",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "bangalore, india": {
+      "address": {
+        "city": "Bengaluru",
+        "country": "India",
+        "country_code": "in",
+        "county": "Bangalore North",
+        "formatted_address": "Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 12.9767936,
+          "longitude": 77.590082
+        },
+        "post_code": "",
+        "query": "bangalore, india",
+        "state": "Karnataka",
+        "state_code": "IN-KA",
+        "state_district": "Bengaluru Urban",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "bavaria": {
+      "address": {
+        "city": "",
+        "country": "Germany",
+        "country_code": "de",
+        "county": "",
+        "formatted_address": "Bavaria, Germany",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 48.9467562,
+          "longitude": 11.4038717
+        },
+        "post_code": "",
+        "query": "bavaria",
+        "state": "Bavaria",
+        "state_code": "DE-BY",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "beijing, china": {
+      "address": {
+        "city": "Beijing",
+        "country": "China",
+        "country_code": "cn",
+        "county": "",
+        "formatted_address": "Beijing, China",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 39.9057136,
+          "longitude": 116.3912972
+        },
+        "post_code": "",
+        "query": "beijing, china",
+        "state": "",
+        "state_code": "CN-BJ",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "bellevue, wa": {
+      "address": {
+        "city": "Bellevue",
+        "country": "United States",
+        "country_code": "us",
+        "county": "King County",
+        "formatted_address": "Bellevue, King County, Washington, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 47.6144219,
+          "longitude": -122.192337
+        },
+        "post_code": "",
+        "query": "bellevue, wa",
+        "state": "Washington",
+        "state_code": "US-WA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "bengaluru, india": {
+      "address": {
+        "city": "Bengaluru",
+        "country": "India",
+        "country_code": "in",
+        "county": "Bangalore North",
+        "formatted_address": "Bengaluru, Bangalore North, Bengaluru Urban, Karnataka, India",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 12.9767936,
+          "longitude": 77.590082
+        },
+        "post_code": "",
+        "query": "bengaluru, india",
+        "state": "Karnataka",
+        "state_code": "IN-KA",
+        "state_district": "Bengaluru Urban",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "bergen, norway": {
+      "address": {
+        "city": "Bergen",
+        "country": "Norway",
+        "country_code": "no",
+        "county": "Vestland",
+        "formatted_address": "Bergen, Vestland, Norway",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 60.3943055,
+          "longitude": 5.3259192
+        },
+        "post_code": "",
+        "query": "bergen, norway",
+        "state": "",
+        "state_code": "NO-46",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "berlin, germany": {
+      "address": {
+        "city": "Berlin",
+        "country": "Germany",
+        "country_code": "de",
+        "county": "",
+        "formatted_address": "Berlin, Germany",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 52.5173885,
+          "longitude": 13.3951309
+        },
+        "post_code": "",
+        "query": "berlin, germany",
+        "state": "",
+        "state_code": "DE-BE",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "bratkovice u velvar, czechia": {
+      "address": {
+        "city": "Bratkovice",
+        "country": "Czechia",
+        "country_code": "cz",
+        "county": "",
+        "formatted_address": "Bratkovice u Velvar, Bratkovice, Černuc, okres Kladno, Central Bohemian Region, Czechia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 50.2891324,
+          "longitude": 14.1866427
+        },
+        "post_code": "",
+        "query": "bratkovice u velvar, czechia",
+        "state": "Central Bohemian Region",
+        "state_code": "CZ-20",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "california": {
+      "address": {
+        "city": "",
+        "country": "United States",
+        "country_code": "us",
+        "county": "",
+        "formatted_address": "California, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 36.7014631,
+          "longitude": -118.755997
+        },
+        "post_code": "",
+        "query": "california",
+        "state": "California",
+        "state_code": "US-CA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "canada": {
+      "address": {
+        "city": "",
+        "country": "Canada",
+        "country_code": "ca",
+        "county": "",
+        "formatted_address": "Canada",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 61.0666922,
+          "longitude": -107.991707
+        },
+        "post_code": "",
+        "query": "canada",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "canada/italy/brazil": {
+      "address": {
+        "city": null,
+        "country": null,
+        "country_code": null,
+        "county": null,
+        "formatted_address": null,
+        "house_number": null,
+        "internal_location": {
+          "latitude": null,
+          "longitude": null
+        },
+        "post_code": null,
+        "query": "canada/italy/brazil",
+        "state": null,
+        "state_code": null,
+        "state_district": null,
+        "street": null,
+        "suburb": null
+      },
+      "matched": false,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
     "czech republic": {
       "address": {
         "city": "",
@@ -16,6 +315,144 @@
         "query": "czech republic",
         "state": "",
         "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "dearborn, michigan, usa": {
+      "address": {
+        "city": "Dearborn",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Wayne County",
+        "formatted_address": "Dearborn, Wayne County, Michigan, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 42.3222599,
+          "longitude": -83.1763145
+        },
+        "post_code": "",
+        "query": "dearborn, michigan, usa",
+        "state": "Michigan",
+        "state_code": "US-MI",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "earth": {
+      "address": {
+        "city": "Earth",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Lamb County",
+        "formatted_address": "Earth, Lamb County, Texas, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 34.2331373,
+          "longitude": -102.4107493
+        },
+        "post_code": "",
+        "query": "earth",
+        "state": "Texas",
+        "state_code": "US-TX",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "edinburgh, scotland": {
+      "address": {
+        "city": "City of Edinburgh",
+        "country": "United Kingdom",
+        "country_code": "gb",
+        "county": "",
+        "formatted_address": "City of Edinburgh, Scotland, United Kingdom",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 55.9533456,
+          "longitude": -3.1883749
+        },
+        "post_code": "",
+        "query": "edinburgh, scotland",
+        "state": "Scotland",
+        "state_code": "GB-SCT",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "europe/berlin": {
+      "address": {
+        "city": "Vitrolles",
+        "country": "France",
+        "country_code": "fr",
+        "county": "Bouches-du-Rhône",
+        "formatted_address": "Europe Berlin, Boulevard de l'Europe, ZA Estroublans-Anjoly, La Tuilière, Vitrolles, Istres, Bouches-du-Rhône, Provence-Alpes-Côte d'Azur, Metropolitan France, 13127, France",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 43.4228125,
+          "longitude": 5.2537966
+        },
+        "post_code": "13127",
+        "query": "europe/berlin",
+        "state": "Provence-Alpes-Côte d'Azur",
+        "state_code": "FR-PAC",
+        "state_district": "",
+        "street": "Boulevard de l'Europe",
+        "suburb": "La Tuilière"
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "finland": {
+      "address": {
+        "city": "",
+        "country": "Finland",
+        "country_code": "fi",
+        "county": "",
+        "formatted_address": "Finland",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 63.2467777,
+          "longitude": 25.9209164
+        },
+        "post_code": "",
+        "query": "finland",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "fr / us": {
+      "address": {
+        "city": "Us",
+        "country": "France",
+        "country_code": "fr",
+        "county": "Val-d'Oise",
+        "formatted_address": "Us, Pontoise, Val-d'Oise, Ile-de-France, Metropolitan France, 95450, France",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 49.1009451,
+          "longitude": 1.9672466
+        },
+        "post_code": "95450",
+        "query": "fr / us",
+        "state": "Ile-de-France",
+        "state_code": "FR-IDF",
         "state_district": "",
         "street": "",
         "suburb": ""
@@ -46,6 +483,144 @@
       "matched": true,
       "resolved_at": "2026-01-01T00:00:00+00:00"
     },
+    "frýdek-místek": {
+      "address": {
+        "city": "Frýdek-Místek",
+        "country": "Czechia",
+        "country_code": "cz",
+        "county": "okres Frýdek-Místek",
+        "formatted_address": "Frýdek-Místek, okres Frýdek-Místek, Moravian-Silesian Region, Czechia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 49.685635,
+          "longitude": 18.3483416
+        },
+        "post_code": "",
+        "query": "frýdek-místek",
+        "state": "Moravian-Silesian Region",
+        "state_code": "CZ-80",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "germany": {
+      "address": {
+        "city": "",
+        "country": "Germany",
+        "country_code": "de",
+        "county": "",
+        "formatted_address": "Germany",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 51.1638175,
+          "longitude": 10.4478313
+        },
+        "post_code": "",
+        "query": "germany",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "germany, nrw": {
+      "address": {
+        "city": "",
+        "country": "Germany",
+        "country_code": "de",
+        "county": "",
+        "formatted_address": "North Rhine-Westphalia, Germany",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 51.4789205,
+          "longitude": 7.5543751
+        },
+        "post_code": "",
+        "query": "germany, nrw",
+        "state": "North Rhine-Westphalia",
+        "state_code": "DE-NW",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "greater poland, pl": {
+      "address": {
+        "city": "",
+        "country": "Poland",
+        "country_code": "pl",
+        "county": "",
+        "formatted_address": "Greater Poland Voivodeship, Poland",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 52.1458506,
+          "longitude": 17.397672
+        },
+        "post_code": "",
+        "query": "greater poland, pl",
+        "state": "Greater Poland Voivodeship",
+        "state_code": "PL-30",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "hamburg, germany": {
+      "address": {
+        "city": "Hamburg",
+        "country": "Germany",
+        "country_code": "de",
+        "county": "",
+        "formatted_address": "Hamburg, Germany",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 53.5501721,
+          "longitude": 10.0013165
+        },
+        "post_code": "",
+        "query": "hamburg, germany",
+        "state": "",
+        "state_code": "DE-HH",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "heidelberg": {
+      "address": {
+        "city": "Heidelberg",
+        "country": "Germany",
+        "country_code": "de",
+        "county": "",
+        "formatted_address": "Heidelberg, Baden-Württemberg, Germany",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 49.4093582,
+          "longitude": 8.694724
+        },
+        "post_code": "",
+        "query": "heidelberg",
+        "state": "Baden-Württemberg",
+        "state_code": "DE-BW",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
     "helsinki, finland": {
       "address": {
         "city": "Helsinki",
@@ -62,6 +637,75 @@
         "query": "helsinki, finland",
         "state": "Uusimaa",
         "state_code": "FI-18",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "hong kong": {
+      "address": {
+        "city": "",
+        "country": "China",
+        "country_code": "cn",
+        "county": "",
+        "formatted_address": "Hong Kong, China",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 22.3492361,
+          "longitude": 114.1857778
+        },
+        "post_code": "",
+        "query": "hong kong",
+        "state": "Hong Kong",
+        "state_code": "CN-HK",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "hot springs, arkansas, usa": {
+      "address": {
+        "city": "Hot Springs",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Garland County",
+        "formatted_address": "Hot Springs, Garland County, Arkansas, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 34.5038393,
+          "longitude": -93.0552437
+        },
+        "post_code": "",
+        "query": "hot springs, arkansas, usa",
+        "state": "Arkansas",
+        "state_code": "US-AR",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "jefferson city, mo": {
+      "address": {
+        "city": "Jefferson City",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Cole County",
+        "formatted_address": "Jefferson City, Cole County, Missouri, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 38.577359,
+          "longitude": -92.1724265
+        },
+        "post_code": "",
+        "query": "jefferson city, mo",
+        "state": "Missouri",
+        "state_code": "US-MO",
         "state_district": "",
         "street": "",
         "suburb": ""
@@ -92,6 +736,857 @@
       "matched": true,
       "resolved_at": "2026-01-01T00:00:00+00:00"
     },
+    "korea/seoul": {
+      "address": {
+        "city": "Seoul",
+        "country": "South Korea",
+        "country_code": "kr",
+        "county": "",
+        "formatted_address": "Seoul, South Korea",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 37.5666791,
+          "longitude": 126.9782914
+        },
+        "post_code": "",
+        "query": "korea/seoul",
+        "state": "",
+        "state_code": "KR-11",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "kuala lumpur, malaysia": {
+      "address": {
+        "city": "",
+        "country": "Malaysia",
+        "country_code": "my",
+        "county": "",
+        "formatted_address": "Kuala Lumpur, Malaysia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 3.1516964,
+          "longitude": 101.6942371
+        },
+        "post_code": "",
+        "query": "kuala lumpur, malaysia",
+        "state": "Kuala Lumpur",
+        "state_code": "MY-14",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "la réunion": {
+      "address": {
+        "city": "",
+        "country": "France",
+        "country_code": "fr",
+        "county": "",
+        "formatted_address": "La Réunion, Réunion, France",
+        "house_number": "",
+        "internal_location": {
+          "latitude": -21.1307379,
+          "longitude": 55.5364801
+        },
+        "post_code": "",
+        "query": "la réunion",
+        "state": "Réunion",
+        "state_code": "FR-974",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "lahore, pakistan": {
+      "address": {
+        "city": "Lahore",
+        "country": "Pakistan",
+        "country_code": "pk",
+        "county": "Lahore District",
+        "formatted_address": "Lahore, Lahore City Tehsil, Lahore District, Lahore Division, Punjab, 54100, Pakistan",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 31.5656822,
+          "longitude": 74.3141829
+        },
+        "post_code": "54100",
+        "query": "lahore, pakistan",
+        "state": "Punjab",
+        "state_code": "PK-PB",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "landour": {
+      "address": {
+        "city": "Lewes",
+        "country": "United Kingdom",
+        "country_code": "gb",
+        "county": "East Sussex",
+        "formatted_address": "Landour, Upper Bannings Road, Telscombe Cliffs, Telscombe, Lewes, East Sussex, England, BN7 3HZ, United Kingdom",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 50.8129652,
+          "longitude": -0.0166859
+        },
+        "post_code": "BN7 3HZ",
+        "query": "landour",
+        "state": "England",
+        "state_code": "GB-ENG",
+        "state_district": "",
+        "street": "Upper Bannings Road",
+        "suburb": "Telscombe Cliffs"
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "lisbon, portugal": {
+      "address": {
+        "city": "Lisbon",
+        "country": "Portugal",
+        "country_code": "pt",
+        "county": "Lisbon",
+        "formatted_address": "Lisbon, Portugal",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 38.7077507,
+          "longitude": -9.1365919
+        },
+        "post_code": "",
+        "query": "lisbon, portugal",
+        "state": "",
+        "state_code": "PT-11",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "lithuania": {
+      "address": {
+        "city": "",
+        "country": "Lithuania",
+        "country_code": "lt",
+        "county": "",
+        "formatted_address": "Lithuania",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 55.3500003,
+          "longitude": 23.7499997
+        },
+        "post_code": "",
+        "query": "lithuania",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "london": {
+      "address": {
+        "city": "Greater London",
+        "country": "United Kingdom",
+        "country_code": "gb",
+        "county": "",
+        "formatted_address": "Greater London, England, United Kingdom",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 51.5074456,
+          "longitude": -0.1277653
+        },
+        "post_code": "",
+        "query": "london",
+        "state": "England",
+        "state_code": "GB-ENG",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "london / lisbon": {
+      "address": {
+        "city": "Greater London",
+        "country": "United Kingdom",
+        "country_code": "gb",
+        "county": "",
+        "formatted_address": "Lisbon Avenue, Whitton, London Borough of Richmond upon Thames, Greater London, England, TW2 5HW, United Kingdom",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 51.4408409,
+          "longitude": -0.3574222
+        },
+        "post_code": "TW2 5HW",
+        "query": "london / lisbon",
+        "state": "England",
+        "state_code": "GB-ENG",
+        "state_district": "",
+        "street": "Lisbon Avenue",
+        "suburb": "Whitton"
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "london, uk": {
+      "address": {
+        "city": "Greater London",
+        "country": "United Kingdom",
+        "country_code": "gb",
+        "county": "",
+        "formatted_address": "Greater London, England, United Kingdom",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 51.5074456,
+          "longitude": -0.1277653
+        },
+        "post_code": "",
+        "query": "london, uk",
+        "state": "England",
+        "state_code": "GB-ENG",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "los angeles": {
+      "address": {
+        "city": "Los Angeles",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Los Angeles County",
+        "formatted_address": "Los Angeles, Los Angeles County, California, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 34.0536909,
+          "longitude": -118.242766
+        },
+        "post_code": "",
+        "query": "los angeles",
+        "state": "California",
+        "state_code": "US-CA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "ma, usa": {
+      "address": {
+        "city": "",
+        "country": "United States",
+        "country_code": "us",
+        "county": "",
+        "formatted_address": "Massachusetts, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 42.3788774,
+          "longitude": -72.032366
+        },
+        "post_code": "",
+        "query": "ma, usa",
+        "state": "Massachusetts",
+        "state_code": "US-MA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "madison, wi": {
+      "address": {
+        "city": "Madison",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Dane County",
+        "formatted_address": "Madison, Dane County, Wisconsin, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 43.07469,
+          "longitude": -89.3841663
+        },
+        "post_code": "",
+        "query": "madison, wi",
+        "state": "Wisconsin",
+        "state_code": "US-WI",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "melbourne, australia": {
+      "address": {
+        "city": "Melbourne",
+        "country": "Australia",
+        "country_code": "au",
+        "county": "",
+        "formatted_address": "Melbourne, Victoria, Australia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": -37.8142454,
+          "longitude": 144.9631732
+        },
+        "post_code": "",
+        "query": "melbourne, australia",
+        "state": "Victoria",
+        "state_code": "AU-VIC",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "mexico": {
+      "address": {
+        "city": "",
+        "country": "Mexico",
+        "country_code": "mx",
+        "county": "",
+        "formatted_address": "Mexico",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 23.6585116,
+          "longitude": -102.0077097
+        },
+        "post_code": "",
+        "query": "mexico",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "montréal, québec, canada": {
+      "address": {
+        "city": "Montreal",
+        "country": "Canada",
+        "country_code": "ca",
+        "county": "Urban agglomeration of Montreal",
+        "formatted_address": "Montreal, Urban agglomeration of Montreal, Montreal (administrative region), Quebec, Canada",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 45.5031824,
+          "longitude": -73.5698065
+        },
+        "post_code": "",
+        "query": "montréal, québec, canada",
+        "state": "Quebec",
+        "state_code": "CA-QC",
+        "state_district": "Montreal (administrative region)",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "moscow": {
+      "address": {
+        "city": "",
+        "country": "Russia",
+        "country_code": "ru",
+        "county": "",
+        "formatted_address": "Moscow, Central Federal District, Russia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 55.625578,
+          "longitude": 37.6063916
+        },
+        "post_code": "",
+        "query": "moscow",
+        "state": "Moscow",
+        "state_code": "RU-MOW",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "moscow, russia": {
+      "address": {
+        "city": "",
+        "country": "Russia",
+        "country_code": "ru",
+        "county": "",
+        "formatted_address": "Moscow, Central Federal District, Russia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 55.625578,
+          "longitude": 37.6063916
+        },
+        "post_code": "",
+        "query": "moscow, russia",
+        "state": "Moscow",
+        "state_code": "RU-MOW",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "málaga": {
+      "address": {
+        "city": "Málaga",
+        "country": "Spain",
+        "country_code": "es",
+        "county": "Málaga-Costa del Sol",
+        "formatted_address": "Málaga, Málaga-Costa del Sol, Malaga, Andalusia, Spain",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 36.7647913,
+          "longitude": -4.4422005
+        },
+        "post_code": "",
+        "query": "málaga",
+        "state": "Andalusia",
+        "state_code": "ES-AN",
+        "state_district": "Malaga",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "málaga, spain": {
+      "address": {
+        "city": "Málaga",
+        "country": "Spain",
+        "country_code": "es",
+        "county": "Málaga-Costa del Sol",
+        "formatted_address": "Málaga, Málaga-Costa del Sol, Malaga, Andalusia, Spain",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 36.7647913,
+          "longitude": -4.4422005
+        },
+        "post_code": "",
+        "query": "málaga, spain",
+        "state": "Andalusia",
+        "state_code": "ES-AN",
+        "state_district": "Malaga",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "münchen": {
+      "address": {
+        "city": "Munich",
+        "country": "Germany",
+        "country_code": "de",
+        "county": "",
+        "formatted_address": "Munich, Bavaria, Germany",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 48.1371079,
+          "longitude": 11.5753822
+        },
+        "post_code": "",
+        "query": "münchen",
+        "state": "Bavaria",
+        "state_code": "DE-BY",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "new zealand": {
+      "address": {
+        "city": "",
+        "country": "New Zealand",
+        "country_code": "nz",
+        "county": "",
+        "formatted_address": "New Zealand",
+        "house_number": "",
+        "internal_location": {
+          "latitude": -41.5000831,
+          "longitude": 172.8344077
+        },
+        "post_code": "",
+        "query": "new zealand",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "norway": {
+      "address": {
+        "city": "",
+        "country": "Norway",
+        "country_code": "no",
+        "county": "",
+        "formatted_address": "Norway",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 61.1529386,
+          "longitude": 8.7876653
+        },
+        "post_code": "",
+        "query": "norway",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "norwich, uk": {
+      "address": {
+        "city": "Norwich",
+        "country": "United Kingdom",
+        "country_code": "gb",
+        "county": "Norfolk",
+        "formatted_address": "Norwich, Norfolk, England, United Kingdom",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 52.6285576,
+          "longitude": 1.2923954
+        },
+        "post_code": "",
+        "query": "norwich, uk",
+        "state": "England",
+        "state_code": "GB-ENG",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "paris, france": {
+      "address": {
+        "city": "Paris",
+        "country": "France",
+        "country_code": "fr",
+        "county": "",
+        "formatted_address": "Paris, Ile-de-France, Metropolitan France, France",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 48.8588897,
+          "longitude": 2.320041
+        },
+        "post_code": "",
+        "query": "paris, france",
+        "state": "Ile-de-France",
+        "state_code": "FR-IDF",
+        "state_district": "",
+        "street": "",
+        "suburb": "Paris"
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "philadelphia, pa": {
+      "address": {
+        "city": "Philadelphia",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Philadelphia County",
+        "formatted_address": "Philadelphia, Philadelphia County, Pennsylvania, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 39.9527237,
+          "longitude": -75.1635262
+        },
+        "post_code": "",
+        "query": "philadelphia, pa",
+        "state": "Pennsylvania",
+        "state_code": "US-PA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "pittsburgh, pa, usa": {
+      "address": {
+        "city": "Pittsburgh",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Allegheny County",
+        "formatted_address": "Pittsburgh, Allegheny County, Pennsylvania, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 40.4406968,
+          "longitude": -80.0025666
+        },
+        "post_code": "",
+        "query": "pittsburgh, pa, usa",
+        "state": "Pennsylvania",
+        "state_code": "US-PA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "pohang, south korea": {
+      "address": {
+        "city": "Pohang-si",
+        "country": "South Korea",
+        "country_code": "kr",
+        "county": "",
+        "formatted_address": "Pohang-si, North Gyeongsang, South Korea",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 36.0189315,
+          "longitude": 129.3429384
+        },
+        "post_code": "",
+        "query": "pohang, south korea",
+        "state": "North Gyeongsang",
+        "state_code": "KR-47",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "poland": {
+      "address": {
+        "city": "",
+        "country": "Poland",
+        "country_code": "pl",
+        "county": "",
+        "formatted_address": "Poland",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 52.215933,
+          "longitude": 19.134422
+        },
+        "post_code": "",
+        "query": "poland",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "porto, portugal": {
+      "address": {
+        "city": "Porto",
+        "country": "Portugal",
+        "country_code": "pt",
+        "county": "Porto",
+        "formatted_address": "Porto, Portugal",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 41.1502195,
+          "longitude": -8.6103497
+        },
+        "post_code": "",
+        "query": "porto, portugal",
+        "state": "",
+        "state_code": "PT-13",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "portugal": {
+      "address": {
+        "city": "",
+        "country": "Portugal",
+        "country_code": "pt",
+        "county": "",
+        "formatted_address": "Portugal",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 39.6621648,
+          "longitude": -8.1353519
+        },
+        "post_code": "",
+        "query": "portugal",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "prague, czechia": {
+      "address": {
+        "city": "Prague",
+        "country": "Czechia",
+        "country_code": "cz",
+        "county": "",
+        "formatted_address": "Prague, Czechia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 50.0874654,
+          "longitude": 14.4212535
+        },
+        "post_code": "",
+        "query": "prague, czechia",
+        "state": "",
+        "state_code": "CZ-10",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "puducherry": {
+      "address": {
+        "city": "",
+        "country": "India",
+        "country_code": "in",
+        "county": "",
+        "formatted_address": "Puducherry, India",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 10.9156489,
+          "longitude": 79.8069488
+        },
+        "post_code": "",
+        "query": "puducherry",
+        "state": "Puducherry",
+        "state_code": "IN-PY",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "raleigh, nc": {
+      "address": {
+        "city": "Raleigh",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Wake County",
+        "formatted_address": "Raleigh, Wake County, North Carolina, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 35.7803977,
+          "longitude": -78.6390989
+        },
+        "post_code": "",
+        "query": "raleigh, nc",
+        "state": "North Carolina",
+        "state_code": "US-NC",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "reading, uk": {
+      "address": {
+        "city": "Reading",
+        "country": "United Kingdom",
+        "country_code": "gb",
+        "county": "",
+        "formatted_address": "Reading, England, United Kingdom",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 51.4564242,
+          "longitude": -0.9700664
+        },
+        "post_code": "",
+        "query": "reading, uk",
+        "state": "England",
+        "state_code": "GB-ENG",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "remote": {
+      "address": {
+        "city": "Remote",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Coos County",
+        "formatted_address": "Remote, Coos County, Oregon, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 43.0059455,
+          "longitude": -123.8925908
+        },
+        "post_code": "",
+        "query": "remote",
+        "state": "Oregon",
+        "state_code": "US-OR",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "saint petersburg": {
+      "address": {
+        "city": "",
+        "country": "Russia",
+        "country_code": "ru",
+        "county": "",
+        "formatted_address": "Saint Petersburg, Northwestern Federal District, Russia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 59.9606739,
+          "longitude": 30.1586551
+        },
+        "post_code": "",
+        "query": "saint petersburg",
+        "state": "Saint Petersburg",
+        "state_code": "RU-SPE",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
     "san francisco": {
       "address": {
         "city": "San Francisco",
@@ -115,25 +1610,324 @@
       "matched": true,
       "resolved_at": "2026-01-01T00:00:00+00:00"
     },
-    "universit\u00e9 paris-saclay": {
+    "san francisco, ca": {
+      "address": {
+        "city": "San Francisco",
+        "country": "United States",
+        "country_code": "us",
+        "county": "",
+        "formatted_address": "San Francisco, California, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 37.7879363,
+          "longitude": -122.4075201
+        },
+        "post_code": "",
+        "query": "san francisco, ca",
+        "state": "California",
+        "state_code": "US-CA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "san jose, ca": {
+      "address": {
+        "city": "San Jose",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Santa Clara County",
+        "formatted_address": "San Jose, Santa Clara County, California, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 37.3361663,
+          "longitude": -121.890591
+        },
+        "post_code": "",
+        "query": "san jose, ca",
+        "state": "California",
+        "state_code": "US-CA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "seoul, korea": {
+      "address": {
+        "city": "Seoul",
+        "country": "South Korea",
+        "country_code": "kr",
+        "county": "",
+        "formatted_address": "Seoul, South Korea",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 37.5666791,
+          "longitude": 126.9782914
+        },
+        "post_code": "",
+        "query": "seoul, korea",
+        "state": "",
+        "state_code": "KR-11",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "shenzhen, china": {
+      "address": {
+        "city": "Shenzhen",
+        "country": "China",
+        "country_code": "cn",
+        "county": "",
+        "formatted_address": "Shenzhen, Guangdong, China",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 22.5445741,
+          "longitude": 114.0545429
+        },
+        "post_code": "",
+        "query": "shenzhen, china",
+        "state": "Guangdong",
+        "state_code": "CN-GD",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "silicon valley": {
+      "address": {
+        "city": "Palo Alto",
+        "country": "United States",
+        "country_code": "us",
+        "county": "Santa Clara County",
+        "formatted_address": "Silicon Valley, Palo Alto, Santa Clara County, California, 94301, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 37.4429964,
+          "longitude": -122.1545229
+        },
+        "post_code": "94301",
+        "query": "silicon valley",
+        "state": "California",
+        "state_code": "US-CA",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "stuttgart, germany": {
+      "address": {
+        "city": "Stuttgart",
+        "country": "Germany",
+        "country_code": "de",
+        "county": "",
+        "formatted_address": "Stuttgart, Baden-Württemberg, Germany",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 48.7784485,
+          "longitude": 9.1800132
+        },
+        "post_code": "",
+        "query": "stuttgart, germany",
+        "state": "Baden-Württemberg",
+        "state_code": "DE-BW",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "switzerland": {
+      "address": {
+        "city": "",
+        "country": "Switzerland",
+        "country_code": "ch",
+        "county": "",
+        "formatted_address": "Switzerland",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 46.7985624,
+          "longitude": 8.2319736
+        },
+        "post_code": "",
+        "query": "switzerland",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "sydney": {
+      "address": {
+        "city": "Sydney",
+        "country": "Australia",
+        "country_code": "au",
+        "county": "",
+        "formatted_address": "Sydney, New South Wales, Australia",
+        "house_number": "",
+        "internal_location": {
+          "latitude": -33.8698439,
+          "longitude": 151.2082848
+        },
+        "post_code": "",
+        "query": "sydney",
+        "state": "New South Wales",
+        "state_code": "AU-NSW",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "taipei, taiwan": {
+      "address": {
+        "city": "Taipei",
+        "country": "Taiwan",
+        "country_code": "tw",
+        "county": "",
+        "formatted_address": "Taipei, Taiwan",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 25.0375198,
+          "longitude": 121.5636796
+        },
+        "post_code": "",
+        "query": "taipei, taiwan",
+        "state": "",
+        "state_code": "TW-TPE",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "tel aviv": {
+      "address": {
+        "city": "Tel-Aviv",
+        "country": "Israel",
+        "country_code": "il",
+        "county": "",
+        "formatted_address": "Tel-Aviv, Tel Aviv Subdistrict, Tel-Aviv District, Israel",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 32.0852997,
+          "longitude": 34.7818064
+        },
+        "post_code": "",
+        "query": "tel aviv",
+        "state": "Tel-Aviv District",
+        "state_code": "IL-TA",
+        "state_district": "Tel Aviv Subdistrict",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "the internet": {
+      "address": {
+        "city": "Strabane",
+        "country": "United Kingdom",
+        "country_code": "gb",
+        "county": "County Tyrone",
+        "formatted_address": "Internet, Castle Street, Foot of the Town, Strabane, Derry and Strabane District, County Tyrone, Northern Ireland, BT82 8AN, United Kingdom",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 54.8270604,
+          "longitude": -7.4634535
+        },
+        "post_code": "BT82 8AN",
+        "query": "the internet",
+        "state": "Northern Ireland",
+        "state_code": "GB-NIR",
+        "state_district": "",
+        "street": "Castle Street",
+        "suburb": "Foot of the Town"
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "toulouse, france": {
+      "address": {
+        "city": "Toulouse",
+        "country": "France",
+        "country_code": "fr",
+        "county": "Haute-Garonne",
+        "formatted_address": "Toulouse, Haute-Garonne, Occitania, Metropolitan France, France",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 43.6044638,
+          "longitude": 1.4442433
+        },
+        "post_code": "",
+        "query": "toulouse, france",
+        "state": "Occitania",
+        "state_code": "FR-OCC",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "ukraine": {
+      "address": {
+        "city": "",
+        "country": "Ukraine",
+        "country_code": "ua",
+        "county": "",
+        "formatted_address": "Ukraine",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 49.4871968,
+          "longitude": 31.2718321
+        },
+        "post_code": "",
+        "query": "ukraine",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "université paris-saclay": {
       "address": {
         "city": "Orsay",
         "country": "France",
         "country_code": "fr",
         "county": "Essonne",
-        "formatted_address": "Universit\u00e9 Paris-Saclay, Avenue des Sciences, Belved\u00e8re, Campus Urbain de Paris-Saclay, Orsay, Palaiseau, Essonne, Ile-de-France, Metropolitan France, 91400, France",
+        "formatted_address": "Université Paris-Saclay, Avenue des Sciences, Belvedère, Campus Urbain de Paris-Saclay, Orsay, Palaiseau, Essonne, Ile-de-France, Metropolitan France, 91400, France",
         "house_number": "",
         "internal_location": {
           "latitude": 48.7121501,
           "longitude": 2.1735087
         },
         "post_code": "91400",
-        "query": "universit\u00e9 paris-saclay",
+        "query": "université paris-saclay",
         "state": "Ile-de-France",
         "state_code": "FR-IDF",
         "state_district": "",
         "street": "Avenue des Sciences",
-        "suburb": "Belved\u00e8re"
+        "suburb": "Belvedère"
       },
       "matched": true,
       "resolved_at": "2026-01-01T00:00:00+00:00"
@@ -154,6 +1948,52 @@
         "query": "utc-8",
         "state": "Siberian Federal District",
         "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "vancouver, bc, canada": {
+      "address": {
+        "city": "Vancouver",
+        "country": "Canada",
+        "country_code": "ca",
+        "county": "Metro Vancouver Regional District",
+        "formatted_address": "Vancouver, Metro Vancouver Regional District, British Columbia, Canada",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 49.2608724,
+          "longitude": -123.113952
+        },
+        "post_code": "",
+        "query": "vancouver, bc, canada",
+        "state": "British Columbia",
+        "state_code": "CA-BC",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "warsaw, poland": {
+      "address": {
+        "city": "",
+        "country": "Poland",
+        "country_code": "pl",
+        "county": "",
+        "formatted_address": "Warsaw, Masovian Voivodeship, Poland",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 52.2333742,
+          "longitude": 21.0711489
+        },
+        "post_code": "",
+        "query": "warsaw, poland",
+        "state": "Masovian Voivodeship",
+        "state_code": "PL-14",
         "state_district": "",
         "street": "",
         "suburb": ""
@@ -182,6 +2022,167 @@
         "suburb": ""
       },
       "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "washington d.c.": {
+      "address": {
+        "city": "Washington",
+        "country": "United States",
+        "country_code": "us",
+        "county": "",
+        "formatted_address": "Washington, District of Columbia, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 38.8950982,
+          "longitude": -77.0363849
+        },
+        "post_code": "",
+        "query": "washington d.c.",
+        "state": "District of Columbia",
+        "state_code": "US-DC",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "washington, dc": {
+      "address": {
+        "city": "Washington",
+        "country": "United States",
+        "country_code": "us",
+        "county": "",
+        "formatted_address": "Washington, District of Columbia, United States",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 38.8950982,
+          "longitude": -77.0363849
+        },
+        "post_code": "",
+        "query": "washington, dc",
+        "state": "District of Columbia",
+        "state_code": "US-DC",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "wellington, new zealand": {
+      "address": {
+        "city": "Wellington",
+        "country": "New Zealand",
+        "country_code": "nz",
+        "county": "Wellington City",
+        "formatted_address": "Wellington, Wellington City, Wellington, 6011, New Zealand",
+        "house_number": "",
+        "internal_location": {
+          "latitude": -41.2887953,
+          "longitude": 174.7772114
+        },
+        "post_code": "6011",
+        "query": "wellington, new zealand",
+        "state": "Wellington",
+        "state_code": "NZ-WGN",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "wuhan, china": {
+      "address": {
+        "city": "Wuhan",
+        "country": "China",
+        "country_code": "cn",
+        "county": "",
+        "formatted_address": "Wuhan, Hubei, China",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 30.578891,
+          "longitude": 114.2921197
+        },
+        "post_code": "",
+        "query": "wuhan, china",
+        "state": "Hubei",
+        "state_code": "CN-HB",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "zurich, switzerland": {
+      "address": {
+        "city": "Zurich",
+        "country": "Switzerland",
+        "country_code": "ch",
+        "county": "District Zurich",
+        "formatted_address": "Zurich, District Zurich, Zurich, Switzerland",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 47.3744489,
+          "longitude": 8.5410422
+        },
+        "post_code": "",
+        "query": "zurich, switzerland",
+        "state": "Zurich",
+        "state_code": "CH-ZH",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "한국": {
+      "address": {
+        "city": "",
+        "country": "South Korea",
+        "country_code": "kr",
+        "county": "",
+        "formatted_address": "South Korea",
+        "house_number": "",
+        "internal_location": {
+          "latitude": 36.638392,
+          "longitude": 127.6961188
+        },
+        "post_code": "",
+        "query": "한국",
+        "state": "",
+        "state_code": "",
+        "state_district": "",
+        "street": "",
+        "suburb": ""
+      },
+      "matched": true,
+      "resolved_at": "2026-01-01T00:00:00+00:00"
+    },
+    "🇨🇿 mikulov ↜ 🇨🇿 brno ↜ 🇺🇦 brovary/kyiv": {
+      "address": {
+        "city": null,
+        "country": null,
+        "country_code": null,
+        "county": null,
+        "formatted_address": null,
+        "house_number": null,
+        "internal_location": {
+          "latitude": null,
+          "longitude": null
+        },
+        "post_code": null,
+        "query": "🇨🇿 mikulov ↜ 🇨🇿 brno ↜ 🇺🇦 brovary/kyiv",
+        "state": null,
+        "state_code": null,
+        "state_district": null,
+        "street": null,
+        "suburb": null
+      },
+      "matched": false,
       "resolved_at": "2026-01-01T00:00:00+00:00"
     }
   },

@@ -21,6 +21,7 @@ from github_metrics.model.statistics import (
     Exclusion,
     ExclusionReason,
     IdentityGaps,
+    RepositoryState,
     RepositoryStatistics,
     ScanStatistics,
     percent,
@@ -56,8 +57,7 @@ def build(*contributors: Contributor, **kwargs: Any) -> RepositoryStatistics:
     return build_repository_statistics(
         SoftwareRow(owner="pypa", name="virtualenv", url="https://github.com/pypa/virtualenv"),
         contributors,
-        collected=True,
-        documented=True,
+        state=RepositoryState(collected=True, documented=True),
         **kwargs,
     )
 
@@ -330,13 +330,19 @@ def test_the_run_counts_are_derived_rather_than_tracked_separately() -> None:
         repositories_named=3,
         repositories=(
             build_repository_statistics(
-                SoftwareRow(owner="a", name="a"), (), collected=True, documented=True
+                SoftwareRow(owner="a", name="a"),
+                (),
+                state=RepositoryState(collected=True, documented=True),
             ),
             build_repository_statistics(
-                SoftwareRow(owner="b", name="b"), (), collected=True, documented=False
+                SoftwareRow(owner="b", name="b"),
+                (),
+                state=RepositoryState(collected=True, documented=False),
             ),
             build_repository_statistics(
-                SoftwareRow(owner="c", name="c"), (), collected=False, documented=False
+                SoftwareRow(owner="c", name="c"),
+                (),
+                state=RepositoryState(collected=False, documented=False),
             ),
         ),
     )

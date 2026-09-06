@@ -48,10 +48,13 @@ mode this suite exists to catch, occurring inside the suite itself.
 |---|---|
 | `tests/conformance/inventory.csv` | The default-route input. |
 | `tests/conformance/inventory-deep.csv` | The `--deep-attribution` input. |
-| `tests/conformance/recording.json` | Every API exchange, captured from the live API (~140 KB). |
-| `tests/conformance/geocode.json` | A pre-populated geocode cache covering **every** location the fixtures publish. |
+| `tests/conformance/inventory-anonymous.csv` | The input with an anonymous tail. |
+| `tests/conformance/recording.json` | Every API exchange, captured from the live API (~390 KB). |
+| `tests/conformance/geocode.json` | A geocode cache covering **every** location the fixtures publish (95 of them). |
 | `tests/conformance/expected/` | The default route's artifacts, byte for byte. |
 | `tests/conformance/expected-deep/` | The deep route's artifacts. |
+| `tests/conformance/expected-anonymous/` | The anonymous tail and what was recovered from it. |
+| `tests/conformance/expected-partial/` | A run that stopped when its budget ran out. |
 
 ### Why these repositories
 
@@ -61,6 +64,7 @@ mode this suite exists to catch, occurring inside the suite itself.
 | `octocat/Spoon-Knife` | default | The minimum: one identity, a single-page census with no `rel="last"` |
 | `ghost/no-such-repository-conformance` | default | A **valid reference to an absent repository**: identity-only row, no document, exit 4 |
 | `hukkin/tomli` | deep | A **bot** contributor, and a 333-commit history — four pages, short enough to record |
+| `pypa/virtualenv` | anonymous | 156 linked accounts, 5 anonymous, **one** carrying a recoverable no-reply address |
 
 The `octocat` repositories are GitHub's own demonstrations: a handful of
 contributors, last pushed in 2024, about as unlikely to change as a public
@@ -75,10 +79,21 @@ a page per hundred commits, so a fixture repository needs a bot *and* a short
 history. At 333 commits it records in four pages, against the 321 the feature
 was measured on.
 
-The recording is ~140 KB, most of it those four pages of commit nodes. That is
-past the point where it can be read end to end in review — an earlier version
-of this document claimed 18 KB and no longer holds. The parts worth reading are
-the metadata and detail responses; the history pages are bulk.
+`pypa/virtualenv` is the expensive one, and the cost is worth stating plainly:
+adding it took the recording from 140 KB to **390 KB** and the geocode cache
+from 8 locations to **95**, for exactly **one** recovered account. It earns
+that because nothing else exercises the recovery path or the unreachable bucket
+end to end, and because the sum invariant only means something against real
+numbers — 156 + 1 + 4 = 161 identities, on data nobody chose.
+
+It was also the only candidate. Of ten repositories probed, it was the sole one
+under a few hundred contributors carrying a `NNN+login@users.noreply` address
+among its anonymous entries.
+
+The recording is past the point where it can be read end to end in review —
+an earlier version of this document claimed 18 KB and no longer holds. The
+parts worth reading are the metadata and detail responses; the history and
+contributor pages are bulk.
 
 ## What is asserted
 
@@ -96,6 +111,12 @@ the metadata and detail responses; the history pages are bulk.
 | `test_the_deep_route_records_the_method_that_produced_it` | `attribution.method`, without which the two routes could be diffed as though comparable |
 | `test_both_routes_find_the_same_bots` | The two bot-detection mechanisms agree |
 | `test_every_fixture_the_suite_needs_is_present` | A missing fixture fails here rather than inside a comparison |
+| `test_a_partial_run_still_accounts_for_every_repository` | A stopped run's artifacts, and exit 9 |
+| `test_a_partial_run_says_so_in_the_statistics` | `incomplete_because_exhausted`, and that the counts still add up |
+| `test_an_unattempted_repository_is_not_a_failed_one` | Two states that call for different responses |
+| `test_the_anonymous_route_artifacts_are_unchanged` | The tail, and what was rescued from it |
+| `test_an_account_is_recovered_from_a_no_reply_address` | Recovery end to end on real data, and the sum invariant |
+| `test_the_unreachable_tail_reports_its_commits` | Measured, not `null`, because the pages were walked |
 
 ## What is normalised, and why only that
 
@@ -162,13 +183,15 @@ together. Re-record in its own commit.
 
 ## Known limits
 
-- **`--on-exhaustion partial` and `--no-recover-anonymous` have no golden
-  artifacts.** Both have unit tests. `partial` is the harder one to fixture,
-  because it needs a budget that runs out mid-run.
-- **No fixture repository has an anonymous contributor**, so the no-reply
-  recovery path is exercised only by unit tests. Finding one small enough to
-  record is the difficulty: the ceiling bites at 500 author emails, which means
-  a large repository and a large recording.
+- **`--no-recover-anonymous` has no golden artifacts.** It is the *absence* of
+  a step rather than a step, and the anonymous fixture already shows what that
+  step contributes.
+- **`--on-exhaustion wait` is not fixtured**, deliberately: a fixture that
+  waits would either sleep or need the clock injected through the CLI, and the
+  waiting is covered by `tests/test_exhaustion.py` without sleeping at all.
+- **The partial fixture pins `--workers 1`.** With a pool, *which* repository
+  the budget runs out on is a race and the artifacts would differ between runs.
+  What it verifies is the shape of a stopped run, not its concurrency.
 - **The recording freezes upstream data**, so a change in what GitHub returns
   for these repositories is invisible until someone re-records. That is the
   deliberate trade for determinism, and it is why the one live `integration`

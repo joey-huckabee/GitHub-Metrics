@@ -52,6 +52,7 @@ from github_metrics.model.software import SoftwareRow
 from github_metrics.model.statistics import (
     BudgetStatistics,
     GeocodingStatistics,
+    RepositoryState,
     ScanStatistics,
 )
 from github_metrics.output import (
@@ -675,8 +676,11 @@ def _write_statistics(
         build_repository_statistics(
             row,
             outcome.contributors,
-            collected=outcome.ok,
-            documented=outcome.documented,
+            state=RepositoryState(
+                attempted=outcome.attempted,
+                collected=outcome.ok,
+                documented=outcome.documented,
+            ),
             # Free: the metrics query already carries it, measured at one
             # point whether the repository has 1,250 commits or 32,016.
             commits_total=outcome.metadata.commits if outcome.metadata else None,

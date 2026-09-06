@@ -52,7 +52,9 @@ import pytest
 from click.testing import CliRunner
 from github.GithubException import UnknownObjectException
 
-from github_metrics.cli import EXIT_REPOSITORY_UNFETCHABLE, main
+from github_metrics.cli import EXIT_INCOMPLETE, EXIT_REPOSITORY_UNFETCHABLE, main
+from github_metrics.collect.budget import MIN_POINTS_PER_REPOSITORY
+from github_metrics.collect.exhaustion import VERIFY_MARGIN
 from github_metrics.model.scan import ScanIdentifier
 
 CONFORMANCE = Path(__file__).parent / "conformance"
@@ -70,6 +72,26 @@ contributor, and the deep route learns that from the reserved `[bot]` login
 suffix rather than from the account type the contributors endpoint reports -
 two different mechanisms that must agree, and did not when the feature landed.
 Its history is 333 commits, four pages, short enough to record.
+"""
+
+EXPECTED_ANONYMOUS = CONFORMANCE / "expected-anonymous"
+INVENTORY_ANONYMOUS = CONFORMANCE / "inventory-anonymous.csv"
+"""The set with an anonymous tail, and one account recoverable from it.
+
+`pypa/virtualenv` was the only small repository found carrying a
+`NNN+login@users.noreply.github.com` address among its anonymous contributors.
+That single entry is the point: it is the only fixture that exercises recovery
+at all, and the four beside it exercise the bucket no API can reach.
+"""
+
+EXPECTED_PARTIAL = CONFORMANCE / "expected-partial"
+"""The default inventory scanned with a budget that runs out part way.
+
+It reuses `inventory.csv` rather than adding one, because what is under test is
+not the input but what a **stopped** run publishes: a row for every named
+repository, the unreached ones marked, and a status of its own. A partial CSV
+that were merely shorter would be indistinguishable from a shorter inventory,
+and no unit test can show that the way a golden file can.
 """
 
 # Pinned so the artifacts are reproducible. A run identity is a property of the
@@ -116,9 +138,18 @@ class ReplayClient:
     subtly wrong with nothing to say why.
     """
 
-    def __init__(self, recording: dict[str, Any]) -> None:
+    def __init__(self, recording: dict[str, Any], budget: list[int] | None = None) -> None:
+        """Serve a recording, optionally against a budget that runs out.
+
+        Args:
+            recording: The captured traffic.
+            budget: Successive readings for `graphql_budget`, the last
+                repeating. `None` means a budget that never runs short.
+        """
         self.recording = recording
         self.unmatched: list[str] = []
+        self.budget = list(budget) if budget else []
+        self.budget_reads = 0
 
     def graphql(self, query: str, variables: dict[str, Any]) -> tuple[Any, Any]:
         """Answer one GraphQL exchange from the recording."""
@@ -153,15 +184,22 @@ class ReplayClient:
         """The recorded contributor list for one repository."""
         return _Repository(self.recording["contributors"].get(slug, []))
 
-    @staticmethod
-    def graphql_points_remaining() -> int:
-        """A budget that never runs short, so the policy never engages."""
-        return 5000
+    def graphql_points_remaining(self) -> int:
+        """What the pre-flight reads, before any repository is collected."""
+        return self.budget[0] if self.budget else 5000
 
-    @staticmethod
-    def graphql_budget() -> tuple[int, None]:
-        """As above, with no reset time to wait for."""
-        return 5000, None
+    def graphql_budget(self) -> tuple[int, None]:
+        """What the guard reads before each repository.
+
+        Successive calls walk the scripted readings and then hold at the last,
+        so a run can be made to reach the end of its budget at a chosen point.
+        No reset time is offered: `wait` would sleep, and a fixture must not.
+        """
+        if not self.budget:
+            return 5000, None
+        value = self.budget[min(self.budget_reads, len(self.budget) - 1)]
+        self.budget_reads += 1
+        return value, None
 
     @staticmethod
     def rate_limit_remaining() -> int:
@@ -175,11 +213,12 @@ class ReplayClient:
         return None
 
 
-@pytest.fixture
-def replay(monkeypatch: pytest.MonkeyPatch) -> ReplayClient:
+def install_replay(
+    monkeypatch: pytest.MonkeyPatch, budget: list[int] | None = None
+) -> ReplayClient:
     """Replace the network, the clock and the run identity."""
     recording = json.loads(RECORDING.read_text(encoding="utf-8"))
-    client = ReplayClient(recording)
+    client = ReplayClient(recording, budget)
 
     monkeypatch.setattr("github_metrics.cli.GitHubClient", lambda _settings: client)
     monkeypatch.setattr("github_metrics.cli.verify_credentials", lambda _settings: None)
@@ -195,6 +234,12 @@ def replay(monkeypatch: pytest.MonkeyPatch) -> ReplayClient:
     # the network - passing, slowly, for the wrong reason.
     monkeypatch.setattr("github_metrics.geocache._utcnow", lambda: SCAN_DATE)
     return client
+
+
+@pytest.fixture
+def replay(monkeypatch: pytest.MonkeyPatch) -> ReplayClient:
+    """A replay whose budget never runs short."""
+    return install_replay(monkeypatch)
 
 
 REGENERATE = os.environ.get("CONFORMANCE_REGENERATE") == "1"
@@ -385,12 +430,15 @@ def test_the_run_reaches_no_network_at_all(tmp_path: Path) -> None:
     which would make it slow, flaky, and dependent on a third party's uptime
     for a result that has nothing to do with the change under test.
     """
+    # Every inventory, without exception. Each one added so far has brought
+    # contributors whose locations the shipped cache did not cover, and each
+    # time the only symptom was the suite getting slower - 2.7 seconds to 22.7
+    # when the deep set arrived, and to over four minutes when the anonymous
+    # one did.
     for inventory, extra in (
         (INVENTORY, ()),
-        # The deep set is checked too: it was added later, its contributors
-        # publish locations the first set does not, and the suite silently
-        # started geocoding over the network until this covered it.
         (INVENTORY_DEEP, ("--deep-attribution",)),
+        (INVENTORY_ANONYMOUS, ()),
     ):
         target = tmp_path / inventory.stem
         target.mkdir()
@@ -512,3 +560,152 @@ def test_both_routes_find_the_same_bots(tmp_path: Path) -> None:
 
     assert from_list, "the fixture repository is supposed to have a bot"
     assert bots_of(deep) == from_list
+
+
+# ---------------------------------------------------------------------------
+# A run that stopped part way
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-CNF-006")
+def test_a_partial_run_still_accounts_for_every_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The contract a stopped run has to keep, and the hardest one to verify.
+
+    A CSV row is positional, so a shorter file silently changes what every
+    later row means and a consumer counting rows against its inventory sees
+    nothing wrong. The unreached repositories therefore keep their rows and are
+    marked, rather than being omitted.
+
+    `--workers 1` is not incidental: with a pool, *which* repository the budget
+    runs out on is a race, and the artifacts would differ between runs.
+    """
+    # Enough for the first repository, then nothing.
+    client = install_replay(monkeypatch, budget=[VERIFY_MARGIN, MIN_POINTS_PER_REPOSITORY, 0])
+
+    result = run_scan(tmp_path, "--on-exhaustion", "partial", "--workers", "1")
+
+    assert result.exit_code == EXIT_INCOMPLETE
+    assert client.budget_reads > 0, "the guard never consulted the budget"
+
+    compare(
+        tmp_path / "githubmetrics.csv",
+        Path("githubmetrics.csv"),
+        golden_root=EXPECTED_PARTIAL,
+    )
+    compare(
+        tmp_path / "statistics.json",
+        Path("statistics.json"),
+        golden_root=EXPECTED_PARTIAL,
+        normalised=True,
+    )
+
+
+@pytest.mark.requirement("L3-CNF-006")
+def test_a_partial_run_says_so_in_the_statistics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The field a consumer must check before treating a CSV as complete."""
+    install_replay(monkeypatch, budget=[VERIFY_MARGIN, MIN_POINTS_PER_REPOSITORY, 0])
+
+    run_scan(tmp_path, "--on-exhaustion", "partial", "--workers", "1")
+
+    statistics = json.loads((tmp_path / "statistics.json").read_text(encoding="utf-8"))
+
+    assert statistics["budget"]["incomplete_because_exhausted"] is True
+    assert statistics["budget"]["exhausted"] is True
+    assert statistics["budget"]["exhaustion_policy"] == "partial"
+    assert statistics["repositories"]["not_attempted"] > 0
+    # Every named repository is still accounted for.
+    counts = statistics["repositories"]
+    assert counts["collected"] + counts["failed"] + counts["not_attempted"] == counts["named"]
+
+
+@pytest.mark.requirement("L3-CNF-006")
+def test_an_unattempted_repository_is_not_a_failed_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two states, two responses: one is a budget problem, one an inventory
+    problem, and collapsing them would send someone to fix the wrong thing."""
+    install_replay(monkeypatch, budget=[VERIFY_MARGIN, MIN_POINTS_PER_REPOSITORY, 0])
+
+    run_scan(tmp_path, "--on-exhaustion", "partial", "--workers", "1")
+
+    statistics = json.loads((tmp_path / "statistics.json").read_text(encoding="utf-8"))
+    rows = list(csv.DictReader((tmp_path / "githubmetrics.csv").read_text().splitlines()))
+
+    assert len(rows) == statistics["repositories"]["named"]
+    # The ones never reached carry identity and no measurements, exactly as an
+    # unreadable repository does - the difference is recorded in statistics.json
+    # rather than in the row, because the row has no field that could say it.
+    unmeasured = [row for row in rows if not row["stars"]]
+    assert len(unmeasured) >= statistics["repositories"]["not_attempted"]
+
+
+# ---------------------------------------------------------------------------
+# The anonymous tail, and what can be rescued from it
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-CNF-007")
+@pytest.mark.usefixtures("replay")
+def test_the_anonymous_route_artifacts_are_unchanged(tmp_path: Path) -> None:
+    """The only fixture whose contributor list GitHub could not fully link."""
+    run_scan(tmp_path, inventory=INVENTORY_ANONYMOUS)
+
+    compare(
+        tmp_path / "githubmetrics.csv",
+        Path("githubmetrics.csv"),
+        golden_root=EXPECTED_ANONYMOUS,
+    )
+    compare(
+        tmp_path / "statistics.json",
+        Path("statistics.json"),
+        golden_root=EXPECTED_ANONYMOUS,
+        normalised=True,
+    )
+    for path in sorted(tmp_path.rglob("*.json")):
+        if path.parent == tmp_path:
+            continue
+        compare(path, path.relative_to(tmp_path), golden_root=EXPECTED_ANONYMOUS)
+
+
+@pytest.mark.requirement("L3-CNF-007")
+@pytest.mark.usefixtures("replay")
+def test_an_account_is_recovered_from_a_no_reply_address(tmp_path: Path) -> None:
+    """The recovery path, end to end, on real data.
+
+    Everything else about it is unit-tested against constructed addresses. This
+    is the only place a real `NNN+login@users.noreply.github.com` entry travels
+    the whole way from GitHub's response into a published exclusion count.
+    """
+    run_scan(tmp_path, inventory=INVENTORY_ANONYMOUS)
+
+    statistics = json.loads((tmp_path / "statistics.json").read_text(encoding="utf-8"))
+    breakdown = statistics["repository_statistics"][0]["contributors"]["breakdown"]
+
+    assert breakdown["recovered_from_noreply"] > 0, "the fixture's no-reply entry was missed"
+    assert breakdown["anonymous_unrecoverable"] > 0, "the unreachable bucket is empty"
+    # The invariant the breakdown exists to make checkable.
+    identities = statistics["repository_statistics"][0]["contributors"]["identities"]
+    assert sum(breakdown.values()) == identities
+
+
+@pytest.mark.requirement("L3-CNF-007")
+@pytest.mark.usefixtures("replay")
+def test_the_unreachable_tail_reports_its_commits(tmp_path: Path) -> None:
+    """Walking the pages is what makes those commits knowable at all.
+
+    Without recovery the census counts people and leaves `commits` null,
+    because reading them costs every page. With it, the figure is measured -
+    and a `0` there would claim the tail contributed nothing.
+    """
+    run_scan(tmp_path, inventory=INVENTORY_ANONYMOUS)
+
+    statistics = json.loads((tmp_path / "statistics.json").read_text(encoding="utf-8"))
+    exclusions = statistics["repository_statistics"][0]["exclusions"]
+    unreachable = next(item for item in exclusions if item["reason"] == "anonymous_no_account")
+
+    assert unreachable["commits"] is not None
+    assert unreachable["commits"] > 0

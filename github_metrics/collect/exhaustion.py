@@ -10,7 +10,8 @@ Three policies, and the default is the one that finishes
   inventory completes unattended.
 - **`fail`** refuses at the first sign of exhaustion. What a CI job with a step
   timeout should pass.
-- **`partial`** collects what fits, marks the rest unmeasured, and exits 9.
+- **`partial`** collects what fits, marks the rest unmeasured, and exits with
+  the degraded status.
 
 Defaulting to `wait` changes what `scan` does, and only for runs that
 previously produced nothing usable: a run inside its budget never reaches this
@@ -82,8 +83,12 @@ class ExhaustionPolicy(str, Enum):
     """Stop immediately, as every release before v0.6.0 did."""
 
     PARTIAL = "partial"
-    """Stop collecting, keep what was gathered, and exit 9. The run says so in
-    the data as well as the status - see `statistics.json`."""
+    """Stop collecting, keep what was gathered, and exit degraded.
+
+    The run says so in the data as well as the status: a row for every named
+    repository, the unreached ones marked, and
+    `budget.incomplete_because_exhausted` in `statistics.json`. The status says
+    only that something is missing; the artifact says what."""
 
 
 class Decision(Enum):

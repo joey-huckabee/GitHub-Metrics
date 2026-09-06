@@ -438,6 +438,10 @@ omitted: a shorter file cannot be told from a shorter inventory.
 `statistics.json` carries `budget.incomplete_because_exhausted`, which is the
 field to check before treating a CSV as complete.
 
+The **status** says only that something is missing; the **artifact** says what.
+That split is deliberate - a single byte is the wrong place for a distinction
+that is really per repository.
+
 Nothing was collected and nothing was spent. That is better than the
 alternative: a run that runs out halfway has already spent its quota and left
 you a file where the repositories at the end are indistinguishable from
@@ -830,7 +834,6 @@ token.
 | `3` | Some input references were rejected | yes |
 | `4` | A repository could not be collected, or has moved | yes |
 | `5` | The budget could not cover the run | no |
-| `9` | Stopped early on an exhausted budget | yes, marked incomplete |
 | `6` | A source could not be read | no |
 | `7` | No token supplied | no |
 | `8` | GitHub rejected the token | no |

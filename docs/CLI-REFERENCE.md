@@ -337,7 +337,7 @@ inventories `validate` takes, mixed freely.
 | `--workers N` | `min(repositories, 8)` | Concurrent collections. |
 | `--deep-attribution` | off | Attribute every commit by walking the history instead of reading the contributors endpoint. Complete, and about **35x** the cost - a point per hundred commits, so 321 for a 32,016-commit repository against 9. For a watchlist, not an inventory. |
 | `--deep-attribution-threshold PCT` | `10` | Recommend the above for any repository where this percentage of commits could not be attributed. |
-| `--on-exhaustion {wait,fail,partial}` | `wait` | What to do when the hourly budget runs out. `wait` sleeps to the reset and continues; `fail` stops, as every release before v0.6.0 did; `partial` keeps what was collected, marks the rest unmeasured and exits 9. |
+| `--on-exhaustion {wait,fail,partial}` | `wait` | What to do when the hourly budget runs out. `wait` sleeps to the reset and continues; `fail` stops, as every release before v0.6.0 did; `partial` keeps what was collected, marks the rest unmeasured and exits 4. |
 | `--recover-anonymous` / `--no-recover-anonymous` | on | Link contributors GitHub left anonymous whose no-reply email names their account. Costs a page per hundred identities — 34 requests for a large repository against 4 — and raised one measured repository from 11.9% to 34.2% of contributors and 87.0% to 90.3% of commits. |
 | `--strict` | off | Abort on the first bad input reference. |
 
@@ -467,10 +467,9 @@ half failed, which is why the run also warns.
 |---|---|
 | `0` | Every reference was collected |
 | `3` | An input reference was rejected; the rest were collected |
-| `4` | A repository could not be collected, or has moved |
+| `4` | **Degraded**: a usable file was written and something is missing from it - a repository unreadable, never attempted, or measured but undocumented. `statistics.json` says which |
 | `5` | The budget could not cover the run under `--on-exhaustion fail` |
 | `6` | A source could not be read |
-| `9` | The budget ran out and `--on-exhaustion partial` stopped the run. Every named repository still has a row; the ones never reached are marked |
 | `7`, `8` | No token, or a token GitHub rejected |
 
 Severity-ordered, highest applicable wins. `4` beats `3`: both still wrote a
@@ -589,15 +588,17 @@ click and are listed for completeness rather than chosen. See
 | `1` | Configuration error, e.g. a missing token | no | all |
 | `2` | Usage error - malformed command line | no | all |
 | `3` | Degraded: some input rows were rejected | yes | `validate` |
-| `4` | Degraded: a repository could not be read, or has moved | yes | `scan` |
+| `4` | Degraded: a usable file, with something missing from it | yes | `scan` |
 | `5` | Aborted: API budget exhausted | partial | reserved |
 | `6` | Aborted: the input could not be read | no | `validate` |
 | `7` | Aborted: no GitHub token supplied | no | API commands |
 | `8` | Aborted: GitHub rejected the token | no | API commands |
-| `9` | Degraded: stopped early on an exhausted budget | yes, marked incomplete | `scan` |
 
-The 3-4 against 5-6 split is the load-bearing part: **3, 4 and 9 still produced
-a usable result; 5 and 6 did not.** 9 sits above 4 because an unreadable
-repository still produced everything it could, while a stopped run has
-repositories it never looked at. A caller can test `$? -ge 3` for "something
+The 3-4 against 5-6 split is the load-bearing part: **3 and 4 still produced a
+usable result; 5 and 6 did not.**
+
+Exit `9` was used for a stopped run between v0.6.0 and v0.6.2 and is
+**retired**. It sat above this boundary while producing a usable file, so
+`$? -ge 5` wrongly classified it. That outcome exits `4` now, and the number is
+not reused. A caller can test `$? -ge 3` for "something
 was wrong" and `$? -ge 5` for "nothing usable came out".

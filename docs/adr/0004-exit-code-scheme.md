@@ -80,7 +80,7 @@ outcome as one that could not be opened.
 | `1` | Configuration error, e.g. a missing token | no |
 | `2` | Usage error — malformed command line | no |
 | `3` | Degraded: some input rows were rejected | yes |
-| `4` | Degraded: some repositories could not be fetched | yes |
+| `4` | Degraded: a usable file, with something missing from it | yes |
 | `5` | Aborted: API budget exhausted, or pre-flight refused the run | partial or none |
 | `6` | Aborted: the input could not be read | no |
 | `7` | Aborted: no GitHub token was supplied | no |
@@ -93,6 +93,14 @@ that both rejected input rows and failed to fetch a repository exits `4`. This
 gives a single rule to reason about instead of a precedence table, and it means
 a caller can write `[ $? -ge 5 ]` to mean "nothing usable came out" and
 `[ $? -ge 3 ]` to mean "something was wrong".
+
+**Amended by [ADR-0011](0011-one-degraded-exit-status.md).** Code `4` covers
+every incomplete outcome rather than unfetchable repositories alone: a
+repository never attempted, or one measured whose contributor list failed, exit
+it too. The degraded band is only two codes wide, so a third would have to sit
+above the aborted range and break the `$? -ge 5` test below - which is what
+exit `9` did between v0.6.0 and v0.6.2 before being retired. Which kind of
+incompleteness occurred is in `statistics.json`, per repository.
 
 The 3/4 versus 5/6 split is the load-bearing part: **3 and 4 still produced a
 usable file; 5 and 6 did not.** A pipeline that treats any non-zero status as

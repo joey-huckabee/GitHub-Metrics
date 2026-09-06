@@ -78,8 +78,27 @@ LOGGER = logging.getLogger(__name__)
 EXIT_ROWS_REJECTED = 3
 """Degraded: the input was read but at least one row was rejected."""
 
-EXIT_REPOSITORY_UNFETCHABLE = 4
-"""Degraded: a repository could not be read from the API."""
+EXIT_DEGRADED = 4
+"""Degraded: a usable file was written, and something in it is missing.
+
+**One code for every incomplete outcome**, whatever made it incomplete: a
+repository that could not be read, one the run never reached, or one whose
+contributor list failed so no document was written. Which of those happened is
+in `statistics.json`, per repository, where a caller can act on it.
+
+That is deliberate rather than lazy. The scheme's whole value is the boundary
+at 5 - `$? -ge 3` means something was wrong and `$? -ge 5` means nothing usable
+came out - and the degraded band is only 3 and 4 wide. A third degraded code
+would have to sit above the aborted ones and would break the second test for
+every caller, which is exactly what exit 9 did between v0.6.0 and v0.6.2. See
+`docs/adr/0011-one-degraded-exit-status.md`.
+"""
+
+# Exit 9 is **retired**. It meant "the budget ran out and `--on-exhaustion
+# partial` stopped the run", and it was wrong: it sat above the documented
+# "nothing usable came out" boundary at 5 while producing a perfectly usable
+# file, so a caller following the published test would have discarded it. That
+# outcome now exits 4 like every other degraded one. The number is not reused.
 
 EXIT_RATE_LIMITED = 5
 """Aborted: the API budget was exhausted, or pre-flight refused the run."""
@@ -102,16 +121,6 @@ repository falls above it - 13% unattributed - so the recommendation
 demonstrably fires on a real case, and it is expected to be tuned once a
 portfolio has been scanned. That it is arbitrary is recorded rather than
 implied by its presence.
-"""
-
-EXIT_INCOMPLETE = 9
-"""Degraded: the budget ran out and `--on-exhaustion partial` stopped the run.
-
-Its own status because "incomplete but usable" is a different thing from every
-other outcome: the artifacts are well-formed and every named repository has a
-row, but some of those rows were never attempted. A pipeline that would accept
-a degraded run and reject an aborted one needs to tell them apart without
-parsing anything.
 """
 
 
@@ -143,7 +152,7 @@ class BadCredentialsError(click.ClickException):
 
 
 class RepositoryError(click.ClickException):
-    """A CLI error that exits with `EXIT_REPOSITORY_UNFETCHABLE`.
+    """A CLI error that exits with `EXIT_DEGRADED`.
 
     A repository that is deleted, renamed or private is an expected outcome of
     a syntactically valid reference, not a failure of the run. It gets a status
@@ -151,7 +160,7 @@ class RepositoryError(click.ClickException):
     from "nothing usable came out".
     """
 
-    exit_code = EXIT_REPOSITORY_UNFETCHABLE
+    exit_code = EXIT_DEGRADED
 
 
 @dataclass(frozen=True, slots=True)
@@ -335,7 +344,7 @@ def main(
     help=(
         "What to do when the hourly budget runs out. 'wait' sleeps to the reset "
         "and continues; 'fail' stops; 'partial' keeps what was collected and "
-        "exits 9."
+        "exits 4."
     ),
 )
 @click.option(
@@ -444,12 +453,15 @@ def scan_command(  # noqa: PLR0913, PLR0917
 
     # Severity-ordered, highest applicable wins: an unreadable repository is
     # worse news than a rejected input row, and both still produced a file.
-    if any(not outcome.attempted for outcome in run.outcomes):
-        # Above 4: an unreadable repository still produced everything it could,
-        # while this run has repositories it never looked at.
-        ctx.exit(EXIT_INCOMPLETE)
-    if any(not outcome.ok for outcome in run.outcomes):
-        ctx.exit(EXIT_REPOSITORY_UNFETCHABLE)
+    # Every way a run can come out incomplete, under one status. A repository
+    # that was measured but whose contributors failed counts: it produced a
+    # complete-looking row and **no document**, and reporting that as a clean
+    # run let a consumer read a short document set as a whole one.
+    if any(
+        not outcome.attempted or not outcome.ok or outcome.contributor_error is not None
+        for outcome in run.outcomes
+    ):
+        ctx.exit(EXIT_DEGRADED)
     if resolved.issues:
         ctx.exit(EXIT_ROWS_REJECTED)
 
@@ -595,7 +607,7 @@ def _preflight(client: GitHubClient, repositories: int, *, policy: ExhaustionPol
                 budget.repositories,
                 budget.required,
                 budget.available,
-                EXIT_INCOMPLETE,
+                EXIT_DEGRADED,
             )
         return budget
 

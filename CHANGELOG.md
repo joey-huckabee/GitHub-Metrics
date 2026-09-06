@@ -8,6 +8,60 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.2] - 2026-09-06
+
+**One degraded exit status.** Two faults in the exit-code scheme, found
+together, and the second is why the first could not be fixed by adding a code.
+
+A repository whose contributor list fails is still *measured*: its row is
+complete and correct, and it produces no document. Nothing in the exit logic
+looked at that, so a scan where **every** repository's contributors failed
+wrote a full CSV, zero documents, and exited **0**. A pipeline branching on
+status saw a clean run. That gap survived six releases; it was recorded as
+deficiency 4 in `SCAN-PROCESS.md` and never closed.
+
+Meanwhile exit `9`, added last release, broke the scheme's own published
+contract. `ADR-0004` promises two tests, repeated in `CLI-REFERENCE.md` and
+`USER-GUIDE.md`:
+
+    $? -ge 3    something was wrong
+    $? -ge 5    nothing usable came out
+
+A run stopped by `--on-exhaustion partial` produces a perfectly usable file -
+every named repository has a row, the unreached ones marked - and `$? -ge 5`
+called it unusable. A caller following the published advice would have
+discarded results it should have kept.
+
+The degraded band is only two codes wide, because 5 begins the aborted range
+and click owns 1 and 2. A third degraded code has nowhere to go but above 8,
+where it breaks the boundary for everyone whatever it is called. So there is
+one degraded status now, and the question it can no longer answer - *which*
+kind of incompleteness - was always better answered per repository in
+`statistics.json` than by a single byte. See
+[ADR-0011](docs/adr/0011-one-degraded-exit-status.md).
+
+### Fixed
+
+- **A run that lost every document reported success.** A repository collected
+  without its contributors now exits `4` like every other incomplete outcome.
+  Its `statistics.json` entry reads `collected: true, documented: false`, which
+  is the distinction the status never carried.
+- **The mutation check had silently stopped checking one thing.** Extracting
+  `collect_one` moved the line its input-order mutation anchors on, and a
+  mutation whose anchor no longer matches is reported as *skipped* rather than
+  failed. It was skipping in a passing run. Anchor rewritten; 30 of 30 caught.
+- **Three releases had no compare link** at the foot of this file, and
+  `[Unreleased]` still compared against v0.4.1.
+
+### Changed
+
+- **Exit `9` is retired**, one release after it shipped. Any caller keying on
+  it must move to `4`. Per this project's rule on identifiers, it is recorded
+  with its condition and never reused.
+- `EXIT_REPOSITORY_UNFETCHABLE` is now `EXIT_DEGRADED`, and covers a repository
+  that could not be read, one the run never reached, and one that produced no
+  document.
+
 ## [0.6.1] - 2026-09-05
 
 **A conformance suite.** No behaviour changed for a caller except one counting
@@ -1204,7 +1258,11 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.2.0...v0.3.0

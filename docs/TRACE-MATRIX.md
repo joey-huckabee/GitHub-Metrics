@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 19
 - L2 requirements: 87
-- L3 requirements: 129
-- Verified L2+L3: 216 of 216 (100.0%)
+- L3 requirements: 130
+- Verified L2+L3: 217 of 217 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -90,7 +90,7 @@ through their children, so counting them too would count the same work twice.
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-CLI-001 | L1-CLI-001 | L3-CLI-001 | _(none)_ | Implemented |
+| L2-CLI-001 | L1-CLI-001 | L3-CLI-001, L3-CLI-011 | _(none)_ | Implemented |
 | L2-CLI-002 | L1-CLI-001 | L3-CLI-002 | _(none)_ | Implemented |
 | L2-CLI-003 | L1-CLI-001 | L3-CLI-003 | _(none)_ | Implemented |
 | L2-CLI-004 | L1-CLI-001 | L3-CLI-004 | _(none)_ | Implemented |
@@ -109,6 +109,7 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-008 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_csv_is_written_with_one_row_per_reference`<br>`tests/test_cli_scan.py::test_console_format_prints_the_rows_and_still_writes_documents`<br>`tests/test_cli_scan.py::test_fields_selects_columns_in_canonical_order`<br>`tests/test_cli_scan.py::test_json_is_available_for_the_tabular_artifact`<br>`tests/test_cli_scan.py::test_the_csv_carries_no_contributor_columns`<br>`tests/test_cli_scan.py::test_the_sources_are_the_same_ones_validate_takes`<br>`tests/test_cli_scan.py::test_two_runs_are_told_apart` | Implemented |
 | L3-CLI-009 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_bad_destination_fails_before_any_quota_is_spent`<br>`tests/test_cli_scan.py::test_a_rejected_reference_is_a_lesser_status_than_an_unreadable_one`<br>`tests/test_cli_scan.py::test_a_repository_whose_contributors_failed_keeps_its_row_and_loses_its_document`<br>`tests/test_cli_scan.py::test_a_run_that_names_nothing_still_produces_a_well_formed_file`<br>`tests/test_cli_scan.py::test_an_unaffordable_run_spends_nothing_when_told_to_fail`<br>`tests/test_cli_scan.py::test_an_unreadable_repository_gets_a_row_but_no_document` | Implemented |
 | L3-CLI-010 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_document_is_written_for_every_repository_that_was_read`<br>`tests/test_cli_scan.py::test_both_artifacts_of_one_run_carry_the_same_scan`<br>`tests/test_cli_scan.py::test_the_default_destination_is_a_githubmetrics_directory` | Implemented |
+| L3-CLI-011 | L2-CLI-001 | `tests/test_cli_scan.py::test_a_run_that_lost_its_documents_does_not_report_success`<br>`tests/test_cli_scan.py::test_a_run_that_lost_nothing_still_reports_success`<br>`tests/test_cli_scan.py::test_every_degraded_outcome_shares_one_status` | Implemented |
 
 ### CNF: CNF
 

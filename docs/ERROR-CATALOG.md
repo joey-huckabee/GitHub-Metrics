@@ -256,7 +256,7 @@ for the hourly reset, or split the inventory.
 
 Raised **before** collection starts under `--on-exhaustion fail`, and **during**
 it when the budget runs out mid-run. The other two policies do not raise at all:
-`wait` sleeps to the reset and continues, `partial` stops and exits 9.
+`wait` sleeps to the reset and continues, `partial` stops and exits 4.
 
 The pre-flight is a **floor rather than a guarantee**: since v0.5.0 collects every contributor, a repository's real
 cost depends on a contributor count nothing knows until the list is read. A run

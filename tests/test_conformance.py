@@ -52,7 +52,7 @@ import pytest
 from click.testing import CliRunner
 from github.GithubException import UnknownObjectException
 
-from github_metrics.cli import EXIT_INCOMPLETE, EXIT_REPOSITORY_UNFETCHABLE, main
+from github_metrics.cli import EXIT_DEGRADED, main
 from github_metrics.collect.budget import MIN_POINTS_PER_REPOSITORY
 from github_metrics.collect.exhaustion import VERIFY_MARGIN
 from github_metrics.model.scan import ScanIdentifier
@@ -363,7 +363,7 @@ def test_the_exit_status_is_unchanged(tmp_path: Path) -> None:
     degraded rather than clean - and that is part of the contract too."""
     result = run_scan(tmp_path)
 
-    assert result.exit_code == EXIT_REPOSITORY_UNFETCHABLE
+    assert result.exit_code == EXIT_DEGRADED
 
 
 @pytest.mark.requirement("L3-CNF-001")
@@ -586,7 +586,7 @@ def test_a_partial_run_still_accounts_for_every_repository(
 
     result = run_scan(tmp_path, "--on-exhaustion", "partial", "--workers", "1")
 
-    assert result.exit_code == EXIT_INCOMPLETE
+    assert result.exit_code == EXIT_DEGRADED
     assert client.budget_reads > 0, "the guard never consulted the budget"
 
     compare(

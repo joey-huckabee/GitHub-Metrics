@@ -67,8 +67,13 @@ jobs:
           # token cannot read the GraphQL fields a scan needs, and the
           # exhaustion profile deliberately drains whatever it is given - which
           # is not something to do to a token anything else depends on.
-          GITHUB_TOKEN: ${{ secrets.SOAK_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SOAK_GITHUB_METRICS }}
           SOAK_PROFILE: ${{ inputs.profile || 'quick' }}
+          # An absent secret expands to an empty string, and the checks skip
+          # themselves when there is no token - so a misnamed secret produced a
+          # green job that had run nothing, which is the failure this whole
+          # series of releases keeps being about. Here, absent is an error.
+          SOAK_REQUIRE_TOKEN: "1"
           # No geocoder settings: the checks run with `--no-geocode`. These
           # are about the GitHub side, Nominatim's one-request-a-second pace
           # would dominate the wall clock, and a scheduled job that hammered

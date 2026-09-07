@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 22
 - L2 requirements: 88
-- L3 requirements: 136
-- Verified L2+L3: 224 of 224 (100.0%)
+- L3 requirements: 137
+- Verified L2+L3: 225 of 225 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -70,7 +70,7 @@ through their children, so counting them too would count the same work twice.
 | L2-CFG-002 | L1-CFG-001 | L3-CFG-003, L3-CFG-007 | _(none)_ | Implemented |
 | L2-CFG-003 | L1-CFG-001 | L3-CFG-004, L3-CFG-006 | _(none)_ | Implemented |
 | L2-CFG-004 | L1-CFG-002 | L3-CFG-002, L3-CFG-005 | _(none)_ | Implemented |
-| L2-CFG-005 | L1-CFG-001 | L3-CFG-008 | _(none)_ | Implemented |
+| L2-CFG-005 | L1-CFG-001 | L3-CFG-008, L3-CFG-009 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -83,7 +83,8 @@ through their children, so counting them too would count the same work twice.
 | L3-CFG-005 | L2-CFG-004 | `tests/test_credentials.py::test_an_empty_scope_list_is_explained_rather_than_left_bare`<br>`tests/test_credentials.py::test_the_diagnostics_that_replace_it_are_logged`<br>`tests/test_credentials.py::test_the_token_never_appears_in_any_log_record` | Implemented |
 | L3-CFG-006 | L2-CFG-003 | `tests/test_credentials.py::test_a_rejected_token_exits_eight`<br>`tests/test_credentials.py::test_no_token_anywhere_exits_seven`<br>`tests/test_credentials.py::test_the_two_credential_failures_have_different_codes` | Implemented |
 | L3-CFG-007 | L2-CFG-002 | `tests/test_credentials.py::test_ingest_needs_no_token_and_is_never_verified`<br>`tests/test_credentials.py::test_verification_can_be_skipped` | Implemented |
-| L3-CFG-008 | L2-CFG-005 | `tests/test_cli_bands.py::test_a_token_is_read_from_a_file`<br>`tests/test_cli_bands.py::test_an_empty_token_file_is_a_usage_error`<br>`tests/test_cli_bands.py::test_an_unreadable_token_file_is_a_usage_error`<br>`tests/test_cli_bands.py::test_supplying_both_forms_is_refused`<br>`tests/test_cli_bands.py::test_the_token_from_a_file_is_never_echoed` | Implemented |
+| L3-CFG-008 | L2-CFG-005 | `tests/test_cli_bands.py::test_a_token_file_is_used_even_when_the_environment_has_one`<br>`tests/test_cli_bands.py::test_a_token_is_read_from_a_file`<br>`tests/test_cli_bands.py::test_an_empty_token_file_is_a_usage_error`<br>`tests/test_cli_bands.py::test_an_unreadable_token_file_is_a_usage_error`<br>`tests/test_cli_bands.py::test_supplying_both_forms_is_refused`<br>`tests/test_cli_bands.py::test_the_token_from_a_file_is_never_echoed` | Implemented |
+| L3-CFG-009 | L2-CFG-005 | `tests/test_cli.py::test_no_option_reads_a_variable_that_settings_already_owns`<br>`tests/test_cli_bands.py::test_a_token_file_is_used_even_when_the_environment_has_one`<br>`tests/test_cli_bands.py::test_the_environment_is_used_when_no_flag_is_given`<br>`tests/test_cli_bands.py::test_the_token_flag_beats_the_environment` | Implemented |
 
 ### CLI: CLI capability surface
 

@@ -8,6 +8,68 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.8] - 2026-09-06
+
+**Exporting `GITHUB_TOKEN` made `--token-file` a usage error.** Which is to
+say: the safer of the two token flags did not work for anyone configured the
+ordinary way.
+
+`--token` carried `envvar="GITHUB_TOKEN"`, so click filled it from the
+environment, `_resolve_token` saw a token *and* a token file, and refused the
+run:
+
+    $ export GITHUB_TOKEN=ghp_...
+    $ github-metrics --token-file /run/secrets/github rate-limit
+    Error: pass --token or --token-file, not both
+    $ echo $?
+    2
+
+The operator had passed one flag. `USER-GUIDE.md` gives that exact command as
+the way to use a mounted container secret.
+
+`CLI-REFERENCE.md` documents the precedence a flag is supposed to have:
+
+    1. --token or --token-file
+    2. GITHUB_TOKEN in the environment
+    3. GITHUB_TOKEN in a .env file
+
+**The variable had two readers.** `Settings.from_env` already resolves
+`GITHUB_TOKEN`, after loading `.env` without override - which is what makes
+that precedence work. Click reading the same variable added nothing except the
+inability to tell the environment from the flag. The redundant reader was the
+one that decided.
+
+Nothing in the suite could see it. The autouse `clean_env` fixture deletes
+`GITHUB_TOKEN` before every test, so every existing `--token-file` test ran in
+an environment where the bug cannot occur.
+
+### Fixed
+
+- **`--token` no longer declares an `envvar`.** All four combinations now match
+  the documented precedence: `--token-file` beats the environment, `--token`
+  beats the environment, the environment is used when neither is given, and the
+  two flags together remain a usage error - which now means what it says.
+- **The DEBUG line naming the token's source is right again.** It reported
+  `--token` whenever the value came from the environment, because click had
+  supplied it as though it were the flag.
+
+### Changed
+
+- **`L3-CFG-009`** states the precedence and the rule behind it: no CLI option
+  shall declare an `envvar` naming a variable `config.Settings` already reads.
+  A test walks the AST of `cli.py` against the `os.getenv` calls in `config.py`,
+  so a variable added to the settings is covered without anyone remembering the
+  test exists.
+- **`CLI-REFERENCE.md` says plainly that a flag and the environment do not
+  conflict**, and that only the two flags together are an error. The precedence
+  list was already correct; what was missing was the sentence ruling out the
+  reading the code had taken.
+
+### Notes
+
+`--token` and `--token-file` together is still refused, deliberately: there is
+no sensible order between two things the operator typed on the same line.
+
 ## [0.6.7] - 2026-09-06
 
 **A network interruption ended the run and lost every row.** PyGithub speaks
@@ -1691,7 +1753,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.7...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.8...HEAD
+[0.6.8]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.4...v0.6.5

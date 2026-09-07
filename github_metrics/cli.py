@@ -174,7 +174,15 @@ class CliContext:
 )
 @click.option(
     "--token",
-    envvar="GITHUB_TOKEN",
+    # **No `envvar` here, deliberately.** `Settings.from_env` already reads
+    # `GITHUB_TOKEN`, after loading `.env` without override, which is what
+    # makes the documented precedence work: flag, then environment, then
+    # `.env`. Letting click read the same variable made the environment
+    # indistinguishable from the flag, so `--token-file` with `GITHUB_TOKEN`
+    # exported - the ordinary way this tool is configured - failed as
+    # "pass --token or --token-file, not both". It also made the DEBUG line
+    # naming the token's source say `--token` for a variable. One variable,
+    # one reader.
     default=None,
     help=(
         "GitHub token, overriding GITHUB_TOKEN. Note that a token passed as an "

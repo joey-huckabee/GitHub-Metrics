@@ -183,8 +183,16 @@ private repositories - it cannot reach them unless you grant it:
 - **Permissions**: none needed beyond the read-only public access that setting
   already implies.
 
-Then add it to the repository as a secret named **`SOAK_GITHUB_TOKEN`**
-(Settings → Secrets and variables → Actions → New repository secret).
+Then add it to the repository as a secret named **`SOAK_GITHUB_METRICS`**
+(Settings → Secrets and variables → Actions → New repository secret). The
+name has to match what `soak.yml` reads, exactly: an absent secret expands to
+an empty string rather than failing, so a typo does not announce itself.
+
+That is why the workflow also sets `SOAK_REQUIRE_TOKEN=1`. Without a token the
+checks skip themselves, and a skip is reported as a pass - so the first
+dispatch of this workflow finished green in twenty-eight seconds having run
+nothing. With that variable set, an empty token is an error instead. Locally it
+is unset, and skipping is the right behaviour there.
 
 It is deliberately not the workflow's own `GITHUB_TOKEN`: that one cannot read
 the GraphQL fields a scan needs, and `soak-exhaustion` would drain whatever it

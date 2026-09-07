@@ -6,7 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **The soak workflow read a secret that does not exist.** It named
+  `SOAK_GITHUB_TOKEN`; the secret on the repository is `SOAK_GITHUB_METRICS`.
+  An absent secret expands to an empty string rather than failing, so the job
+  supplied an empty `GITHUB_TOKEN`, all four checks skipped themselves, and the
+  first dispatch reported success in twenty-eight seconds having driven no code
+  at all.
+- **A soak job that skips everything is now a failure.** The workflow sets
+  `SOAK_REQUIRE_TOKEN=1` and the module refuses to be collected without a
+  token. Skipping stays right on a developer's machine, where a soak check is
+  not what pytest is being run for; it is wrong in the job that exists to run
+  these and nothing else. This is the same shape as every defect the file was
+  written to catch - a check that passes on the one route where it cannot fail.
+
+No package change: the tool itself is untouched.
 
 ## [0.6.17] - 2026-09-07
 

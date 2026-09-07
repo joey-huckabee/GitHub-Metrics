@@ -60,6 +60,25 @@ fixture-time read would find nothing.
 
 PROFILE = os.environ.get("SOAK_PROFILE", "quick")
 
+REQUIRE_TOKEN = os.environ.get("SOAK_REQUIRE_TOKEN") == "1"
+"""Set by the workflow, and by nothing else.
+
+Skipping is right on a developer's machine: most work here needs no token and
+a soak check is not what `pytest` is being run for. It is wrong in the job that
+exists to run these and nothing else, because a skip is reported as a pass. The
+first dispatch of that workflow named the secret wrongly, every check skipped,
+and the job went green in twenty-eight seconds having driven no code at all -
+the same shape as the defects this file was written to catch.
+"""
+
+if REQUIRE_TOKEN and not LIVE_TOKEN:
+    raise RuntimeError(
+        "SOAK_REQUIRE_TOKEN is set but GITHUB_TOKEN is empty. The workflow "
+        "supplies it from the SOAK_GITHUB_METRICS secret; an absent or "
+        "misnamed secret expands to an empty string. Failing here rather than "
+        "skipping, because a soak job that skips everything reports success."
+    )
+
 QUICK_INVENTORY = (
     "pypa/virtualenv",
     "psf/requests",

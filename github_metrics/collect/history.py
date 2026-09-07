@@ -51,6 +51,11 @@ from typing import Any, Final
 from github_metrics.client import GitHubClient
 from github_metrics.collect.contributors import BOT_LOGIN_SUFFIX, ContributorAccount
 from github_metrics.collect.graphql import execute
+from github_metrics.errors import (
+    CollectionError,
+    ContributorCollectionError,
+    RateLimitExhaustedError,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -131,8 +136,10 @@ def attribute_from_history(
         branch, which is a repository with no commits.
 
     Raises:
-        RepositoryNotFoundError: The repository could not be read.
-        GraphQLQueryError: The query failed for any other reason.
+        RateLimitExhaustedError: The budget ran out, which the guard must see.
+        ContributorCollectionError: The history could not be walked, for any
+            other reason. The repository keeps its row and loses its document,
+            like every other failure of the contributor half.
     """
     slug = f"{owner}/{repoid}"
     counts: dict[str, _Account] = {}
@@ -212,13 +219,38 @@ def _page(
     cursor: str | None,
     page: int,
 ) -> dict[str, Any] | None:
-    """Fetch one page of history, or `None` when there is none to fetch."""
-    data = execute(
-        client,
-        HISTORY_QUERY,
-        {"owner": owner, "name": repoid, "cursor": cursor},
-        description=f"commit history for {slug} (page {page})",
-    )
+    """Fetch one page of history, or `None` when there is none to fetch.
+
+    Raises:
+        RateLimitExhaustedError: The budget ran out. Passed through untouched,
+            because it is a fact about the run and the guard has to see it.
+        ContributorCollectionError: The page could not be read for any other
+            reason. Translated rather than propagated, for the same reason the
+            detail query translates: `execute` raises types the runner does
+            not catch for the attribution half, so an untranslated failure
+            here escapes the per-repository handling and takes the whole run
+            down with it, producing no CSV at all. The contract is a row and
+            no document.
+
+            This route needs it more than the cheap one, not less. It issues
+            up to `MAX_PAGES` queries for a single repository against a
+            ten-second processing window, so it has the most chances to fail
+            and it is used on the largest repositories.
+    """
+    try:
+        data = execute(
+            client,
+            HISTORY_QUERY,
+            {"owner": owner, "name": repoid, "cursor": cursor},
+            description=f"commit history for {slug} (page {page})",
+        )
+    # pylint: disable-next=try-except-raise  # ordering: the handler below is broader
+    except RateLimitExhaustedError:
+        raise
+    except CollectionError as exc:
+        raise ContributorCollectionError(
+            f"{slug}: could not walk the commit history: {exc}"
+        ) from exc
     repository = data.get("repository") or {}
     branch = repository.get("defaultBranchRef")
     if not isinstance(branch, dict):

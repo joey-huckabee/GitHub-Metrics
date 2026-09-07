@@ -12,8 +12,12 @@ from github.GithubException import GithubException
 from github_metrics.client import GitHubClient
 from github_metrics.collect.budget import Budget, check_budget
 from github_metrics.collect.exhaustion import BudgetGuard, Decision, ExhaustionPolicy
-from github_metrics.collect.runner import collect_all, collect_one
-from github_metrics.errors import RateLimitExhaustedError, RepositoryNotFoundError
+from github_metrics.collect.runner import CollectionOptions, collect_all, collect_one
+from github_metrics.errors import (
+    ContributorCollectionError,
+    RateLimitExhaustedError,
+    RepositoryNotFoundError,
+)
 from github_metrics.sources import RepositoryRef
 
 RUNNER_LOGGER = "github_metrics.collect.runner"
@@ -486,3 +490,41 @@ def test_a_budget_still_empty_after_waiting_gives_up_on_that_repository() -> Non
 
     assert isinstance(outcome.error, RateLimitExhaustedError)
     assert client.refused == 2, "exactly one retry, not a loop"
+
+
+class _BadHistoryClient(_StubClient):
+    """Metrics fine; every commit-history page fails the way a 502 does."""
+
+    def graphql(
+        self, query: str, variables: dict[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Refuse the history query and answer everything else normally."""
+        if "history(" in query:
+            raise GithubException(
+                502,
+                {"errors": [{"type": "INTERNAL", "message": "Something went wrong"}]},
+                {},
+            )
+        return super().graphql(query, variables)
+
+
+@pytest.mark.requirement("L3-COL-001", "L3-ATT-003")
+def test_a_deep_attribution_failure_does_not_take_the_run_with_it() -> None:
+    """`L2-COL-001` holds on both routes, not just the cheap one.
+
+    It held on one of them for four releases. The deep route reached the CLI
+    in v0.6.0 without the translation the contributor detail query had gained
+    in v0.5.0, so one failed page produced a traceback, exit 1 and no CSV -
+    losing every repository in the inventory, including the ones already
+    collected and paid for.
+    """
+    outcomes = run(_BadHistoryClient(), options=CollectionOptions(deep_attribution=True))
+
+    assert len(outcomes) == len(REFERENCES), "every reference still produces an outcome"
+    readable = [outcome for outcome in outcomes if outcome.metadata is not None]
+    assert readable, "the repositories that exist were still measured"
+    for outcome in readable:
+        # The measurements survive; only the document is lost.
+        assert outcome.ok, "the repository was still measured"
+        assert isinstance(outcome.contributor_error, ContributorCollectionError)
+        assert not outcome.documented

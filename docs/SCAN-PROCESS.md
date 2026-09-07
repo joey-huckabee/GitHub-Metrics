@@ -157,6 +157,15 @@ a chunk costs 1 point whether it carries 1 alias or 50.
 > found" blames a correct inventory. Both happened, and the resulting exception
 > was of a type the runner does not catch for the contributor half, so **one
 > bot ended an entire scan with no CSV at all**.
+>
+> **It recurred one release later, in the next module.** `--deep-attribution`
+> reached the CLI in v0.6.0 walking the commit history through the same
+> `execute`, and it did not translate. One failed page - a 502, an `INTERNAL`,
+> or the ten-second window closing on a large `history` connection - produced a
+> traceback, exit 1 and no CSV, losing every repository in the inventory
+> including the ones already collected. Fixed in v0.6.5. The rule is general:
+> **anything that calls `execute` on the contributor half must translate what
+> it raises**, because the runner catches exactly one type there.
 
 An account with no detail is still recorded, using its login as `name`, because
 its commits are a real measurement and dropping it would quietly reduce
@@ -207,6 +216,7 @@ An address has **three states that must not be collapsed**:
 | Fully collected | yes, complete | yes |
 | Metrics failed | yes, identity only | **no** |
 | Metrics fine, contributors failed | yes, complete | **no** |
+| Metrics fine, history walk failed (`--deep-attribution`) | yes, complete | **no** |
 
 **A row without a document means "named, not fully measured."** A CSV row is
 positional so omitting one would shift every later row's meaning; a directory

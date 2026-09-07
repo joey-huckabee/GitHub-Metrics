@@ -17,6 +17,7 @@ import logging
 from typing import Any, cast
 
 import pytest
+from github.GithubException import GithubException
 
 from github_metrics.client import GitHubClient
 from github_metrics.collect.history import (
@@ -24,6 +25,10 @@ from github_metrics.collect.history import (
     MAX_PAGES,
     PAGE_SIZE,
     attribute_from_history,
+)
+from github_metrics.errors import (
+    ContributorCollectionError,
+    RateLimitExhaustedError,
 )
 
 HISTORY_LOGGER = "github_metrics.collect.history"
@@ -228,3 +233,63 @@ def test_the_query_reports_the_budget_it_spends() -> None:
     the guard cannot afford to make per repository.
     """
     assert "rateLimit" in HISTORY_QUERY
+
+
+# ---------------------------------------------------------------------------
+# What a failed page does to the run around it
+# ---------------------------------------------------------------------------
+
+
+class _FailingClient:
+    """Fails the history query the way a timeout or a 502 does."""
+
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self.payload = payload
+
+    def graphql(self, query: str, variables: dict[str, Any]) -> tuple[Any, Any]:
+        """Refuse every page."""
+        del query, variables
+        raise GithubException(502, self.payload, {})
+
+
+@pytest.mark.requirement("L3-ATT-003")
+def test_a_failed_page_degrades_the_repository_instead_of_killing_the_run() -> None:
+    """The contract is a row and no document, never an abandoned run.
+
+    `execute` raises this package's own errors, none of which is a
+    `ContributorCollectionError`, and the runner catches only that one for the
+    attribution half. Untranslated, one failed page took down every other
+    repository in the inventory and produced no CSV at all - the same defect
+    the contributor detail query was fixed for one release earlier.
+    """
+    stub = _FailingClient({"errors": [{"type": "INTERNAL", "message": "Something went wrong"}]})
+
+    with pytest.raises(ContributorCollectionError) as caught:
+        walk(cast(_StubClient, stub))
+
+    assert "pypa/virtualenv" in str(caught.value)
+    assert "commit history" in str(caught.value)
+
+
+@pytest.mark.requirement("L3-ATT-003")
+def test_a_repository_that_vanished_mid_walk_is_the_same_kind_of_failure() -> None:
+    """A `NOT_FOUND` here is not a defective reference: the metrics query
+    already resolved this repository, so it went away between the two."""
+    stub = _FailingClient(
+        {"errors": [{"type": "NOT_FOUND", "message": "Could not resolve to a Repository"}]}
+    )
+
+    with pytest.raises(ContributorCollectionError):
+        walk(cast(_StubClient, stub))
+
+
+@pytest.mark.requirement("L3-ATT-003", "L3-EXH-005")
+def test_an_exhausted_budget_is_not_dressed_as_an_attribution_failure() -> None:
+    """It has to reach the guard. Translating it would degrade this repository,
+    let the run carry on, and fail every repository after it the same way."""
+    stub = _FailingClient(
+        {"errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]}
+    )
+
+    with pytest.raises(RateLimitExhaustedError):
+        walk(cast(_StubClient, stub))

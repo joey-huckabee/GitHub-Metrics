@@ -373,6 +373,17 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   `contribution_total` be a plain number rather than an optional one: a
   document exists only where the list was read.
 
+- **Anything on the contributor half that calls `execute` must translate what
+  it raises** into `ContributorCollectionError`, letting `RateLimitExhaustedError`
+  through untouched. `runner.py` catches exactly one type there, so an
+  untranslated failure escapes the per-repository handling and takes the whole
+  run down - a traceback, exit 1, and no CSV at all, losing the repositories
+  already collected. This has happened twice: a bot's `NOT_FOUND` in the detail
+  query until v0.5.0, and every failure of the commit-history walk from v0.6.0
+  until v0.6.5, the deep route having been written a release after the lesson.
+  The rate-limit exception is not an oversight - the guard has to see that one
+  (`L2-EXH-004`), and it is the only thing that may escape.
+
 - **A repository that was not fully collected gets a row and no document.** A
   CSV row is positional, so omitting one shifts what every later row means; a
   directory has no positions, so an absent file says "named, not measured" on

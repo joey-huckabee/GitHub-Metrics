@@ -8,6 +8,72 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.5] - 2026-09-06
+
+**One failed page of commit history ended the whole scan.** On the
+`--deep-attribution` route, any failure of the history query - a 502, an
+`INTERNAL`, or GitHub's ten-second processing window closing on a large
+`history` connection - produced a traceback, **exit 1 and no CSV at all**,
+discarding every repository in the inventory including the ones already
+collected and paid for.
+
+`collect/history.py` called `graphql.execute` and translated nothing.
+`execute` raises `RepositoryNotFoundError` and `GraphQLQueryError`, and the
+runner catches exactly one type on the contributor half -
+`ContributorCollectionError` - so neither was caught anywhere. Reproduced
+through the CLI on a two-repository inventory:
+
+    cheap route      exit 0   githubmetrics.csv, documents, statistics.json
+    --deep-attribution   exit 1   GraphQLQueryError traceback, no files at all
+
+`L2-COL-001` states the obligation this breaks in as many words: *every
+reference SHALL produce an outcome, and a repository that cannot be collected
+SHALL NOT prevent the collection of any other*. It held on one of the two
+routes.
+
+**The lesson had already been learned, one release earlier.** The same
+translation exists in `collect/contributors.py`, added in v0.5.0 after a bot's
+`NOT_FOUND` ended a live scan; its commit message describes this exact failure
+- *"raised as a type the runner does not catch for the contributor half, and
+took the run down with no CSV at all"* - and `SCAN-PROCESS.md` calls it "the
+shape of failure most likely to recur". The deep route arrived in v0.6.0, one
+release later, through the same `execute`, without it.
+
+Nothing caught it because nothing tested it: no test in the suite passed
+`deep_attribution=True` to the runner, and the conformance suite exercises the
+deep route only on replayed successful traffic. `L3-COL-001` was reported
+**Implemented** on a test that covers the cheap route alone.
+
+### Fixed
+
+- **A failed history page degrades the repository instead of ending the run.**
+  It becomes a `ContributorCollectionError` naming the repository, so the row
+  survives complete and only the document is lost - the same contract the
+  detail query has had since v0.5.0. The run now exits 4 with a full CSV where
+  it previously exited 1 with nothing.
+- **An exhausted budget still passes through untranslated**, because the guard
+  has to see it (`L2-EXH-004`, v0.6.4). Translating it here would degrade this
+  repository, let the run carry on, and fail every repository after it the same
+  way for a reason nothing recorded.
+
+### Changed
+
+- **`L3-ATT-003`** states the obligation: a history page that cannot be read is
+  raised as `ContributorCollectionError` naming the repository; an exhausted
+  budget passes through.
+- **`SCAN-PROCESS.md` records the recurrence** beside the v0.5.0 defect it
+  repeats, and states the general rule: anything calling `execute` on the
+  contributor half must translate what it raises, because the runner catches
+  exactly one type there.
+
+### Notes
+
+Rejected: falling back to the cheap route when the history walk fails. It would
+silently change which population was measured, and `attribution.method` exists
+in `statistics.json` precisely so two runs by different methods are never
+compared by accident. A repository whose history could not be walked has not
+been attributed, and says so.
+
 ## [0.6.4] - 2026-09-06
 
 **The budget guard could not see the budget.** `--on-exhaustion wait` is the
@@ -1503,7 +1569,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.5...HEAD
+[0.6.5]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.1...v0.6.2

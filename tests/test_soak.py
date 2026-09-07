@@ -51,6 +51,8 @@ from typing import Any
 
 import pytest
 
+from github_metrics.collect.history import MAX_PAGES
+
 LIVE_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 """Read at import, like the other live test.
 
@@ -91,11 +93,32 @@ degrade it to an identity-only row and carry on, which is `L2-COL-001` and the
 thing that broke twice in this release series.
 """
 
-DEEP_INVENTORY = ("torvalds/linux",)
-"""One repository with an enormous history, for the exhaustion profile.
+DEEP_INVENTORY = (
+    "torvalds/linux",
+    "NixOS/nixpkgs",
+    "llvm/llvm-project",
+    "rust-lang/rust",
+    "microsoft/vscode",
+)
+"""Five enormous histories, for the exhaustion profile.
 
-`--deep-attribution` costs a point per hundred commits, so this reaches the
-wall in one repository rather than the ~555 an ordinary scan would need.
+`--deep-attribution` costs a point per hundred commits, which is what makes the
+wall reachable at all: an ordinary scan would need ~555 repositories to spend an
+hourly quota.
+
+**One repository cannot do it, and that is not a size problem.**
+`history.MAX_PAGES` stops any single walk at 2,000 pages - a deliberate cap, so
+that one repository cannot silently consume a whole run's quota. Against a
+5,000-point budget that leaves 3,000 points unspent, the guard never sees the
+wall, and this check skips itself with "the token had more budget than this
+inventory could spend". It read `("torvalds/linux",)` when it was written, so
+it could only ever have skipped.
+
+Five rather than three for two reasons: the cap is per repository, so the
+inventory has to be able to spend more than the budget with room to spare, and
+`runner` gives one worker per repository up to eight - so five walk in
+parallel and the drain takes a fifth of the wall clock, which is what keeps
+this inside the subprocess timeout below.
 """
 
 pytestmark = [
@@ -105,7 +128,7 @@ pytestmark = [
 
 
 def run_scan(
-    directory: Path, *args: str, inventory: tuple[str, ...]
+    directory: Path, *args: str, inventory: tuple[str, ...], timeout: int = 1800
 ) -> subprocess.CompletedProcess[str]:
     """Run a real scan in a subprocess, as an operator would.
 
@@ -117,6 +140,9 @@ def run_scan(
         directory: Where the artifacts go.
         *args: Extra flags for `scan`.
         inventory: Repositories to name on the command line.
+        timeout: Seconds to wait. The default suits the quick profile, which
+            finishes in under a minute; the exhaustion profile has to page
+            through a whole hourly quota and is given its own.
 
     Returns:
         The finished process, with output captured.
@@ -145,7 +171,7 @@ def run_scan(
         capture_output=True,
         text=True,
         check=False,
-        timeout=1800,
+        timeout=timeout,
     )
 
 
@@ -281,7 +307,8 @@ def test_a_run_that_reaches_the_wall_stops_and_says_so(tmp_path: Path) -> None:
 
     Expensive by design. `--deep-attribution` on a large history spends a point
     per hundred commits, which is the only way to reach the wall in minutes
-    rather than in five hundred repositories.
+    rather than in five hundred repositories - across five of them, because
+    `history.MAX_PAGES` caps any one walk at 2,000 points and a budget is 5,000.
     """
     result = run_scan(
         tmp_path,
@@ -289,6 +316,11 @@ def test_a_run_that_reaches_the_wall_stops_and_says_so(tmp_path: Path) -> None:
         "--on-exhaustion",
         "partial",
         inventory=DEEP_INVENTORY,
+        # Draining a 5,000-point budget is 5,000 pages of a hundred commits.
+        # Five walks run in parallel, so the round trips divide by five, but a
+        # slow afternoon at GitHub should not turn a real result into a
+        # `TimeoutExpired` that says nothing about the code.
+        timeout=5400,
     )
 
     assert result.returncode in (0, 4), result.stderr[-2000:]
@@ -296,8 +328,10 @@ def test_a_run_that_reaches_the_wall_stops_and_says_so(tmp_path: Path) -> None:
 
     if not budget["exhausted"]:
         pytest.skip(
-            "the token had more budget than this inventory could spend; "
-            "re-run against a token that has already been used, or add repositories"
+            f"the token had more budget than this inventory could spend "
+            f"({budget['graphql_points_spent']} points spent, "
+            f"{budget['graphql_remaining']} left). Every walk is capped at "
+            f"{MAX_PAGES} pages, so add repositories rather than enlarging one"
         )
 
     assert budget["incomplete_because_exhausted"] is True, (

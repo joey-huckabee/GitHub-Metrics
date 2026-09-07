@@ -35,6 +35,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it reads can be checked in the gate, and finding a typo there costs nothing
   instead of costing a dispatch and a wait.
 
+- **The exhaustion profile could never have reached the wall.** It named one
+  repository, and `history.MAX_PAGES` caps a single walk at 2,000 pages so that
+  one repository cannot consume a whole run's quota - against a 5,000-point
+  budget the guard would never see exhaustion, and the check would skip itself
+  after spending 2,000 points and half an hour. It now names five large
+  histories, which also drains faster: `runner` gives one worker per repository,
+  so five walks run in parallel.
+- **The deep route gets its own subprocess timeout** (5,400s against the
+  default 1,800s). Draining a quota is 5,000 pages of a hundred commits; a slow
+  afternoon should not turn a real result into a `TimeoutExpired` that says
+  nothing about the code.
+
 No package change: the tool itself is untouched.
 
 ## [0.6.17] - 2026-09-07

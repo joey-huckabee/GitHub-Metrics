@@ -219,11 +219,20 @@ is paced at one request a second and would dominate the wall clock, and a
 scheduled job that hammered it risks the shared user agent being blocked -
 which fails every later run rather than the one that earned it.
 
-`exhaustion` drives the hourly budget to its end with `--deep-attribution` on a
-large history - a point per hundred commits reaches the wall in one repository
-rather than five hundred - and checks that the run stops, says so, and still
-writes its file. It is manual on purpose: scheduling it weekly would buy one
-check at the price of a token nobody else can use for an hour.
+`exhaustion` drives the hourly budget to its end with `--deep-attribution` on
+five large histories - a point per hundred commits reaches the wall in five
+repositories rather than five hundred - and checks that the run stops, says so,
+and still writes its file. It is manual on purpose: scheduling it weekly would
+buy one check at the price of a token nobody else can use for an hour.
+
+**Five, not one, and the reason is a cap rather than a size.**
+`history.MAX_PAGES` stops any single walk at 2,000 pages so that one repository
+cannot silently consume a whole run's quota. Against a 5,000-point budget that
+leaves 3,000 unspent, the guard never reaches the wall, and the check skips
+itself. It named one repository when it was written, so it could only ever have
+skipped - found by reading the cap before spending an hour on the run, not by
+running it. If you add repositories, add ones with more than 200,000 commits:
+below that the walk ends before the cap and contributes less than 2,000 points.
 
 ### Adding a check
 

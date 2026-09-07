@@ -45,6 +45,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -142,9 +143,38 @@ def statistics_of(directory: Path) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True, slots=True)
+class Scan:
+    """One completed scan, and everything the checks below read from it."""
+
+    process: subprocess.CompletedProcess[str]
+    directory: Path
+
+    @property
+    def statistics(self) -> dict[str, Any]:
+        """The statistics artifact it wrote."""
+        payload: dict[str, Any] = json.loads(
+            (self.directory / "statistics.json").read_text(encoding="utf-8")
+        )
+        return payload
+
+
+@pytest.fixture(scope="session")
+def quick_scan(tmp_path_factory: pytest.TempPathFactory) -> Scan:
+    """One real scan, shared by every check in the quick profile.
+
+    Session-scoped on purpose. Each check reads the same artifacts and none of
+    them writes, so a scan apiece would cost four times the budget and four
+    times the wall clock to learn the same things - and give four independent
+    chances for a transient failure to fail the run.
+    """
+    directory = tmp_path_factory.mktemp("quick-scan")
+    return Scan(run_scan(directory, inventory=QUICK_INVENTORY), directory)
+
+
 @pytest.mark.skipif(PROFILE != "quick", reason="SOAK_PROFILE is not 'quick'")
 @pytest.mark.requirement("L3-COL-001", "L3-STA-008")
-def test_a_live_scan_measures_what_it_spent(tmp_path: Path) -> None:
+def test_a_live_scan_measures_what_it_spent(quick_scan: Scan) -> None:
     """Spend is measured by difference against the API's own counters.
 
     Every stub in the ordinary suite answers a constant, so a budget that never
@@ -152,10 +182,8 @@ def test_a_live_scan_measures_what_it_spent(tmp_path: Path) -> None:
     and the pre-flight reading the wrong budget entirely is a defect this
     series shipped twice.
     """
-    result = run_scan(tmp_path, inventory=QUICK_INVENTORY)
-
-    assert result.returncode in (0, 4), result.stderr[-2000:]
-    budget = statistics_of(tmp_path)["budget"]
+    assert quick_scan.process.returncode in (0, 4), quick_scan.process.stderr[-2000:]
+    budget = quick_scan.statistics["budget"]
 
     assert budget["graphql_points_spent"] > 0, "a real run spends real points"
     assert budget["graphql_points_remaining"] < 5000, "and the remaining count moves"
@@ -164,25 +192,24 @@ def test_a_live_scan_measures_what_it_spent(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(PROFILE != "quick", reason="SOAK_PROFILE is not 'quick'")
 @pytest.mark.requirement("L3-COL-001")
-def test_a_repository_that_does_not_exist_degrades_the_row_not_the_run(tmp_path: Path) -> None:
+def test_a_repository_that_does_not_exist_degrades_the_row_not_the_run(quick_scan: Scan) -> None:
     """The obligation that broke twice: one bad reference must not end the run.
 
     Against the live API rather than a stub, because both times it broke, the
     stub was answering something the real transport never sends.
     """
-    result = run_scan(tmp_path, inventory=QUICK_INVENTORY)
-
-    assert result.returncode == 4, "degraded, not aborted"
-    rows = (tmp_path / "githubmetrics.csv").read_text(encoding="utf-8").splitlines()
+    directory = quick_scan.directory
+    assert quick_scan.process.returncode == 4, "degraded, not aborted"
+    rows = (directory / "githubmetrics.csv").read_text(encoding="utf-8").splitlines()
 
     assert len(rows) == len(QUICK_INVENTORY) + 1, "one row per reference, plus the header"
-    assert (tmp_path / "pypa" / "virtualenv.json").is_file(), "the good ones are documented"
-    assert not (tmp_path / "ghost").exists(), "the absent one gets a row and no document"
+    assert (directory / "pypa" / "virtualenv.json").is_file(), "the good ones are documented"
+    assert not (directory / "ghost").exists(), "the absent one gets a row and no document"
 
 
 @pytest.mark.skipif(PROFILE != "quick", reason="SOAK_PROFILE is not 'quick'")
 @pytest.mark.requirement("L3-LOG-004")
-def test_a_live_run_is_quiet_at_the_default_level(tmp_path: Path) -> None:
+def test_a_live_run_is_quiet_at_the_default_level(quick_scan: Scan) -> None:
     """geopy logged twenty-two unformatted lines per unresolvable location.
 
     That was invisible to the ordinary suite because nothing there geocodes
@@ -190,30 +217,26 @@ def test_a_live_run_is_quiet_at_the_default_level(tmp_path: Path) -> None:
     library starts writing outside the package's handler again, it shows up
     as unformatted lines on stderr.
     """
-    result = run_scan(tmp_path, inventory=QUICK_INVENTORY)
-
     unformatted = [
         line
-        for line in result.stderr.splitlines()
+        for line in quick_scan.process.stderr.splitlines()
         if line.strip() and not line.startswith(("INFO", "WARNING", "ERROR", "DEBUG", "!"))
     ]
 
-    assert "Traceback" not in result.stderr, "a traceback is never a correct outcome"
+    assert "Traceback" not in quick_scan.process.stderr, "a traceback is never correct"
     assert not unformatted, f"output bypassing the package logger: {unformatted[:5]}"
 
 
 @pytest.mark.skipif(PROFILE != "quick", reason="SOAK_PROFILE is not 'quick'")
 @pytest.mark.requirement("L3-STA-011", "L3-STA-012")
-def test_the_identity_breakdown_adds_up_on_real_data(tmp_path: Path) -> None:
+def test_the_identity_breakdown_adds_up_on_real_data(quick_scan: Scan) -> None:
     """The buckets are derived, so one that nobody populates hides in the
     remainder - which is exactly how `unresolvable_accounts` stayed zero.
 
     The sum is the property worth checking: it holds whatever the counts are,
     so it does not need pinning to a repository's current contributors.
     """
-    run_scan(tmp_path, inventory=QUICK_INVENTORY)
-
-    for repository in statistics_of(tmp_path)["repository_statistics"]:
+    for repository in quick_scan.statistics["repository_statistics"]:
         breakdown = repository.get("contributors", {}).get("breakdown")
         if breakdown is None:
             continue

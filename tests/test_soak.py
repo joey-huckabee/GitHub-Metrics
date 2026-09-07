@@ -205,7 +205,7 @@ def test_a_live_scan_measures_what_it_spent(quick_scan: Scan) -> None:
     budget = quick_scan.statistics["budget"]
 
     assert budget["graphql_points_spent"] > 0, "a real run spends real points"
-    assert budget["graphql_points_remaining"] < 5000, "and the remaining count moves"
+    assert budget["graphql_remaining"] < 5000, "and the remaining count moves"
     assert budget["exhausted"] is False, "this run is far too small to run dry"
 
 

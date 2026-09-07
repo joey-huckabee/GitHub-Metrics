@@ -528,3 +528,63 @@ def test_a_deep_attribution_failure_does_not_take_the_run_with_it() -> None:
         assert outcome.ok, "the repository was still measured"
         assert isinstance(outcome.contributor_error, ContributorCollectionError)
         assert not outcome.documented
+
+
+class _TwoBudgetClient:
+    """A token whose two budgets are genuinely different numbers.
+
+    `_StubClient` cannot show this: it answers both from constants that no
+    call can change, which is exactly why the defect was invisible to it.
+    """
+
+    def __init__(self, points: int, requests: int) -> None:
+        self.points = points
+        self.requests = requests
+        self.reads: list[str] = []
+
+    def graphql_points_remaining(self) -> int:
+        """The GraphQL budget, read from GraphQL."""
+        self.reads.append("graphql")
+        return self.points
+
+    def rate_limit_remaining(self) -> int:
+        """The REST budget, which must not follow the GraphQL one."""
+        self.reads.append("rest")
+        return self.requests
+
+
+@pytest.mark.requirement("L3-COL-003", "L3-STA-010")
+def test_the_preflight_reads_each_budget_from_its_own_source() -> None:
+    """Both figures reach the Budget, and they are not the same number.
+
+    Until v0.6.6 they were. `check_budget` reads the GraphQL budget first,
+    PyGithub overwrote its one `rate_limiting` from that response's headers,
+    and the REST figure came back as the GraphQL one - so the REST clause
+    compared a number against a threshold half its own and could never fail.
+    """
+    client = _TwoBudgetClient(points=4990, requests=1200)
+
+    budget = check_budget(cast(GitHubClient, client), 100)
+
+    assert budget.available == 4990
+    assert budget.requests_available == 1200
+    assert client.reads == ["graphql", "rest"]
+
+
+@pytest.mark.requirement("L3-COL-003")
+def test_a_run_the_rest_budget_cannot_cover_is_refused() -> None:
+    """The REST half of the pre-flight was unreachable, not merely wrong.
+
+    One number served both, and the REST threshold is half the GraphQL one, so
+    the GraphQL clause always tripped first. Checked exhaustively over every
+    inventory size to 3,000: no value of a single shared figure could ever make
+    the REST clause the one that refused a run.
+    """
+    client = _TwoBudgetClient(points=5000, requests=40)
+
+    with pytest.raises(RateLimitExhaustedError) as caught:
+        check_budget(cast(GitHubClient, client), 100)
+
+    message = str(caught.value)
+    assert "REST" in message
+    assert "40 remain" in message

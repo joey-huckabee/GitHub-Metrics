@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 22
 - L2 requirements: 88
-- L3 requirements: 134
-- Verified L2+L3: 222 of 222 (100.0%)
+- L3 requirements: 135
+- Verified L2+L3: 223 of 223 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -149,7 +149,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-COL-001 | L2-COL-001 | `tests/test_runner.py::test_a_deep_attribution_failure_does_not_take_the_run_with_it`<br>`tests/test_runner.py::test_a_failure_does_not_take_the_rest_of_the_run_with_it`<br>`tests/test_runner.py::test_an_outcome_keeps_the_reference_that_produced_it`<br>`tests/test_runner.py::test_nothing_to_collect_is_not_an_error`<br>`tests/test_runner.py::test_the_failures_are_named_in_the_log` | Implemented |
 | L3-COL-002 | L2-COL-002 | `tests/test_runner.py::test_results_come_back_in_input_order_not_completion_order`<br>`tests/test_runner.py::test_the_pool_never_exceeds_the_work_available`<br>`tests/test_runner.py::test_the_same_inventory_collects_identically_every_time`<br>`tests/test_runner.py::test_the_worker_count_is_respected` | Implemented |
-| L3-COL-003 | L2-COL-003 | `tests/test_runner.py::test_a_run_that_does_not_fit_is_refused_before_it_starts`<br>`tests/test_runner.py::test_a_run_that_fits_reports_what_it_will_cost`<br>`tests/test_runner.py::test_the_budget_runs_to_zero`<br>`tests/test_runner.py::test_the_cost_is_two_points_and_one_request_per_repository`<br>`tests/test_runner.py::test_the_rest_budget_is_checked_as_well_as_the_graphql_one` | Implemented |
+| L3-COL-003 | L2-COL-003 | `tests/test_runner.py::test_a_run_that_does_not_fit_is_refused_before_it_starts`<br>`tests/test_runner.py::test_a_run_that_fits_reports_what_it_will_cost`<br>`tests/test_runner.py::test_a_run_the_rest_budget_cannot_cover_is_refused`<br>`tests/test_runner.py::test_the_budget_runs_to_zero`<br>`tests/test_runner.py::test_the_cost_is_two_points_and_one_request_per_repository`<br>`tests/test_runner.py::test_the_preflight_reads_each_budget_from_its_own_source`<br>`tests/test_runner.py::test_the_rest_budget_is_checked_as_well_as_the_graphql_one` | Implemented |
 
 ### CON: Concurrency
 
@@ -486,7 +486,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|-------------|----------------|--------|
 | L2-STA-001 | L1-STA-001 | L3-CNF-007, L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004, L3-STA-007, L3-STA-009 | _(none)_ | Implemented |
 | L2-STA-002 | L1-STA-001 | L3-STA-005 | _(none)_ | Implemented |
-| L2-STA-003 | L1-STA-001 | L3-STA-006, L3-STA-008 | _(none)_ | Implemented |
+| L2-STA-003 | L1-STA-001 | L3-STA-006, L3-STA-008, L3-STA-010 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -501,6 +501,7 @@ through their children, so counting them too would count the same work twice.
 | L3-STA-007 | L2-STA-001 | `tests/test_census.py::test_a_failed_request_raises_the_contributor_error`<br>`tests/test_census.py::test_a_repository_with_no_contributors_counts_zero`<br>`tests/test_census.py::test_a_single_page_result_counts_the_entries_it_got`<br>`tests/test_census.py::test_an_unreadable_header_and_payload_is_unknown_rather_than_zero`<br>`tests/test_census.py::test_the_census_asks_for_anonymous_contributors_one_per_page`<br>`tests/test_census.py::test_the_count_is_logged_so_a_surprising_coverage_can_be_traced`<br>`tests/test_census.py::test_the_last_link_is_read_rather_than_the_first_one_present`<br>`tests/test_census.py::test_the_last_page_number_is_the_identity_count`<br>`tests/test_census.py::test_the_page_number_is_read_even_though_it_does_not_end_the_url`<br>`tests/test_statistics.py::test_a_repository_inside_the_ceiling_says_it_was_not_truncated`<br>`tests/test_statistics.py::test_anonymous_commits_are_unknown_rather_than_zero`<br>`tests/test_statistics.py::test_coverage_is_no_longer_a_flattering_hundred_percent`<br>`tests/test_statistics.py::test_the_breakdown_accounts_for_every_identity` | Implemented |
 | L3-STA-008 | L2-STA-003 | `tests/test_client.py::test_a_contributors_page_can_ask_for_anonymous_entries`<br>`tests/test_client.py::test_a_response_with_no_data_at_all_reads_as_spent`<br>`tests/test_client.py::test_an_unreadable_graphql_budget_reads_as_spent`<br>`tests/test_client.py::test_anonymous_contributors_are_not_requested_by_default`<br>`tests/test_client.py::test_pages_are_requested_at_the_endpoint_maximum_by_default`<br>`tests/test_client.py::test_the_graphql_budget_is_read_from_graphql`<br>`tests/test_client.py::test_the_rest_budget_comes_from_the_response_header` | Implemented |
 | L3-STA-009 | L2-STA-001 | `tests/test_anonymous.py::test_a_failed_page_degrades_the_repository_rather_than_the_run`<br>`tests/test_anonymous.py::test_a_no_reply_address_yields_the_account_it_names`<br>`tests/test_anonymous.py::test_a_repository_with_no_anonymous_tail_reports_nothing`<br>`tests/test_anonymous.py::test_an_address_that_does_not_name_an_account_is_not_recovered`<br>`tests/test_anonymous.py::test_every_page_is_walked_until_a_short_one_ends_it`<br>`tests/test_anonymous.py::test_linked_entries_are_skipped_because_they_are_already_collected`<br>`tests/test_anonymous.py::test_one_account_under_several_addresses_is_merged_and_summed`<br>`tests/test_anonymous.py::test_the_pattern_itself_refuses_the_idless_form`<br>`tests/test_anonymous.py::test_the_tail_is_counted_in_people_and_commits`<br>`tests/test_anonymous.py::test_what_was_recovered_is_logged`<br>`tests/test_statistics.py::test_the_breakdown_counts_identities_even_when_accounts_are_fewer`<br>`tests/test_statistics.py::test_the_breakdown_never_goes_negative_on_inconsistent_input` | Implemented |
+| L3-STA-010 | L2-STA-003 | `tests/test_client.py::test_a_graphql_call_does_not_move_the_rest_budget`<br>`tests/test_client.py::test_a_reading_about_another_resource_is_ignored`<br>`tests/test_client.py::test_an_unread_rest_budget_is_fetched_once`<br>`tests/test_client.py::test_an_unreadable_rest_budget_reads_as_spent`<br>`tests/test_runner.py::test_the_preflight_reads_each_budget_from_its_own_source` | Implemented |
 
 ### TRU: Trust policy
 

@@ -12,9 +12,15 @@ a run whose budget is already gone, which is precisely the failure
 
 Two sources are trustworthy, and both are free:
 
-- **REST**: the `X-RateLimit-Remaining` header on every response, which
-  PyGithub exposes as `Github.rate_limiting`. Verified decrementing one
-  per request.
+- **REST**: the `X-RateLimit-Remaining` header on every REST response.
+  Verified decrementing one per request. Recorded here rather than read
+  from PyGithub's `Github.rate_limiting`, which is **one number for both
+  budgets**, set from whatever response came back last: GitHub reports the
+  GraphQL points budget under the same header names, so a single GraphQL
+  call replaces the REST figure with a number about the other budget.
+  `x-ratelimit-resource` is what tells them apart. Until v0.6.6 the
+  pre-flight read the contaminated value and was therefore checking the
+  GraphQL figure twice.
 - **GraphQL**: the `rateLimit` field inside a GraphQL document. A query
   selecting nothing else is not charged - confirmed by issuing it twice
   and reading the same `remaining` - so asking costs nothing of what is
@@ -76,6 +82,7 @@ class GitHubClient:
         # Shared across the worker pool, so the last reading needs a lock.
         self._observed_lock = threading.Lock()
         self._observed: tuple[int, datetime | None] | None = None
+        self._observed_rest: int | None = None
 
     def repository(self, full_name: str) -> Repository:
         """Fetch a repository by its `owner/name` identifier.
@@ -215,9 +222,14 @@ class GitHubClient:
             scope headers as well as the budgets.
         """
         LOGGER.debug("Requesting the rate-limit snapshot")
-        return self._github.requester.requestJsonAndCheck(
+        headers, data = self._github.requester.requestJsonAndCheck(
             "GET", f"{self._settings.api_url}/rate_limit"
         )
+        # The body of this endpoint is not trusted - measured at 5000 while the
+        # token had 4984 - but its *headers* are the same accurate ones every
+        # REST response carries, and this request is not itself counted.
+        self._observe_rest(headers)
+        return headers, data
 
     def contributors_page(
         self,
@@ -249,32 +261,78 @@ class GitHubClient:
         if anonymous:
             parameters["anon"] = "1"
         LOGGER.debug("Requesting contributors page %d for %s (anon=%s)", page, slug, anonymous)
-        return self._github.requester.requestJsonAndCheck(
+        headers, payload = self._github.requester.requestJsonAndCheck(
             "GET",
             f"{self._settings.api_url}/repos/{slug}/contributors",
             parameters=parameters,
         )
+        self._observe_rest(headers)
+        return headers, payload
+
+    def _observe_rest(self, headers: Any) -> None:
+        """Record the core REST budget a REST response reported.
+
+        Kept here rather than read from PyGithub because PyGithub keeps **one**
+        `rate_limiting` for both budgets, set from whatever response came back
+        last. GitHub reports the GraphQL *points* budget in the same header
+        names REST uses for its *requests* budget, so a single GraphQL call
+        replaces the REST figure with a number about the other budget entirely.
+
+        `x-ratelimit-resource` is what tells them apart, and it is why this
+        checks it: a reading is taken only from a response that says it is
+        about `core`.
+
+        Args:
+            headers: A REST response's headers, or anything else; a shape that
+                carries no core reading is ignored rather than guessed at.
+        """
+        if not isinstance(headers, dict):
+            return
+        lowered = {str(key).lower(): value for key, value in headers.items()}
+        resource = lowered.get("x-ratelimit-resource")
+        if resource is not None and str(resource) != "core":
+            return
+        remaining = lowered.get("x-ratelimit-remaining")
+        if remaining is None:
+            return
+        try:
+            self._observed_rest = int(float(remaining))
+        except (TypeError, ValueError):
+            LOGGER.warning("REST rate limit header %r could not be read", remaining)
 
     def rate_limit_remaining(self) -> int:
         """Return the number of core REST requests still available.
 
-        **Read from response headers, not from `/rate_limit`.** Every REST
-        response carries `X-RateLimit-Remaining`, and PyGithub keeps the
-        most recent one; measured, it tracks spend exactly - 4986, 4985,
-        4984 across three requests. The `/rate_limit` endpoint reported a
-        flat 5000 throughout, for the same token, in the same minute.
+        **Read from REST response headers, and only from REST ones.** Every
+        REST response carries `X-RateLimit-Remaining`, and measured it tracks
+        spend exactly - 4986, 4985, 4984 across three requests - while the
+        `/rate_limit` body reported a flat 5000 throughout for the same token
+        in the same minute. The header costs nothing: it arrives on responses
+        the run was making anyway.
 
-        The header costs nothing: it arrives on responses the run was
-        making anyway.
+        It is *not* read from PyGithub's `rate_limiting`, which is one number
+        for both budgets, set from whatever response came back last. GitHub
+        reports the GraphQL points budget under the same header names, so a
+        single GraphQL call replaces the REST figure with a number about the
+        other budget. That is what made this return the GraphQL figure to the
+        pre-flight until v0.6.6, since `check_budget` reads the GraphQL budget
+        first; `_observe_rest` keeps the two apart by checking
+        `x-ratelimit-resource`.
 
         Returns:
-            Requests remaining as of the last response. Before any request
-            has been made this is PyGithub's optimistic default rather than
-            a measurement, which is why `check_budget` leans on the GraphQL
-            budget - the binding one, and independently readable.
+            Requests remaining as of the last REST response. When none has
+            been seen yet, the rate-limit snapshot is fetched to get one - it
+            is free and is not itself counted.
         """
-        remaining, _ = self._github.rate_limiting
-        return int(remaining)
+        if self._observed_rest is None:
+            self.rate_limit_snapshot()
+        if self._observed_rest is None:
+            # No response has reported the budget. Zero is the safe failure,
+            # as it is for the GraphQL budget: it refuses a run rather than
+            # letting one start on a number nothing confirmed.
+            LOGGER.warning("REST rate limit could not be read; treating it as spent")
+            return 0
+        return self._observed_rest
 
     def close(self) -> None:
         """Release the underlying HTTP connection pool."""

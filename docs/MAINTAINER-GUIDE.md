@@ -158,6 +158,42 @@ is a question, not a verdict** - read it before believing it.
 The same checks run weekly from `.github/workflows/soak.yml`, and can be
 started by hand from the Actions tab with a profile argument. It gates nothing.
 
+### The token it needs
+
+**No scopes.** The tool reads public repositories only, and
+`verify_credentials` reads a token's scopes to *log* them - it never requires
+one. An authenticated request gets the 5,000/hour budget whether or not any box
+is ticked, and a token with no scopes cannot do anything to the account it
+belongs to, which is what you want for something that runs unattended every
+week.
+
+**Classic personal access token** (Settings → Developer settings → Personal
+access tokens → Tokens (classic) → Generate new token):
+
+- **Note**: something you will recognise in a year - `github-metrics soak`.
+- **Expiration**: pick one and put the date in your calendar. An expired token
+  makes the soak fail with exit 8 and a clear message, which is a good failure,
+  but only if someone knows why.
+- **Scopes**: **tick nothing.** Not `repo`, not `read:org`.
+
+**Fine-grained token** works too, and is the better choice if the account owns
+private repositories - it cannot reach them unless you grant it:
+
+- **Repository access**: *Public repositories (read-only)*.
+- **Permissions**: none needed beyond the read-only public access that setting
+  already implies.
+
+Then add it to the repository as a secret named **`SOAK_GITHUB_TOKEN`**
+(Settings → Secrets and variables → Actions → New repository secret).
+
+It is deliberately not the workflow's own `GITHUB_TOKEN`: that one cannot read
+the GraphQL fields a scan needs, and `soak-exhaustion` would drain whatever it
+is given, which is not something to do to a token other jobs depend on.
+
+Locally, the soak reads `GITHUB_TOKEN` like everything else - your ordinary
+development token is fine for the `quick` profile. Use a separate one for
+`soak-exhaustion` unless you want to wait an hour for your own budget back.
+
 ### What the profiles do
 
 `quick` collects a handful of real repositories, one of which does not exist,
@@ -169,6 +205,11 @@ and asserts what only a live run can show:
 | A repository GitHub does not have degrades the row, not the run | both times this broke, the stub was answering something the real transport never sends |
 | stderr carries nothing outside the package's format | the geocoder here is real, so a library logging outside the handler shows up |
 | The identity breakdown sums to `identities` | the buckets are derived, so one nobody populates hides in the remainder |
+
+Both run with `--no-geocode`: these checks are about the GitHub side, Nominatim
+is paced at one request a second and would dominate the wall clock, and a
+scheduled job that hammered it risks the shared user agent being blocked -
+which fails every later run rather than the one that earned it.
 
 `exhaustion` drives the hourly budget to its end with `--deep-attribution` on a
 large history - a point per hundred commits reaches the wall in one repository

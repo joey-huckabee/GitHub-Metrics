@@ -20,6 +20,13 @@ Two profiles, chosen with `SOAK_PROFILE`:
   inventory names but GitHub does not is degraded rather than fatal, and that
   the default log level stays quiet.
 
+Both run with `--no-geocode`. Nominatim is paced at one request a second, so it
+dominates the wall clock of any scan, and none of these checks is about it -
+they are about the GitHub side. It also removes the one way a scheduled job
+could cause harm beyond itself: the policy penalty for hammering that service
+is blocking the user agent, which fails every *later* run rather than the one
+that earned it.
+
 - **`exhaustion`** drives the hourly budget to its end on purpose and watches
   `--on-exhaustion` do what it promises. It is **manual only**: it spends a
   token's whole hourly quota and then waits for the reset, so it takes over an
@@ -108,6 +115,11 @@ def run_scan(
             *inventory,
             "--output",
             str(directory),
+            # Nominatim is paced at one request a second and is not what any
+            # of these checks is about. It is also the part most likely to
+            # make a scheduled job slow, flaky, or - if the shared agent were
+            # ever blocked for hammering it - a problem for every later run.
+            "--no-geocode",
             *args,
         ],
         capture_output=True,

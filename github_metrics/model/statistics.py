@@ -541,8 +541,14 @@ class GeocodingStatistics:
         unmatched: Lookups the gazetteer had nothing for.
         service_failures: Lookups that failed for a reason unrelated to the
             location. Never cached, so a later run will ask again.
+        enabled: Whether geocoding was asked for at all. `False` under
+            `--no-geocode`, and the reason every counter below it is zero -
+            which is otherwise indistinguishable from a run where nobody
+            published a location, and would make every address read as
+            "resolved to nothing" rather than "never asked".
     """
 
+    enabled: bool = True
     cache_loaded: int = 0
     cache_expired_on_load: int = 0
     cache_hits: int = 0
@@ -554,6 +560,7 @@ class GeocodingStatistics:
     def to_mapping(self) -> dict[str, Any]:
         """Render as a JSON-ready mapping."""
         return {
+            "enabled": self.enabled,
             "cache_loaded": self.cache_loaded,
             "cache_expired_on_load": self.cache_expired_on_load,
             "cache_hits": self.cache_hits,

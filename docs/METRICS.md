@@ -577,6 +577,7 @@ Design reasoning is in [ADR-0008](adr/0008-statistics-json.md).
 | `budget.incomplete_because_exhausted` | `bool` | Whether the run stopped early as a result. **The field a consumer must check before treating the CSV as complete.** | **Settled** |
 | `budget.waits` | `int` | How many hourly resets the run slept through. | **Settled** |
 | `geocoding` | `object` | Cache and lookup behaviour; see below. | **Settled** |
+| `geocoding.enabled` | `bool` | Whether locations were resolved at all. `false` under `--no-geocode`, and the reason the counters beside it are zero - otherwise indistinguishable from a run where nobody published a location. | **Settled** |
 | `warnings` | `array` | Every degradation, machine-readable, in run order. | **Settled** |
 
 **The REST budget is not reported, and that is deliberate.** Measured on

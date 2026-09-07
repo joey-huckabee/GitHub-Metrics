@@ -339,6 +339,7 @@ inventories `validate` takes, mixed freely.
 |---|---|---|
 | `--output DIR` | `./githubmetrics` | Directory both artifacts are written into. |
 | `--format {csv,json,console}` | `csv` | Form of the tabular artifact. The documents are always JSON. |
+| `--geocode` / `--no-geocode` | `--geocode` | Resolve contributor locations. Nominatim is paced at one request a second, so this is the slowest part of a scan; `--no-geocode` skips it and every address stays at "never asked". |
 | `--fields a,b,c` | all | Columns the tabular artifact emits, always in canonical order. An unrecognised name is a usage error (exit 2), reported before anything is created. |
 | `--workers N` | `min(repositories, 8)` | Concurrent collections. |
 | `--deep-attribution` | off | Attribute every commit by walking the history instead of reading the contributors endpoint. Complete, and about **35x** the cost - a point per hundred commits, so 321 for a 32,016-commit repository against 9. For a watchlist, not an inventory. |

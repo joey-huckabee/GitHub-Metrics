@@ -36,7 +36,19 @@ max-args = 8
 # limit does not describe how these functions are actually called.
 max-positional-arguments = 8
 max-attributes = 16
-max-locals = 20
+# Same reason as the argument limits above: a click command's parameters are
+# one per flag and count as locals, so `scan` reads as 21 while assigning
+# seven. The limit is meant to catch a function doing too much, and counting
+# the command line as complexity does not measure that.
+max-locals = 24
+# `cli.py` is long because it explains itself: 22 functions, the longest 101
+# lines, 78 comment-only lines, and no branching worth splitting. The one
+# split that was worth making - `exit_codes.py` in v0.6.3 - was made because
+# the exit-status scheme had no owner and that absence was a defect, not
+# because of a line count. A further split needs a reason of that kind. This
+# ceiling exists to make the next person argue for one, not to be raised
+# again quietly.
+max-module-lines = 1100
 
 [REPORTS]
 score = no

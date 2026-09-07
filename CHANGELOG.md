@@ -8,6 +8,58 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.12] - 2026-09-07
+
+**A registry that trusts nobody got the built-in three.** `is_trusted_org` and
+`score_org_bonus` read `registry or TrustedOrganizations()`, and
+`TrustedOrganizations` defines `__len__` - so a registry with no entries is
+falsy, and `or` discarded it:
+
+    is_trusted_org('google', registry=nobody)     True
+    score_org_bonus('google', registry=nobody)    10.0
+
+Ten points of `trusted_org_bonus`, about an eighth of the 85-point maximum,
+awarded against a policy that had refused it.
+
+The object itself was right: `nobody.is_trusted('google')` returns `False`
+throughout. So did the constructor, sixty lines above, which draws exactly the
+distinction the functions lost - `DEFAULT_TRUSTED_ORGANIZATIONS if entries is
+None else entries`. Only the two module-level functions collapsed "not
+supplied" into "supplied empty", and those are what `analysis/row.py` and every
+library caller go through.
+
+`L3-TRU-004` already required it: *"a caller-supplied mapping shall replace the
+default entirely, an empty mapping shall trust nobody"*. The test carrying that
+marker asserted `TrustedOrganizations({}).is_trusted("google") is False` - the
+method, which was never the broken path.
+
+### Fixed
+
+- **`is_trusted_org` and `score_org_bonus` test `registry is None`**, matching
+  the constructor. An empty registry now trusts nobody through the functions,
+  and through the row they build.
+
+### Changed
+
+- **`L3-TRU-004` says where "trusts nobody" has to hold**: through
+  `is_trusted_org`, `score_org_bonus` and the row, not only through the
+  registry object.
+- **`__len__` carries the reason the check must be `is None`**, so the shorter
+  form does not come back as a simplification.
+
+### Notes
+
+**No CLI user is affected.** `cli.py` never constructs a registry, so every
+scan uses the default list, where the fallback and the intent agree. This is a
+library-API defect, and a latent one for the configurable trusted list
+`ROADMAP.md` contemplates - which would have shipped with "trust nobody"
+silently meaning "trust Google".
+
+The package was swept for the same pattern: nine `param or ...` sites where the
+parameter defaults to `None`, and `TrustedOrganizations` is the only class among
+them defining `__len__` or `__bool__`. The rest take dataclasses or a
+`datetime`, which are always truthy, so they are safe - checked, not assumed.
+
 ## [0.6.11] - 2026-09-07
 
 **Line numbers stopped being physical after any multi-line quoted field.** The
@@ -1908,7 +1960,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.11...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.12...HEAD
+[0.6.12]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.11...v0.6.12
 [0.6.11]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.10...v0.6.11
 [0.6.10]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.8...v0.6.9

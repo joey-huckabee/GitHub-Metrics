@@ -10,6 +10,7 @@ import pytest
 
 from github_metrics.analysis.row import build_empty_row, build_row
 from github_metrics.analysis.total import MAX_TOTAL_SCORE
+from github_metrics.analysis.trusted_orgs import TrustedOrganizations
 from github_metrics.collect.repository import RepoMetaData
 from github_metrics.collect.timestamps import RepositoryTimestamps
 from github_metrics.model.scan import ScanIdentifier
@@ -217,3 +218,22 @@ def test_organization_is_empty_because_only_the_api_could_have_filled_it() -> No
     row = build_empty_row(RepositoryRef(owner="ghost", repoid="missing"), SCAN)
 
     assert row.organization == ""
+
+
+@pytest.mark.requirement("L3-ROW-002", "L3-TRU-004")
+def test_a_row_built_with_an_empty_registry_awards_nothing() -> None:
+    """Trusting nobody has to reach the row, which is where it is published.
+
+    It did not: the registry was discarded for being empty, `google` came back
+    trusted, and `total_score` carried ten points - about an eighth of the
+    85-point maximum - that the caller's own policy had refused.
+    """
+    row = build_row(
+        RepositoryRef(owner="google", repoid="guava"),
+        metadata(owner="google", name="guava"),
+        SCAN,
+        registry=TrustedOrganizations({}),
+    )
+
+    assert row.is_trusted_org is False
+    assert row.trusted_org_bonus == 0.0

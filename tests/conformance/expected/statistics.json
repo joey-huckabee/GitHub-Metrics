@@ -21,6 +21,7 @@
     "waits": 0
   },
   "geocoding": {
+    "enabled": true,
     "cache_loaded": 95,
     "cache_expired_on_load": 0,
     "cache_hits": 3,

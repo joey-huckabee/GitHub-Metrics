@@ -932,3 +932,58 @@ def test_a_token_rejected_after_no_verify_still_exits_the_credentials_status(
     assert result.exit_code == EXIT_BAD_CREDENTIALS
     assert isinstance(result.exception, SystemExit)
     assert "rejected the token" in result.output
+
+
+@pytest.mark.requirement("L3-CFG-010")
+def test_no_geocode_builds_no_geocoder_and_says_so(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nominatim is paced at one request a second and is the slowest part of a
+    scan. A run that only wants the metrics should not pay for it.
+
+    The artifact records that it was skipped. All-zero counters are otherwise
+    the same shape a run produces when nobody published a location, and a
+    reader would take every unresolved address for one the gazetteer had
+    nothing for.
+    """
+    built: list[object] = []
+    _patch(monkeypatch, lambda *args, **kwargs: [])
+
+    def record(*args: Any, **kwargs: Any) -> _NullGeocoder:
+        """Note that a geocoder was built, and stand in for one."""
+        del args, kwargs
+        built.append(object())
+        return _NullGeocoder()
+
+    monkeypatch.setattr("github_metrics.cli.Geocoder", record)
+
+    result = run("pypa/virtualenv", "--output", str(tmp_path), "--no-geocode")
+
+    assert result.exit_code == 0, result.output
+    assert not built, "no geocoder is built at all"
+    statistics = json.loads((tmp_path / "statistics.json").read_text(encoding="utf-8"))
+    assert statistics["geocoding"]["enabled"] is False
+
+
+@pytest.mark.requirement("L3-CFG-010")
+def test_geocoding_is_on_by_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Opting out is the caller's choice, never the default: a scan that
+    silently stopped resolving locations would publish the same shape with
+    less in it."""
+    built: list[object] = []
+    _patch(monkeypatch, lambda *args, **kwargs: [])
+
+    def record(*args: Any, **kwargs: Any) -> _NullGeocoder:
+        """Note that a geocoder was built, and stand in for one."""
+        del args, kwargs
+        built.append(object())
+        return _NullGeocoder()
+
+    monkeypatch.setattr("github_metrics.cli.Geocoder", record)
+
+    result = run("pypa/virtualenv", "--output", str(tmp_path))
+
+    assert result.exit_code == 0, result.output
+    assert len(built) == 1, "one geocoder for the run"
+    statistics = json.loads((tmp_path / "statistics.json").read_text(encoding="utf-8"))
+    assert statistics["geocoding"]["enabled"] is True

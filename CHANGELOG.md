@@ -8,6 +8,53 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.17] - 2026-09-07
+
+**`--no-geocode`, and the soak checks use it.** Nominatim is paced at one
+request a second, which makes it the slowest part of any scan - measured, 186s
+cold against 42s warm - and none of the soak checks is about it. They are about
+the GitHub side.
+
+### Added
+
+- **`--geocode` / `--no-geocode`** on `scan`, defaulting to resolving. With it
+  off, no geocoder is built and no cache is loaded; every address stays at
+  "never asked", which is a state the record already distinguishes from "asked
+  and unresolved".
+- **`geocoding.enabled` in `statistics.json`**, so an artifact says which it
+  was. Counters reading zero are otherwise the same shape a run produces when
+  nobody published a location, and every unresolved address would read as one
+  the gazetteer had nothing for.
+
+### Changed
+
+- **The soak checks run with `--no-geocode`.** Besides the wall clock, it
+  removes the one way a scheduled job could cause harm beyond itself:
+  Nominatim's policy penalty is blocking the user agent, which fails every
+  *later* run rather than the one that earned it. The workflow no longer needs
+  a geocoder identity or a cache path.
+- **`MAINTAINER-GUIDE.md` says how to make the token** the scheduled run needs:
+  **no scopes at all**. The tool reads public repositories, and
+  `verify_credentials` reads a token's scopes to log them, never to require
+  one. A classic token with nothing ticked, or a fine-grained token limited to
+  *Public repositories (read-only)*, is enough - and a token that can do
+  nothing to the account is what you want for something running unattended
+  every week.
+- **Two pylint ceilings are recorded rather than tripped over.** `max-locals`,
+  because a click command's parameters are one per flag and count as locals -
+  `scan` reads as 21 while assigning seven, which is the same reason
+  `max-positional-arguments` was already tuned. And `max-module-lines`, because
+  `cli.py` is long by explanation rather than by branching: 22 functions, the
+  longest 101 lines, 78 comment-only lines. The one split worth making,
+  `exit_codes.py` in v0.6.3, was made because the exit-status scheme had no
+  owner - a design reason, not a line count. The comment says the next split
+  needs one too.
+
+### Notes
+
+The artifact gains a key. Nothing is removed or renamed, and the golden
+artifacts show exactly that one addition and nothing else.
+
 ## [0.6.16] - 2026-09-07
 
 **Live checks, because the stubs are the blind spot.** Every defect fixed
@@ -2223,7 +2270,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.16...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.17...HEAD
+[0.6.17]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.16...v0.6.17
 [0.6.16]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.15...v0.6.16
 [0.6.15]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.14...v0.6.15
 [0.6.14]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.13...v0.6.14

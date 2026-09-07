@@ -69,13 +69,11 @@ jobs:
           # is not something to do to a token anything else depends on.
           GITHUB_TOKEN: ${{ secrets.SOAK_GITHUB_TOKEN }}
           SOAK_PROFILE: ${{ inputs.profile || 'quick' }}
-          # Named so a Nominatim operator can tell who this is. The policy
-          # penalty is blocking the agent, which would fail every later run
-          # rather than this one.
-          GEOCODER_USER_AGENT: github-metrics-soak (+https://github.com/joey-huckabee/GitHub-Metrics)
-          # Off the runner's default path so a cached home directory cannot
-          # carry geocode results between runs and hide a lookup that broke.
-          GEOCODE_CACHE_PATH: ${{ runner.temp }}/soak-geocode.json
+          # No geocoder settings: the checks run with `--no-geocode`. These
+          # are about the GitHub side, Nominatim's one-request-a-second pace
+          # would dominate the wall clock, and a scheduled job that hammered
+          # it risks the shared user agent being blocked - which fails every
+          # later run rather than the one that earned it.
         run: poetry run pytest -m soak -v --no-cov
 
       - name: artifacts from the run

@@ -177,14 +177,9 @@ class CliContext:
 @click.option(
     "--token",
     # **No `envvar` here, deliberately.** `Settings.from_env` already reads
-    # `GITHUB_TOKEN`, after loading `.env` without override, which is what
-    # makes the documented precedence work: flag, then environment, then
-    # `.env`. Letting click read the same variable made the environment
-    # indistinguishable from the flag, so `--token-file` with `GITHUB_TOKEN`
-    # exported - the ordinary way this tool is configured - failed as
-    # "pass --token or --token-file, not both". It also made the DEBUG line
-    # naming the token's source say `--token` for a variable. One variable,
-    # one reader.
+    # `GITHUB_TOKEN`; a second reader made the environment indistinguishable
+    # from the flag and broke `--token-file`. One variable, one reader - see
+    # `L3-CFG-009` and the note in `CLAUDE.md`.
     default=None,
     help=(
         "GitHub token, overriding GITHUB_TOKEN. Note that a token passed as an "
@@ -288,6 +283,12 @@ def main(
     ),
 )
 @click.option(
+    "--geocode/--no-geocode",
+    default=True,
+    show_default=True,
+    help="Resolve contributor locations. The slowest part of a scan; skippable.",
+)
+@click.option(
     "--recover-anonymous/--no-recover-anonymous",
     default=True,
     show_default=True,
@@ -319,6 +320,7 @@ def scan_command(  # noqa: PLR0913, PLR0917
     deep_attribution_threshold: float,
     on_exhaustion: str,
     recover_anonymous: bool,
+    geocode: bool,
     strict: bool,
 ) -> None:
     """Scan every repository SOURCES names and write its metrics.
@@ -366,6 +368,7 @@ def scan_command(  # noqa: PLR0913, PLR0917
         recover_anonymous=recover_anonymous,
         deep_attribution=deep_attribution,
         policy=ExhaustionPolicy(on_exhaustion),
+        geocode=geocode,
     )
     rows = [
         (
@@ -479,6 +482,7 @@ def _collect(
     recover_anonymous: bool = True,
     deep_attribution: bool = False,
     policy: ExhaustionPolicy = ExhaustionPolicy.WAIT,
+    geocode: bool = True,
 ) -> CollectionRun:
     """Check the budget, then collect. Nothing named means nothing to spend."""
     if not references:
@@ -497,8 +501,11 @@ def _collect(
     # does, and a re-run should pay only for places never seen before. The CLI
     # builds it because `geo` may not parse a file format and `geocache` may
     # not open a socket; this is where the two meet.
-    cache = GeocodeCache.load(settings.geocode_cache_path)
-    geocoder = Geocoder(settings.geocoder_user_agent, cache=cache)
+    # `None` under `--no-geocode`: every address stays at "never asked", a
+    # state the record distinguishes from "asked and unresolved". No geocoder
+    # means no cache either.
+    cache = GeocodeCache.load(settings.geocode_cache_path) if geocode else None
+    geocoder = Geocoder(settings.geocoder_user_agent, cache=cache) if geocode else None
 
     try:
         with GitHubClient(settings) as client:
@@ -544,7 +551,8 @@ def _collect(
         # In a finally block because a run that failed still resolved
         # locations, and throwing that away would make the next attempt pay
         # for them again. Saving cannot raise; see `GeocodeCache.save`.
-        cache.save()
+        if cache is not None:
+            cache.save()
 
 
 def _preflight(client: GitHubClient, repositories: int, *, policy: ExhaustionPolicy) -> Budget:
@@ -646,8 +654,15 @@ def _spend(
     )
 
 
-def _geocoding(geocoder: Geocoder) -> GeocodingStatistics:
-    """Read the geocoder's counters into the shape the artifact publishes."""
+def _geocoding(geocoder: Geocoder | None) -> GeocodingStatistics:
+    """Read the geocoder's counters into the shape the artifact publishes.
+
+    `None` under `--no-geocode`, and the artifact says so rather than
+    publishing zeros - which are the shape of a run where nobody published a
+    location.
+    """
+    if geocoder is None:
+        return GeocodingStatistics(enabled=False)
     return GeocodingStatistics(
         cache_loaded=geocoder.cache.loaded,
         cache_expired_on_load=geocoder.cache.expired_on_load,

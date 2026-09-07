@@ -12,6 +12,7 @@ from pathlib import Path
 
 import click
 from dotenv import load_dotenv
+from github.GithubException import BadCredentialsException
 
 from github_metrics import __version__
 from github_metrics.analysis.closed_issues import describe_bands
@@ -43,6 +44,7 @@ from github_metrics.errors import (
     MissingCredentialsError,
     OutputDestinationError,
     RateLimitExhaustedError,
+    UnknownFieldError,
 )
 from github_metrics.exit_codes import (
     EXIT_DEGRADED,
@@ -342,8 +344,11 @@ def scan_command(  # noqa: PLR0913, PLR0917
     longer promises that a run which starts will finish.
     """
     context: CliContext = ctx.obj
+    # Before `_document_root`, which creates a directory. Checking the command
+    # line costs nothing and touches nothing, so a typo should not leave an
+    # empty results directory behind as its only trace.
+    columns = _columns(fields)
     root = _document_root(output)
-    columns = resolve_fields(split_selection(fields) if fields else None)
 
     try:
         resolved = resolve_sources(sources, strict=strict)
@@ -402,6 +407,31 @@ def scan_command(  # noqa: PLR0913, PLR0917
         ctx.exit(EXIT_DEGRADED)
     if resolved.issues:
         ctx.exit(EXIT_ROWS_REJECTED)
+
+
+def _columns(fields: str | None) -> tuple[str, ...]:
+    """Resolve `--fields` into a column selection.
+
+    `resolve_fields` names the unknown field, suggests the nearest real one and
+    lists every valid name - a better message than anything this layer could
+    write. It reached nobody: `UnknownFieldError` is an `OutputError`, not a
+    `ClickException`, so it escaped the command and the operator got a
+    traceback and exit 1 instead. A malformed command line is exit 2, which is
+    what `--format` already gives for the same class of mistake.
+
+    Args:
+        fields: The raw `--fields` value, or `None` for every column.
+
+    Returns:
+        The columns to emit, in canonical order.
+
+    Raises:
+        click.UsageError: A name is not a column.
+    """
+    try:
+        return resolve_fields(split_selection(fields) if fields else None)
+    except UnknownFieldError as exc:
+        raise click.UsageError(str(exc)) from exc
 
 
 def _document_root(output: Path | None) -> Path:
@@ -495,6 +525,16 @@ def _collect(
         # `collect_all` - and catching at the call site would leave whichever
         # one someone forgot.
         raise RateLimitedError(str(exc)) from exc
+    except BadCredentialsException as exc:
+        # Reachable only with `--no-verify-token`: the pre-flight and the
+        # budget guard call the client directly rather than through
+        # `graphql.execute`, so nothing classifies a 401 for them. Skipping
+        # the check is meant to cost finding out later, not finding out from
+        # a traceback - the status for a rejected token is 8 either way.
+        raise BadCredentialsError(
+            f"GitHub rejected the token (401). It was not checked first because "
+            f"--no-verify-token was given: {exc.data or exc}"
+        ) from exc
     finally:
         # In a finally block because a run that failed still resolved
         # locations, and throwing that away would make the next attempt pay

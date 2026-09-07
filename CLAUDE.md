@@ -379,6 +379,21 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   `contribution_total` be a plain number rather than an optional one: a
   document exists only where the list was read.
 
+- **A traceback is never a correct outcome for the CLI.** Its job is to turn
+  the package's errors into the published statuses, and exit 1 with a stack
+  trace fails both documented tests - `$? -ge 3` and `$? -ge 5` read it as a
+  run where nothing went wrong. Three defects have taken that shape: an
+  exhausted budget (v0.6.3), a dropped connection (v0.6.7), and a mistyped
+  `--fields` (v0.6.9, where `UnknownFieldError` reached the top carrying a
+  message naming the field, suggesting the nearest match and listing every
+  valid name - which nobody ever saw). A test in `tests/test_cli.py` runs a
+  table of bad command lines and fails on any non-`SystemExit` exception.
+
+- **Check the command line before creating anything.** `_document_root` ran
+  before `--fields` was validated, so a typo left an empty results directory
+  as the only trace of a run that never started. Argument checks cost nothing
+  and touch nothing; put them first.
+
 - **One environment variable, one reader.** `config.Settings` owns every
   variable this tool reads; a click option must not also declare an `envvar`
   for one. `--token` did, for `GITHUB_TOKEN`, which made the environment

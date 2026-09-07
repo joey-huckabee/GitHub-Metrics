@@ -5,8 +5,11 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
+import github_metrics.cli
+import github_metrics.config
 import github_metrics.exit_codes
 from github_metrics import __version__
 from github_metrics.cli import main
@@ -124,3 +127,44 @@ def test_every_cli_error_class_is_raised_somewhere() -> None:
 
     assert declared, "this found no exception classes to check"
     assert sorted(declared - raised) == []
+
+
+@pytest.mark.requirement("L3-CFG-009")
+def test_no_option_reads_a_variable_that_settings_already_owns() -> None:
+    """One variable, one reader.
+
+    `--token` declared `envvar="GITHUB_TOKEN"` while `Settings.from_env` read
+    the same variable, so the environment became indistinguishable from the
+    flag: `--token-file` with `GITHUB_TOKEN` exported - the ordinary way this
+    tool is configured - was refused as "pass --token or --token-file, not
+    both". Two readers of one variable, and the redundant one decided.
+
+    The check is against `config.py` rather than a list, so a variable added
+    there is covered without anyone remembering this test exists.
+    """
+    settings_source = Path(github_metrics.config.__file__).read_text(encoding="utf-8")
+    owned = {
+        node.args[0].value
+        for node in ast.walk(ast.parse(settings_source))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "getenv"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    }
+
+    declared = {
+        keyword.value.value
+        for node in ast.walk(
+            ast.parse(Path(github_metrics.cli.__file__).read_text(encoding="utf-8"))
+        )
+        if isinstance(node, ast.Call)
+        for keyword in node.keywords
+        if keyword.arg == "envvar"
+        and isinstance(keyword.value, ast.Constant)
+        and isinstance(keyword.value.value, str)
+    }
+
+    assert owned, "this found no environment variables in config.py"
+    assert sorted(declared & owned) == []

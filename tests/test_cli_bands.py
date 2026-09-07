@@ -122,6 +122,69 @@ def test_a_token_is_read_from_a_file(tmp_path: Path) -> None:
     assert "4242" in result.output
 
 
+@pytest.fixture
+def resolved_tokens(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Record the token the settings actually resolved to."""
+    seen: list[str] = []
+
+    def capture(settings: Any) -> None:
+        seen.append(settings.github_token)
+
+    monkeypatch.setattr("github_metrics.cli.verify_credentials", capture)
+    monkeypatch.setattr("github_metrics.cli.GitHubClient", lambda _settings: _NullClient())
+    return seen
+
+
+@pytest.mark.requirement("L3-CFG-008", "L3-CFG-009")
+def test_a_token_file_is_used_even_when_the_environment_has_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, resolved_tokens: list[str]
+) -> None:
+    """The documented precedence: a flag beats the environment.
+
+    `--token` carried `envvar="GITHUB_TOKEN"` until v0.6.8, so click filled it
+    from the environment and `_resolve_token` saw a token *and* a token file -
+    refusing the run as "pass --token or --token-file, not both" when the
+    operator had passed one flag. Exporting `GITHUB_TOKEN` is the ordinary way
+    this tool is configured, so `--token-file` was unusable for most of the
+    people it exists for.
+
+    Every other test in the suite is blind to it: the autouse `clean_env`
+    fixture deletes `GITHUB_TOKEN` before each one.
+    """
+    monkeypatch.setenv("GITHUB_TOKEN", "from-the-environment")
+    token_file = tmp_path / "token"
+    token_file.write_text(SECRET + "\n", encoding="utf-8")
+
+    result = run(["--token-file", str(token_file), "rate-limit"])
+
+    assert result.exit_code == 0, result.output
+    assert resolved_tokens == [SECRET]
+
+
+@pytest.mark.requirement("L3-CFG-009")
+def test_the_token_flag_beats_the_environment(
+    monkeypatch: pytest.MonkeyPatch, resolved_tokens: list[str]
+) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "from-the-environment")
+
+    result = run(["--token", "from-the-flag", "rate-limit"])
+
+    assert result.exit_code == 0, result.output
+    assert resolved_tokens == ["from-the-flag"]
+
+
+@pytest.mark.requirement("L3-CFG-009")
+def test_the_environment_is_used_when_no_flag_is_given(
+    monkeypatch: pytest.MonkeyPatch, resolved_tokens: list[str]
+) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "from-the-environment")
+
+    result = run(["rate-limit"])
+
+    assert result.exit_code == 0, result.output
+    assert resolved_tokens == ["from-the-environment"]
+
+
 @pytest.mark.requirement("L3-CFG-008")
 def test_an_empty_token_file_is_a_usage_error(tmp_path: Path) -> None:
     token_file = tmp_path / "token"

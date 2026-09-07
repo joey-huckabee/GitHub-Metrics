@@ -379,6 +379,16 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   `contribution_total` be a plain number rather than an optional one: a
   document exists only where the list was read.
 
+- **One environment variable, one reader.** `config.Settings` owns every
+  variable this tool reads; a click option must not also declare an `envvar`
+  for one. `--token` did, for `GITHUB_TOKEN`, which made the environment
+  indistinguishable from the flag - so `--token-file` with the variable
+  exported failed as "pass --token or --token-file, not both", and the DEBUG
+  line naming the token's source said `--token` for a variable. The autouse
+  `clean_env` fixture deletes those variables, so no ordinary test can see
+  this; a test walks the AST of `cli.py` against the `os.getenv` calls in
+  `config.py` instead.
+
 - **A transport failure is not a `GithubException`.** PyGithub speaks HTTP
   through `requests` and does not wrap what it raises, so a dropped connection
   or a read timeout arrives as a `requests.RequestException` and sails through

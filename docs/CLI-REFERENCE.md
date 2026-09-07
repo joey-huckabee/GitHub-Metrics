@@ -40,6 +40,12 @@ precedence:
 2. `GITHUB_TOKEN` in the environment
 3. `GITHUB_TOKEN` in a `.env` file
 
+A flag and the environment do not conflict: the flag simply wins. Only
+`--token` **and** `--token-file` together is a usage error, since there is no
+sensible order between two things the operator typed on the same line. (Until
+v0.6.8, `--token` also read `GITHUB_TOKEN` itself, so `--token-file` with the
+variable exported was refused as though both flags had been passed.)
+
 > **A token passed as `--token` is visible to other processes on the machine
 > and is written to your shell history.** Prefer the environment or a `.env`
 > file wherever either will do. `--token` exists for the cases where neither

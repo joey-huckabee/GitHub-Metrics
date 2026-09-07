@@ -121,6 +121,10 @@ class Outcome:
         anonymous: What the anonymous tail contained, when it was walked.
             `None` when recovery was not asked for, which is why the exclusion
             it feeds reports commits as unknown rather than zero.
+        unresolvable: Listed logins the detail query could not resolve -
+            accounts deleted or suspended between the two calls. Bots are
+            not counted: a `Bot` never resolves to a `User`, which is a
+            fact about the account type rather than a gap in the data.
         identities: Every contributor identity GitHub reports, anonymous ones
             included, or `None` when the census was skipped or failed.
 
@@ -140,6 +144,7 @@ class Outcome:
     history: HistoryAttribution | None = None
     attribution: AttributionMethod = AttributionMethod.CONTRIBUTOR_LIST
     identities: int | None = None
+    unresolvable: int = 0
     attempted: bool = True
 
     @property
@@ -248,7 +253,7 @@ def _attempt(
             # contributors endpoint nor its anonymous tail adds anything -
             # and paying for them would be paying twice for less.
             walked = attribute_from_history(client, reference.owner, reference.repoid)
-            contributors = build_contributors(
+            contributors, unresolvable = build_contributors(
                 client,
                 walked.accounts,
                 slug=reference.full_name,
@@ -257,7 +262,7 @@ def _attempt(
         else:
             if options.recover_anonymous:
                 tally = collect_anonymous(client, reference.owner, reference.repoid)
-            contributors = get_contributors(
+            contributors, unresolvable = get_contributors(
                 client,
                 reference.owner,
                 reference.repoid,
@@ -289,6 +294,7 @@ def _attempt(
         reference=reference,
         metadata=metadata,
         contributors=tuple(contributors),
+        unresolvable=unresolvable,
         anonymous=tally,
         history=walked,
         attribution=(

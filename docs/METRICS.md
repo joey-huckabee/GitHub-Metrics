@@ -747,13 +747,19 @@ and they call for different responses. The components sum exactly to
 | `linked_by_github` | Inside the 500-author-email ceiling, so GitHub linked an account and the detail query resolved it. | Already collected |
 | `recovered_from_noreply` | Beyond the ceiling, but publishing a `NNN+login@users.noreply.github.com` address carrying GitHub's own account id and login. | Recovered when enabled |
 | `anonymous_unrecoverable` | Beyond the ceiling with a real email address. GitHub exposes no email-to-user lookup, deliberately. | **No** — not by any API |
-| `unresolvable_accounts` | A login GitHub listed that GraphQL then could not resolve: deleted or suspended between the two calls. | No |
+| `unresolvable_accounts` | A login GitHub listed that GraphQL then could not resolve: deleted or suspended between the two calls. Bots are excluded - a `Bot` never resolves to a `User`, which is a fact about the account type rather than a gap, and they are counted in `bots`. | No |
 
 Read it as a diagnosis. A large `anonymous_unrecoverable` is a property of the
 repository's size and there is nothing to be done about most of it. A large
 `unresolvable_accounts` is a property of its age, and means accounts are
 disappearing between the two calls. 12% coverage from the first is expected;
 12% from the second would be a defect worth investigating.
+
+**This bucket was always zero before v0.6.13.** Nothing populated it, so the
+accounts it describes fell into `linked_by_github` - the remainder - and were
+reported as accounts GitHub had linked and the detail query had resolved. Any
+reading of this field taken before v0.6.13 understates it and overstates
+`linked_by_github` by the same amount.
 
 **`commits.coverage_percent` remains the most important number in the file.**
 It is the difference between "87% of this project's work is characterised" and

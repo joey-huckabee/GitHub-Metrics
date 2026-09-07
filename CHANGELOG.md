@@ -8,6 +8,62 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.13] - 2026-09-07
+
+**A published statistic that could not be non-zero.**
+`IdentityGaps.unresolvable` had a field, a key in the document
+(`unresolvable_accounts`), an exclusion reason written for it
+(`ACCOUNT_UNRESOLVABLE`), and a paragraph in `METRICS.md` telling the reader
+that a large value "would be a defect worth investigating". No call site ever
+passed it. All three constructions in `analysis/statistics.py` left it at its
+default of zero.
+
+The accounts it describes did not vanish from the arithmetic - they moved.
+`linked_by_github` is derived as the remainder, precisely so the breakdown
+always sums to `identities`, so it absorbed them: an account **deleted or
+suspended between the two calls** was published as one GitHub had linked and
+the detail query had resolved. The opposite of what happened to it, and the
+breakdown still summed correctly.
+
+The conformance suite settled how real this is. Replaying recorded live
+traffic, one account in the anonymous-route fixture is affected:
+
+    - "linked_by_github": 156,        + "linked_by_github": 155,
+    - "unresolvable_accounts": 0      + "unresolvable_accounts": 1
+                                      + { "reason": "account_unresolvable", "people": 1 }
+
+### Fixed
+
+- **The count is taken where it is known.** `build_contributors` compares the
+  logins it asked about against the ones the detail query returned, and reports
+  the difference; the runner carries it on the `Outcome` beside `identities`,
+  which exists for the same reason; `gaps_from_outcome` publishes it.
+- **Bots are excluded.** A `Bot` never resolves to a `User` - a fact about the
+  account type rather than a gap in the data, and they are already reported in
+  `bots`. Counting them would have turned this into a bot census and buried the
+  accounts the field exists to surface, since a large repository is more likely
+  to have a bot than not.
+- **`ACCOUNT_UNRESOLVABLE` is reachable.** The exclusion branch guarded by
+  `if gaps.unresolvable:` had never run.
+
+### Changed
+
+- **`L3-STA-011`** states the obligation, including the bot exclusion.
+- **`METRICS.md` records that the bucket was always zero before v0.6.13**, so a
+  reading taken from an earlier scan is not mistaken for a measurement. Any
+  such reading understates this field and overstates `linked_by_github` by the
+  same amount.
+
+### Notes
+
+The document's shape is unchanged. A first attempt recorded the fact on each
+`Contributor` instead, which is arguably where it belongs - the same argument
+`Address` makes for distinguishing "never asked" from "asked and unresolved" -
+but `tests/test_contributor_model.py` enforces that every declared field is
+rendered in the document, so that route meant changing the published contributor
+record. The count answers the reported defect on its own; per-contributor
+resolution is a separate decision, and a schema change rather than a fix.
+
 ## [0.6.12] - 2026-09-07
 
 **A registry that trusts nobody got the built-in three.** `is_trusted_org` and
@@ -1960,7 +2016,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.12...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.13...HEAD
+[0.6.13]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.12...v0.6.13
 [0.6.12]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.11...v0.6.12
 [0.6.11]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.10...v0.6.11
 [0.6.10]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.9...v0.6.10

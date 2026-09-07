@@ -8,6 +8,67 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.14] - 2026-09-07
+
+**Two stack traces per unresolvable location, outside the logger entirely.**
+`geopy.extra.rate_limiter` logs each retry with `exc_info=True`, and the
+`geopy` logger has no handler - so the records reached Python's handler of last
+resort, which writes to **stderr at WARNING with no formatter**. Twenty-two
+lines per location the service could not resolve, in neither this package's
+format nor under its control:
+
+    LOG_LEVEL   stderr lines   tracebacks
+    ERROR                 22            2
+    INFO                  22            2
+    DEBUG                 22            2
+
+`LOG_LEVEL` could not touch them, because the level governing them was the
+last-resort handler's rather than ours. Meanwhile the one honest line about the
+same event - `geo.py`'s "Geocoding failed for the normalised location ..." -
+*was* correctly suppressed at ERROR. The operator could silence the useful
+message and not the noise.
+
+`reset_logger` configures the `github_metrics` logger and sets
+`propagate = False` on it, which is right and was never the problem. Nothing
+configured the tree the third-party records travel.
+
+### Fixed
+
+- **`reset_logger` adopts the libraries that log without a handler of their
+  own** - `THIRD_PARTY_LOGGERS`, which today is `geopy` alone. They get the
+  package handler, `propagate = False`, and ERROR unless the package level is
+  DEBUG. Output now carries the package format and obeys `LOG_LEVEL`:
+
+      LOG_LEVEL   lines   tracebacks
+      ERROR           0            0
+      WARNING         1            0
+      INFO            1            0
+      DEBUG          25            2
+
+  One line at the default, naming the location, from `geo.py`. The retries
+  remain available to anyone diagnosing, in the package's format.
+
+- **Held at ERROR by default rather than passed through.** `geo.py` already
+  reports a failed lookup once, and geopy's version is the same event twice
+  more with a stack trace. `Geocoder` builds its `RateLimiter` with
+  `swallow_exceptions=False`, so an error geopy does not retry past is raised
+  rather than logged - nothing is lost by holding its own logging back.
+
+### Changed
+
+- **`L3-LOG-004`** states it, including the rule for the list: only a library
+  that would otherwise reach the last-resort handler belongs in it.
+
+### Notes
+
+`geopy` is the only dependency here that needs this, established by walking the
+logger tree after importing the CLI rather than by assumption. `requests`,
+`urllib3`, `charset_normalizer` and PyGithub each attach a `NullHandler`, which
+is the convention that makes a library's logging inert until an application
+asks for it. `asyncio` is in the same position as `geopy` and is deliberately
+not listed: nothing here uses it, and adopting a logger this package never
+causes to emit would be a claim about behaviour that does not happen.
+
 ## [0.6.13] - 2026-09-07
 
 **A published statistic that could not be non-zero.**
@@ -2016,7 +2077,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.13...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.14...HEAD
+[0.6.14]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.13...v0.6.14
 [0.6.13]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.12...v0.6.13
 [0.6.12]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.11...v0.6.12
 [0.6.11]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.10...v0.6.11

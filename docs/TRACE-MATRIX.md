@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 22
 - L2 requirements: 88
-- L3 requirements: 140
-- Verified L2+L3: 228 of 228 (100.0%)
+- L3 requirements: 141
+- Verified L2+L3: 229 of 229 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -281,7 +281,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|-------------|----------------|--------|
 | L2-LOG-001 | L1-LOG-001 | L3-LOG-001 | _(none)_ | Implemented |
 | L2-LOG-002 | L1-LOG-001 | L3-LOG-002 | _(none)_ | Implemented |
-| L2-LOG-003 | L1-LOG-001 | L3-LOG-003 | _(none)_ | Implemented |
+| L2-LOG-003 | L1-LOG-001 | L3-LOG-003, L3-LOG-004 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -290,6 +290,7 @@ through their children, so counting them too would count the same work twice.
 | L3-LOG-001 | L2-LOG-001 | `tests/test_csv_inventory.py::test_row_issues_are_logged_at_debug` | Implemented |
 | L3-LOG-002 | L2-LOG-002 | `tests/test_repository.py::test_an_unremarkable_repository_is_collected_in_silence`<br>`tests/test_repository.py::test_something_worth_doubting_is_still_a_warning`<br>`tests/test_repository.py::test_the_detail_is_still_there_at_debug`<br>`tests/test_resolve.py::test_the_run_reports_its_outcome_once_at_info` | Implemented |
 | L3-LOG-003 | L2-LOG-003 | `tests/test_logger.py::test_from_name_falls_back_for_unknown_levels`<br>`tests/test_logger.py::test_from_name_resolves_known_levels`<br>`tests/test_logger.py::test_reset_logger_filters_below_the_minimum_level`<br>`tests/test_logger.py::test_reset_logger_is_idempotent`<br>`tests/test_logger.py::test_reset_logger_writes_to_the_given_stream` | Implemented |
+| L3-LOG-004 | L2-LOG-003 | `tests/test_logger.py::test_a_library_warning_never_escapes_to_the_real_stderr`<br>`tests/test_logger.py::test_an_adopted_library_is_quiet_unless_someone_is_diagnosing`<br>`tests/test_logger.py::test_an_adopted_library_never_reaches_the_last_resort_handler`<br>`tests/test_logger.py::test_an_adopted_library_writes_through_the_package_handler`<br>`tests/test_logger.py::test_only_libraries_without_a_handler_are_adopted` | Implemented |
 
 ### MET: Metric collection
 

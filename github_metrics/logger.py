@@ -10,6 +10,21 @@ from typing import Final, TextIO
 #: Every module in the package logs through a child of this logger.
 PACKAGE_LOGGER_NAME: Final = "github_metrics"
 
+THIRD_PARTY_LOGGERS: Final = ("geopy",)
+"""Libraries that log without attaching a handler of their own.
+
+Only these need adopting. A library that attaches a `NullHandler` - which
+`requests`, `urllib3`, `charset_normalizer` and PyGithub all do - never reaches
+Python's handler of last resort, so its output is already ours to control or
+silently discarded. `geopy` attaches none, and `geopy.extra.rate_limiter` logs
+every retry with `exc_info=True`.
+
+Checked by walking the logger tree after importing the CLI, rather than
+assumed: `asyncio` is in the same position and is not listed because nothing
+here uses it, and adopting a logger this package never causes to emit would be
+a claim about behaviour that does not happen.
+"""
+
 _DEFAULT_LOG_FORMAT: Final = "%(levelname)-8s %(asctime)s %(filename)s:%(lineno)s:%(message)s"
 _DEFAULT_DATE_FORMAT: Final = "%Y-%m-%dT%H:%M:%S%z"
 
@@ -81,7 +96,46 @@ def reset_logger(
     # The package owns its own output; don't re-emit through the root logger.
     logger.propagate = False
 
+    _adopt_third_party(handler, min_level)
+
     return logger
+
+
+def _adopt_third_party(handler: logging.Handler, min_level: int) -> None:
+    """Bring the libraries that log without a handler under this one.
+
+    A library that logs and attaches no handler of its own reaches Python's
+    handler of last resort, which writes to **stderr at WARNING with no
+    formatter** - outside this package's format and, worse, outside its level.
+    Most libraries avoid that by attaching a `NullHandler`; `requests`,
+    `urllib3`, `charset_normalizer` and PyGithub all do. `geopy` does not.
+
+    What that cost: `geopy.extra.rate_limiter` logs each retry with
+    `exc_info=True`, so a location the service could not resolve printed
+    **two full stack traces**, twenty-two lines, per location - unformatted,
+    and emitted identically at `LOG_LEVEL=ERROR`, `INFO` and `DEBUG`, because
+    the level that governed them was the last-resort handler's rather than
+    ours. Meanwhile the one honest line about the same event, from
+    `geo.py`, was correctly suppressed at ERROR. The operator could silence
+    the useful message and not the noise.
+
+    Args:
+        handler: The package handler, so adopted output shares the format.
+        min_level: The level the package was configured with.
+    """
+    for name in THIRD_PARTY_LOGGERS:
+        adopted = logging.getLogger(name)
+        while adopted.handlers:
+            existing = adopted.handlers[0]
+            adopted.removeHandler(existing)
+        adopted.addHandler(handler)
+        adopted.propagate = False
+        # Quiet unless someone is diagnosing. `geo.py` already reports a
+        # failed lookup once, naming the location; geopy's version is the same
+        # event twice more with a stack trace attached. An error it does not
+        # swallow is raised rather than logged, so nothing is lost by holding
+        # its own logging at ERROR.
+        adopted.setLevel(min_level if min_level <= LogLevels.DEBUG else LogLevels.ERROR)
 
 
 class Logger:

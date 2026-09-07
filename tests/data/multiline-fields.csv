@@ -1,0 +1,8 @@
+owner,repoid,note
+pypa,virtualenv,"a note that
+spans two lines"
+psf,requests,plain
+gitlab.com,,"another
+spanning
+note"
+bokeh,bokeh,plain

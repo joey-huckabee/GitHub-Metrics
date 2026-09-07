@@ -132,6 +132,13 @@ Three properties are deliberate:
   then emptiness, then grammar, then duplication. A row stops at its first
   failure.
 - **Line numbers are physical**, so they match what the analyst's editor shows.
+  Read from `csv.reader.line_num`, never derived from the row's index. A row is
+  not always one line: a quoted field may span several, and it does not have to
+  be in a column this module reads. Deriving the line was justified in a comment
+  arguing that such a field "cannot occur in a valid owner or repoid, and a row
+  containing one is rejected anyway" - true of those two columns, and beside the
+  point, since a note column spanning two lines made every line after it wrong
+  by one. Fixed in v0.6.11.
 
 ### Error model
 

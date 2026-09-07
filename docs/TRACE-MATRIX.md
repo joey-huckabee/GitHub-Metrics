@@ -200,7 +200,7 @@ through their children, so counting them too would count the same work twice.
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
 | L3-ERR-001 | L2-ERR-001 | `tests/test_csv_inventory.py::test_a_directory_given_instead_of_a_file_raises`<br>`tests/test_csv_inventory.py::test_a_file_containing_a_nul_byte_raises`<br>`tests/test_csv_inventory.py::test_a_file_that_is_not_utf8_raises`<br>`tests/test_csv_inventory.py::test_a_file_with_no_header_raises`<br>`tests/test_csv_inventory.py::test_a_header_declaring_a_column_twice_raises`<br>`tests/test_csv_inventory.py::test_a_header_missing_required_columns_raises`<br>`tests/test_csv_inventory.py::test_missing_file_raises` | Implemented |
-| L3-ERR-002 | L2-ERR-002 | `tests/test_csv_inventory.py::test_every_row_rejection_kind_is_reported_and_the_good_row_survives`<br>`tests/test_csv_inventory.py::test_issues_carry_the_line_number_and_render_like_a_compiler_diagnostic` | Implemented |
+| L3-ERR-002 | L2-ERR-002 | `tests/test_csv_inventory.py::test_a_duplicate_points_at_the_physical_line_it_repeats`<br>`tests/test_csv_inventory.py::test_a_line_number_survives_a_multi_line_quoted_field`<br>`tests/test_csv_inventory.py::test_every_row_rejection_kind_is_reported_and_the_good_row_survives`<br>`tests/test_csv_inventory.py::test_issues_carry_the_line_number_and_render_like_a_compiler_diagnostic` | Implemented |
 | L3-ERR-003 | L2-ERR-003 | `tests/test_csv_inventory.py::test_a_duplicate_alone_is_enough_to_trip_strict_mode`<br>`tests/test_csv_inventory.py::test_strict_mode_aborts_on_the_first_bad_row`<br>`tests/test_csv_inventory.py::test_strict_mode_accepts_a_clean_file_unchanged` | Implemented |
 | L3-ERR-004 | L2-ERR-004 | `tests/test_csv_inventory.py::test_error_codes_are_unique_across_the_taxonomy`<br>`tests/test_csv_inventory.py::test_every_ingest_failure_shares_one_base_class` | Implemented |
 
@@ -259,7 +259,7 @@ through their children, so counting them too would count the same work twice.
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-ING-001 | L2-ING-001 | `tests/test_csv_inventory.py::test_each_row_becomes_a_github_url`<br>`tests/test_csv_inventory.py::test_reads_the_documented_example`<br>`tests/test_csv_inventory.py::test_source_line_is_recorded_for_every_reference` | Implemented |
+| L3-ING-001 | L2-ING-001 | `tests/test_csv_inventory.py::test_a_line_number_survives_a_multi_line_quoted_field`<br>`tests/test_csv_inventory.py::test_each_row_becomes_a_github_url`<br>`tests/test_csv_inventory.py::test_reads_the_documented_example`<br>`tests/test_csv_inventory.py::test_source_line_is_recorded_for_every_reference` | Implemented |
 | L3-ING-002 | L2-ING-002 | `tests/test_csv_inventory.py::test_a_byte_order_mark_does_not_hide_the_header` | Implemented |
 | L3-ING-003 | L2-ING-003 | `tests/test_csv_inventory.py::test_crlf_line_endings_are_accepted` | Implemented |
 | L3-ING-004 | L2-ING-004 | `tests/test_csv_inventory.py::test_columns_may_be_reordered_recased_and_padded`<br>`tests/test_csv_inventory.py::test_unrecognised_columns_are_ignored` | Implemented |

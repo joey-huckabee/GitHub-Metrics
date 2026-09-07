@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 from click.testing import CliRunner
 
+import github_metrics.exit_codes
 from github_metrics import __version__
 from github_metrics.cli import main
 
@@ -61,3 +63,64 @@ def test_missing_token_is_a_friendly_error(empty_env_file: Path) -> None:
 
     assert result.exit_code != 0
     assert "GITHUB_TOKEN" in result.output
+
+
+def test_every_declared_exit_status_has_something_that_raises_it() -> None:
+    """A status nobody raises is a promise the CLI does not keep.
+
+    `EXIT_RATE_LIMITED` was declared with the rest of the scheme, before any
+    code could reach the condition, and never acquired a raiser. Four
+    documents named 5 as the status for an exhausted budget while the run
+    exited 1 with a traceback. Nothing caught it for six releases, because a
+    constant nobody reads is invisible to every kind of check the repository
+    has: vulture sees a used module attribute, mypy sees a valid int, and the
+    one test over the condition asserted `!= 0`, which a traceback satisfies.
+
+    Declaring a status and wiring it up are two edits. Only one of them was
+    ever checked.
+    """
+    module = Path(github_metrics.exit_codes.__file__)
+    declared = {
+        target.id
+        for node in ast.parse(module.read_text(encoding="utf-8")).body
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name) and target.id.startswith("EXIT_")
+    }
+    # Across the package, not just this module: 3 and 4 are delivered by
+    # `ctx.exit` in the command rather than by an exception class, and both
+    # routes count as wiring a status up.
+    loaded = {
+        node.id
+        for path in module.parent.rglob("*.py")
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+    }
+
+    assert declared, "the exit statuses are module-level constants; this found none"
+    assert sorted(declared - loaded) == []
+
+
+def test_every_cli_error_class_is_raised_somewhere() -> None:
+    """The same rule for the classes, which is how the second one was found.
+
+    `RepositoryError` carried `EXIT_DEGRADED` and was raised nowhere: exit 4
+    is delivered by `ctx.exit`, so the class had been dead since it was
+    written. Harmless, unlike its sibling, and the same defect - a declared
+    exit path with nothing behind it. It was removed in v0.6.3.
+    """
+    module = Path(github_metrics.exit_codes.__file__)
+    tree = ast.parse(module.read_text(encoding="utf-8"))
+    declared = {node.name for node in tree.body if isinstance(node, ast.ClassDef)}
+    package = module.parent
+    raised = {
+        node.exc.func.id
+        for path in package.rglob("*.py")
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Raise)
+        and isinstance(node.exc, ast.Call)
+        and isinstance(node.exc.func, ast.Name)
+    }
+
+    assert declared, "this found no exception classes to check"
+    assert sorted(declared - raised) == []

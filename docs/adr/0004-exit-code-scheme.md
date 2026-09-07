@@ -94,6 +94,20 @@ gives a single rule to reason about instead of a precedence table, and it means
 a caller can write `[ $? -ge 5 ]` to mean "nothing usable came out" and
 `[ $? -ge 3 ]` to mean "something was wrong".
 
+**Code `5` produces no output, not "partial or none".** The table above allowed
+partial output because a run could once exhaust its budget after writing rows.
+Since ADR-0011 that outcome is code `4`: a run stopped under
+`--on-exhaustion partial` writes a usable file and exits degraded. What remains
+under `5` - the pre-flight refusing, and `BudgetGuard` stopping a run under
+`--on-exhaustion fail` - aborts upstream of every write. So `5` is unambiguously
+below the boundary, which is what the `$? -ge 5` test needs it to be.
+
+It reached that state on paper first. `EXIT_RATE_LIMITED` was declared with the
+rest of this scheme before any code could raise it, acquired no raiser for six
+releases, and the condition exited `1` with a traceback until v0.6.3 - a status
+that fails both tests below, so a caller following this ADR read a refused run
+as a clean one.
+
 **Amended by [ADR-0011](0011-one-degraded-exit-status.md).** Code `4` covers
 every incomplete outcome rather than unfetchable repositories alone: a
 repository never attempted, or one measured whose contributor list failed, exit

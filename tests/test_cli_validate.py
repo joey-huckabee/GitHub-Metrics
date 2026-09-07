@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from github_metrics.cli import EXIT_INPUT_UNREADABLE, EXIT_ROWS_REJECTED, main
+from github_metrics.cli import main
+from github_metrics.exit_codes import EXIT_INPUT_UNREADABLE, EXIT_ROWS_REJECTED
 
 DATA = Path(__file__).parent / "data"
 

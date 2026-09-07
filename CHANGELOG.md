@@ -6,6 +6,92 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.6.3] - 2026-09-06
+
+**A status that was never wired up.** Exit `5` has meant "the API budget could
+not cover the run" since the scheme was written, and four documents say so -
+`ERROR-CATALOG.md` names the number against `GM-COL-004`, and `ADR-0004`,
+`CLI-REFERENCE.md` and `USER-GUIDE.md` repeat it. The CLI never raised it.
+`RateLimitExhaustedError` is a `CollectionError`, not a `ClickException`, so it
+propagated out of the command: `--on-exhaustion fail` exited **1** with a
+Python traceback and no message an operator could act on.
+
+Exit 1 fails *both* published tests:
+
+    $? -ge 3    something was wrong
+    $? -ge 5    nothing usable came out
+
+A run that spent nothing and wrote no file therefore read as a run where
+nothing went wrong. That is the same defect as exit `9` last release, pointing
+the other way, and it is worse: `9` mislabelled a usable file, `1` denies that
+anything happened.
+
+**It was never wired up rather than broken later**, which is why no change
+could be blamed. `EXIT_RATE_LIMITED` was declared in v0.1.0 alongside
+`EXIT_REPOSITORY_UNFETCHABLE`, which got an exception class the same day. This
+one got a docstring and a number, because the condition that would raise it did
+not exist yet - there was nothing to connect it to. `RateLimitExhaustedError`
+arrived in the same release from the other direction, and by then the constant
+looked finished. Three later commits added raise sites; none added a handler.
+
+Nothing could see it. Vulture reads a used module attribute. Mypy reads a valid
+`int`. The trace matrix reported `L3-CLI-009` Implemented, because the one test
+over the condition asserted `exit_code != 0` - which a traceback satisfies. The
+status had a number, a docstring, a catalog entry and a test, and no raiser.
+
+### Fixed
+
+- **`--on-exhaustion fail` exits 5 and reports the shortfall.** A new
+  `RateLimitedError(click.ClickException)` carries `EXIT_RATE_LIMITED`, and
+  `_collect` converts. The conversion is in `_collect` rather than at its call
+  site because both raise sites are inside that block - the pre-flight, and
+  `BudgetGuard` within `collect_all` - and catching at the call site would
+  leave whichever one the next person forgets. The operator now sees
+  `Error: [GM-COL-004] ...` on stderr instead of a stack trace.
+- **The mid-run guard is covered.** It had no CLI-level test at all. It is the
+  harder half to argue: the run has already spent quota, so "nothing usable
+  came out" has to be established rather than assumed. It holds because the
+  guard raises out of `collect_all`, upstream of every write - no CSV, no
+  document, no `statistics.json` - and the test asserts the output directory is
+  empty rather than trusting that.
+- **`RepositoryError` is removed.** A second `ClickException` carrying
+  `EXIT_DEGRADED`, raised nowhere: exit 4 is delivered by `ctx.exit`, so the
+  class had been dead since it was written. Harmless, unlike its sibling, and
+  the same defect - a declared exit path with nothing behind it. Found by
+  extending the check below from constants to classes.
+
+### Changed
+
+- **The exit-status scheme has a module: `github_metrics/exit_codes.py`.** It
+  had no owner, which is how it came to publish a status nothing could raise -
+  numbers in `cli.py`, conditions in `errors.py`, contract in four documents,
+  nothing binding them. `cli.py` also sat nine lines under pylint's
+  1000-line cap, so the fix did not fit beside its own explanation; raising the
+  cap or writing the fix undocumented would both have preserved the cause.
+  `cli.py` is 928 lines now. Tests import the statuses from the new module;
+  `from github_metrics.cli import main` is unchanged.
+- **Two rules hold in that module, both tested.** Every status declared there
+  is loaded somewhere in the package - by an exception class, or by `ctx.exit`
+  in the command - and every `ClickException` there is raised somewhere.
+  Declaring a status and wiring it up are two edits, and only one of them was
+  ever checked.
+- **`L3-CLI-012`** states the obligation that was missing: a run the budget
+  refuses or stops under `fail` exits 5 from either source, reports
+  `GM-COL-004` rather than a traceback, and leaves no artifact. `L3-EXH-002`
+  had specified what `fail` *raises* internally and what `partial` *exits*,
+  and named no status for `fail` - the gap, in the requirements, in one line.
+- **`ADR-0004` records that code `5` produces no output**, not the "partial or
+  none" its original table allowed. Since `ADR-0011` a run stopped under
+  `--on-exhaustion partial` exits `4`; what remains under `5` aborts upstream
+  of every write, so `5` is unambiguously below the boundary that `$? -ge 5`
+  depends on.
+- **`CLI-REFERENCE.md` no longer calls exit 5 "reserved"** in its summary
+  table, or claims it may leave partial output. That row was the one place any
+  document admitted the code was not wired up, two lines above the sentence
+  that contradicted it.
+
 ### Documentation
 
 - **The results database is cancelled, and the reasoning is recorded.**
@@ -1328,7 +1414,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.5.0...v0.6.0

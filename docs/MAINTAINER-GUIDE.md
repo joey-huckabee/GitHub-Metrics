@@ -137,6 +137,53 @@ lines, duplicates including a case variant, every row-rejection kind, an empty
 file, a headerless file, a bad header, a duplicated column, non-UTF-8 bytes,
 and an embedded NUL.
 
+## The soak checks
+
+`make check` runs against stubs in seconds. Every defect fixed between v0.6.3
+and v0.6.15 lived on a path those stubs cannot reach - a budget running out, a
+connection dropping, a history page failing - and each was found by reading and
+then fixed and verified by simulation. Nothing in this repository had ever
+driven those paths against the real service.
+
+```bash
+make soak              # minutes, a small amount of budget
+make soak-exhaustion   # over an hour, a token's whole hourly quota
+```
+
+Both need a real `GITHUB_TOKEN` and skip cleanly without one. Neither is part
+of `make check`, and the CI gate deselects them: they cost budget, they take
+time, and they can fail for reasons that are nobody's fault. **A soak failure
+is a question, not a verdict** - read it before believing it.
+
+The same checks run weekly from `.github/workflows/soak.yml`, and can be
+started by hand from the Actions tab with a profile argument. It gates nothing.
+
+### What the profiles do
+
+`quick` collects a handful of real repositories, one of which does not exist,
+and asserts what only a live run can show:
+
+| check | why a stub cannot show it |
+|---|---|
+| Spend is measured and the remaining count moves | every stub answers a constant, so a budget that never moved would look identical |
+| A repository GitHub does not have degrades the row, not the run | both times this broke, the stub was answering something the real transport never sends |
+| stderr carries nothing outside the package's format | the geocoder here is real, so a library logging outside the handler shows up |
+| The identity breakdown sums to `identities` | the buckets are derived, so one nobody populates hides in the remainder |
+
+`exhaustion` drives the hourly budget to its end with `--deep-attribution` on a
+large history - a point per hundred commits reaches the wall in one repository
+rather than five hundred - and checks that the run stops, says so, and still
+writes its file. It is manual on purpose: scheduling it weekly would buy one
+check at the price of a token nobody else can use for an hour.
+
+### Adding a check
+
+Put it in `tests/test_soak.py` behind the `soak` marker, and **assert structure
+rather than values**. Star counts change and contributors come and go; a check
+that pins them is a check that fails on Tuesdays and gets ignored by Wednesday.
+The existing ones assert that a figure moved, that a bucket is populated, that
+a failure was classified - all true whatever the numbers are that day.
+
 ## The offline/online boundary
 
 **`sources/` never touches the network. `collect/` never touches a disk format.**

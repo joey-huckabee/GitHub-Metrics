@@ -83,7 +83,7 @@ jobs:
         run: poetry install --with dev --no-interaction
 
       - name: pytest
-        run: poetry run pytest -m "not integration"
+        run: poetry run pytest -m "not integration and not soak"
 
       - name: Upload coverage
         if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'

@@ -1,6 +1,6 @@
 [project]
 name = "github-metrics"
-version = "0.6.15"
+version = "0.6.16"
 description = "Calculate GitHub Metrics for FOSS Analysis"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -157,6 +157,7 @@ addopts = [
 ]
 markers = [
     "integration: tests that hit the live GitHub API (deselect with '-m \"not integration\"')",
+    "soak: long-running checks against the live API; needs a token and spends budget. Run with 'make soak', never in `make check`",
     "requirement(*ids): requirement identifiers this test verifies; harvested by scripts/build-trace-matrix.py",
 ]
 

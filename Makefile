@@ -5,7 +5,7 @@ PKG := github_metrics
 TESTS := tests
 SCRIPTS := scripts
 
-.PHONY: help install format lint types test cov dead trace trace-check conformance mutants check clean hooks
+.PHONY: help install format lint types test cov soak soak-exhaustion dead trace trace-check conformance mutants check clean hooks
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -31,9 +31,16 @@ types: ## Run mypy
 	$(RUN) mypy --config-file mypy.ini
 
 test: ## Run the test suite
-	$(RUN) pytest -m "not integration"
+	$(RUN) pytest -m "not integration and not soak"
 
 cov: test ## Alias for test (coverage is always on)
+
+soak: ## Long-running checks against the live API. Needs GITHUB_TOKEN; spends budget
+	$(RUN) pytest -m soak -v
+
+soak-exhaustion: ## Drive the hourly budget to its end and watch the policy work
+	@echo "This spends a token's whole hourly quota and takes over an hour."
+	SOAK_PROFILE=exhaustion $(RUN) pytest -m soak -v
 
 dead: ## Look for unused code
 	$(RUN) vulture

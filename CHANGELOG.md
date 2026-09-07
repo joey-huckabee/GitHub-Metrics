@@ -8,6 +8,61 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.16] - 2026-09-07
+
+**Live checks, because the stubs are the blind spot.** Every defect fixed
+between v0.6.3 and v0.6.15 lived on a path the ordinary suite cannot reach - a
+budget running out, a connection dropping, a history page failing - and each
+was found by reading, then fixed and verified by simulation. The suite had one
+integration test, and CI deselected it, so nothing here had ever driven those
+paths against the real service.
+
+### Added
+
+- **`make soak`** - live-API checks against a handful of real repositories, one
+  of which does not exist. Minutes, a small amount of budget, and it asserts
+  what only a live run can show: that spend is measured and the remaining count
+  moves, that an absent repository degrades its row rather than the run, that
+  nothing writes to stderr outside the package's format, and that the identity
+  breakdown sums to `identities`.
+- **`make soak-exhaustion`** - drives the hourly budget to its end with
+  `--deep-attribution` on a large history, and checks the run stops, says so,
+  and still writes its file. **Manual only**: it spends a token's whole hourly
+  quota, so scheduling it weekly would buy one check at the price of a token
+  nobody else can use.
+- **`.github/workflows/soak.yml`** - the same checks weekly, and on demand from
+  the Actions tab with a profile argument. It **gates nothing**: a soak failure
+  can mean the tool broke, or that GitHub was slow, or that someone else was
+  spending the token, so it reports and a person reads it.
+- **A guard against the new hole this opens.** A requirement whose only
+  verification artifact is a soak test would read **Implemented** in the trace
+  matrix on the strength of something no merge ever runs. That is this
+  repository's most persistent failure - a marker claiming coverage the
+  assertion does not provide - in a new place, so `tests/test_trace_matrix.py`
+  refuses it, and asserts it found soak tests to look at rather than passing
+  because it found none.
+
+### Changed
+
+- **`make check` and CI deselect `soak`** as well as `integration`. The gate
+  stays offline, fast, and free.
+- **`MAINTAINER-GUIDE.md`** documents both profiles, what each check proves
+  that a stub cannot, and the rule for adding one: assert structure, not
+  values. Star counts change and contributors come and go; a check that pins
+  them fails on Tuesdays and is ignored by Wednesday.
+
+### Notes
+
+The scheduled run needs a `SOAK_GITHUB_TOKEN` secret - deliberately not the
+workflow's own `GITHUB_TOKEN`, which cannot read the GraphQL fields a scan
+needs, and which the exhaustion profile would drain. It also sets its own
+`GEOCODER_USER_AGENT` and a cache path outside the runner's home, so a
+scheduled job cannot get the shared agent blocked or hide a broken lookup
+behind a warm cache.
+
+**These checks are new and have not yet run against a live token.** The first
+scheduled run is the one to watch.
+
 ## [0.6.15] - 2026-09-07
 
 **An audit's worth of drift, and the tests were reading the developer's own
@@ -2168,7 +2223,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.15...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.16...HEAD
+[0.6.16]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.15...v0.6.16
 [0.6.15]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.14...v0.6.15
 [0.6.14]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.13...v0.6.14
 [0.6.13]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.12...v0.6.13

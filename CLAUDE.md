@@ -53,6 +53,8 @@ make dead           # vulture
 make trace          # regenerate docs/TRACE-MATRIX.md
 make trace-check    # fail if the committed matrix is stale
 make mutants        # mutation check; minutes, not seconds, and not in `check`
+make soak           # live-API checks; needs a token, spends budget, not in `check`
+make soak-exhaustion  # drives the budget to its end; over an hour, manual only
 
 # Without make
 poetry run pytest -m "not integration"
@@ -582,8 +584,17 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   ordering; running both invites them to disagree.
 - **Python 3.14 is a required CI target**, not an experimental one. It passed
   on the first run, so a regression there should fail the build.
-- **Anything touching the live API is marked `@pytest.mark.integration`.** CI
-  runs `-m "not integration"`.
+- **Anything touching the live API is marked `@pytest.mark.integration`**, and
+  the long-running live checks `@pytest.mark.soak`. CI runs
+  `-m "not integration and not soak"`.
+
+  **The stubs are the blind spot, and the soak checks exist because of it.**
+  Every defect fixed between v0.6.3 and v0.6.15 was on a path the stubs cannot
+  reach, and several were invisible precisely *because* a stub answered
+  something the real transport never sends - a `NOT_FOUND` payload PyGithub
+  raises past, a budget that never moves, a logger with a handler geopy does
+  not attach. When a stub and the service disagree, the stub is what the suite
+  believes. `make soak` is the counterweight; see `MAINTAINER-GUIDE.md`.
 - **black, isort and ruff run over the whole tree, not over `github_metrics
   tests scripts`.** CI passes `.`, so scoping them to the package in the
   Makefile lets a file outside it fail CI after `make check` has passed. That

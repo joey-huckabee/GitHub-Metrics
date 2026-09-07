@@ -379,6 +379,15 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   `contribution_total` be a plain number rather than an optional one: a
   document exists only where the list was read.
 
+- **A transport failure is not a `GithubException`.** PyGithub speaks HTTP
+  through `requests` and does not wrap what it raises, so a dropped connection
+  or a read timeout arrives as a `requests.RequestException` and sails through
+  every `except GithubException`. Catch `client.TRANSPORT_ERRORS` alongside it -
+  a test walks the AST and fails any `try` that handles one without the other.
+  Retries are not cover: PyGithub's default is `total=10` with
+  `backoff_factor=0`, so ten attempts pass in milliseconds. `collect/` imports
+  the tuple rather than `requests`, so one module knows what the transport is.
+
 - **Anything on the contributor half that calls `execute` must translate what
   it raises** into `ContributorCollectionError`, letting `RateLimitExhaustedError`
   through untouched. `runner.py` catches exactly one type there, so an

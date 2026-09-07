@@ -37,9 +37,9 @@ from typing import Final
 
 from github.GithubException import BadCredentialsException, GithubException
 
-from github_metrics.client import GitHubClient
+from github_metrics.client import TRANSPORT_ERRORS, GitHubClient
 from github_metrics.config import Settings
-from github_metrics.errors import InvalidCredentialsError
+from github_metrics.errors import InvalidCredentialsError, TransportError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -106,6 +106,9 @@ def verify_credentials(settings: Settings, client: GitHubClient | None = None) -
         What the check learned, for logging and for a pre-flight budget.
 
     Raises:
+        TransportError: GitHub could not be reached at all. Distinguished from
+            a rejected token because the fix is the network, and telling an
+            operator to rotate a working token wastes the one thing they have.
         InvalidCredentialsError: GitHub rejected the token, or the check could
             not be completed.
     """
@@ -125,6 +128,12 @@ def verify_credentials(settings: Settings, client: GitHubClient | None = None) -
         raise InvalidCredentialsError(
             "GitHub rejected the token (401). It may be expired, revoked, or "
             f"mistyped. Kind detected from its prefix: {kind}."
+        ) from exc
+    except TRANSPORT_ERRORS as exc:
+        # Not a credentials problem: nothing was reached to reject the token,
+        # so saying it was rejected sends the operator to the wrong fix.
+        raise TransportError(
+            f"could not reach {settings.api_url} to verify the token: {exc}"
         ) from exc
     except GithubException as exc:
         raise InvalidCredentialsError(

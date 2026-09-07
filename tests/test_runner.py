@@ -7,6 +7,7 @@ import threading
 from typing import Any, cast
 
 import pytest
+import requests
 from github.GithubException import GithubException
 
 from github_metrics.client import GitHubClient
@@ -588,3 +589,38 @@ def test_a_run_the_rest_budget_cannot_cover_is_refused() -> None:
     message = str(caught.value)
     assert "REST" in message
     assert "40 remain" in message
+
+
+class _DropsConnection(_StubClient):
+    """Serves `before_drop` calls, then the network goes away for good."""
+
+    def __init__(self, before_drop: int = 1) -> None:
+        super().__init__()
+        self.before_drop = before_drop
+        self.served = 0
+
+    def graphql(
+        self, query: str, variables: dict[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Fail the way `requests` fails once its retries are spent."""
+        self.served += 1
+        if self.served > self.before_drop:
+            raise requests.exceptions.ConnectionError("Max retries exceeded")
+        return super().graphql(query, variables)
+
+
+@pytest.mark.requirement("L3-COL-001", "L3-COL-004")
+def test_a_dropped_connection_does_not_take_the_run_with_it() -> None:
+    """`L2-COL-001` covers a failure the API never answered at all.
+
+    `requests` raises these, PyGithub does not wrap them, and they are not
+    `GithubException` - so every `except GithubException` in the package let
+    them through, out of the worker and out of the run. One interruption
+    produced a traceback, exit 1 and no CSV, discarding the repositories
+    already collected before it.
+    """
+    outcomes = run(_DropsConnection(before_drop=1))
+
+    assert len(outcomes) == len(REFERENCES), "every reference still produces an outcome"
+    assert outcomes[0].ok, "the repository collected before the drop is kept"
+    assert any(not outcome.ok for outcome in outcomes[1:]), "the rest are recorded as failed"

@@ -49,12 +49,13 @@ from typing import Any
 
 from github.GithubException import GithubException
 
-from github_metrics.client import GitHubClient
+from github_metrics.client import TRANSPORT_ERRORS, GitHubClient
 from github_metrics.errors import (
     GitHubMetricsError,
     GraphQLQueryError,
     RateLimitExhaustedError,
     RepositoryNotFoundError,
+    TransportError,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -162,11 +163,16 @@ def execute(
             the run rather than about any selection in the document.
         GraphQLQueryError: Any other error reported by the API, or a response
             carrying no `data` at all.
+        TransportError: No answer arrived - the connection failed or timed out.
     """
     LOGGER.debug("GraphQL %s: variables=%r", description, variables)
 
     try:
         _, payload = client.graphql(query, variables)
+    except TRANSPORT_ERRORS as exc:
+        # No answer arrived, so there is no payload to classify and
+        # nothing about the repository to learn.
+        raise TransportError(f"{description}: {exc}") from exc
     except GithubException as exc:
         # PyGithub maps a *lone* NOT_FOUND to UnknownObjectException and
         # collapses everything else to a generic 400, even when one of several

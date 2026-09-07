@@ -36,8 +36,9 @@ from __future__ import annotations
 import logging
 import threading
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
+import requests
 from github import Auth, Github
 from github.GithubException import GithubException
 
@@ -55,6 +56,26 @@ REST's `/rate_limit` carries a `resources.graphql` section that does not
 track GraphQL spend - measured at 5000 while GraphQL itself reported 4988
 for the same token at the same moment. A document selecting nothing but
 `rateLimit` is not charged, so asking the right service costs nothing.
+"""
+
+TRANSPORT_ERRORS: Final = (requests.RequestException,)
+"""What is raised when no answer arrived at all.
+
+PyGithub speaks HTTP through `requests` and does not wrap what it raises, so a
+dropped connection, a DNS failure or a read timeout surfaces as a
+`requests.RequestException` - which is **not** a `GithubException`. Every
+`except GithubException` in this package therefore used to let it straight
+through, past the per-repository handling, out of the worker and out of the
+run: one interruption, a traceback, exit 1, and no CSV at all.
+
+Defined here because this module owns the transport. `collect/` imports the
+tuple rather than `requests`, so there is one place that knows what the
+transport is and one place to change if it ever changes.
+
+Retries do not make this unnecessary. PyGithub's default `GithubRetry` sets
+`total=10` with `backoff_factor=0`, so ten attempts happen essentially at once:
+they absorb a single dropped packet and nothing longer. Any real interruption -
+a VPN flap, a sleeping laptop, a DNS blip - outlasts them and raises.
 """
 
 PER_PAGE = 100
@@ -118,10 +139,12 @@ class GitHubClient:
         LOGGER.debug("GraphQL request with variables %r", variables)
         try:
             headers, payload = self._github.requester.graphql_query(query, variables)
-        except GithubException as exc:
+        except (GithubException, *TRANSPORT_ERRORS) as exc:
             # A failed response still reports the budget, and a failure is
-            # exactly when the budget is worth knowing.
-            self._observe(exc.data)
+            # exactly when the budget is worth knowing. A transport failure
+            # carries no response at all, so there is nothing to read and
+            # `_observe` ignores it.
+            self._observe(getattr(exc, "data", None))
             raise
         self._observe(payload)
         return headers, payload

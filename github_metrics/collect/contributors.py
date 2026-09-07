@@ -77,7 +77,7 @@ from typing import TYPE_CHECKING, Any, Final
 
 from github.GithubException import GithubException
 
-from github_metrics.client import GitHubClient
+from github_metrics.client import TRANSPORT_ERRORS, GitHubClient
 from github_metrics.collect.graphql import execute
 from github_metrics.errors import (
     CollectionError,
@@ -215,7 +215,9 @@ def get_contributor_accounts(
         # PyGithub's paginated list is untyped, so what comes out of it is too.
         paginated = repository.get_contributors()
         accounts: list[NamedUser] = list(paginated if limit is None else paginated[:limit])
-    except GithubException as exc:
+    except (GithubException, *TRANSPORT_ERRORS) as exc:
+        # The transport errors belong here too: a dropped connection is a
+        # failure of this repository's contributor list, not of the run.
         raise ContributorCollectionError(f"{slug}: could not read contributors: {exc}") from exc
 
     if limit is not None and len(accounts) == limit:

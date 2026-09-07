@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 22
 - L2 requirements: 88
-- L3 requirements: 135
-- Verified L2+L3: 223 of 223 (100.0%)
+- L3 requirements: 136
+- Verified L2+L3: 224 of 224 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -139,7 +139,7 @@ through their children, so counting them too would count the same work twice.
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-COL-001 | L1-OUT-001 | L3-COL-001 | _(none)_ | Implemented |
+| L2-COL-001 | L1-OUT-001 | L3-COL-001, L3-COL-004 | _(none)_ | Implemented |
 | L2-COL-002 | L1-CON-001 | L3-COL-002 | _(none)_ | Implemented |
 | L2-COL-003 | L1-MET-001 | L3-COL-003 | _(none)_ | Implemented |
 
@@ -147,9 +147,10 @@ through their children, so counting them too would count the same work twice.
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-COL-001 | L2-COL-001 | `tests/test_runner.py::test_a_deep_attribution_failure_does_not_take_the_run_with_it`<br>`tests/test_runner.py::test_a_failure_does_not_take_the_rest_of_the_run_with_it`<br>`tests/test_runner.py::test_an_outcome_keeps_the_reference_that_produced_it`<br>`tests/test_runner.py::test_nothing_to_collect_is_not_an_error`<br>`tests/test_runner.py::test_the_failures_are_named_in_the_log` | Implemented |
+| L3-COL-001 | L2-COL-001 | `tests/test_runner.py::test_a_deep_attribution_failure_does_not_take_the_run_with_it`<br>`tests/test_runner.py::test_a_dropped_connection_does_not_take_the_run_with_it`<br>`tests/test_runner.py::test_a_failure_does_not_take_the_rest_of_the_run_with_it`<br>`tests/test_runner.py::test_an_outcome_keeps_the_reference_that_produced_it`<br>`tests/test_runner.py::test_nothing_to_collect_is_not_an_error`<br>`tests/test_runner.py::test_the_failures_are_named_in_the_log` | Implemented |
 | L3-COL-002 | L2-COL-002 | `tests/test_runner.py::test_results_come_back_in_input_order_not_completion_order`<br>`tests/test_runner.py::test_the_pool_never_exceeds_the_work_available`<br>`tests/test_runner.py::test_the_same_inventory_collects_identically_every_time`<br>`tests/test_runner.py::test_the_worker_count_is_respected` | Implemented |
 | L3-COL-003 | L2-COL-003 | `tests/test_runner.py::test_a_run_that_does_not_fit_is_refused_before_it_starts`<br>`tests/test_runner.py::test_a_run_that_fits_reports_what_it_will_cost`<br>`tests/test_runner.py::test_a_run_the_rest_budget_cannot_cover_is_refused`<br>`tests/test_runner.py::test_the_budget_runs_to_zero`<br>`tests/test_runner.py::test_the_cost_is_two_points_and_one_request_per_repository`<br>`tests/test_runner.py::test_the_preflight_reads_each_budget_from_its_own_source`<br>`tests/test_runner.py::test_the_rest_budget_is_checked_as_well_as_the_graphql_one` | Implemented |
+| L3-COL-004 | L2-COL-001 | `tests/test_runner.py::test_a_dropped_connection_does_not_take_the_run_with_it`<br>`tests/test_transport.py::test_a_dropped_connection_counting_identities_degrades_the_repository`<br>`tests/test_transport.py::test_a_dropped_connection_is_a_transport_error_not_a_query_failure`<br>`tests/test_transport.py::test_a_dropped_connection_reading_anonymous_contributors_degrades_it_too`<br>`tests/test_transport.py::test_a_dropped_connection_reading_contributors_degrades_the_repository`<br>`tests/test_transport.py::test_an_unreachable_api_is_not_reported_as_a_rejected_token`<br>`tests/test_transport.py::test_every_github_exception_handler_also_handles_the_transport` | Implemented |
 
 ### CON: Concurrency
 

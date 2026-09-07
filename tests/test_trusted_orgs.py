@@ -100,6 +100,36 @@ def test_an_empty_list_trusts_nobody() -> None:
     assert len(registry) == 0
 
 
+@pytest.mark.requirement("L3-TRU-004", "L3-TRU-005")
+def test_an_empty_registry_trusts_nobody_through_the_functions_too() -> None:
+    """The test above checked the object, which was always right.
+
+    Everything that consumes this - `analysis/row.py`, and any library caller -
+    goes through these two functions, and they read
+    `registry or TrustedOrganizations()`. This class defines `__len__`, so a
+    registry trusting nobody is falsy, and `or` handed that caller the built-in
+    three: `is_trusted_org("google", nobody)` was True and the owner collected
+    ten points of bonus it had not earned.
+    """
+    nobody = TrustedOrganizations({})
+
+    assert is_trusted_org("google", nobody) is False
+    assert score_org_bonus("google", nobody) == 0.0
+
+
+@pytest.mark.requirement("L3-TRU-004")
+def test_a_registry_that_trusts_nobody_is_falsy() -> None:
+    """The fact that makes `or` the wrong test, pinned so it stays visible.
+
+    `__len__` is legitimate and stays. What must not come back is
+    `registry or TrustedOrganizations()`: the distinction a caller needs is
+    supplied against not supplied, which is `is None`.
+    """
+    assert not TrustedOrganizations({})
+    assert TrustedOrganizations({"acme": "Acme"})
+    assert TrustedOrganizations()
+
+
 @pytest.mark.requirement("L3-TRU-004")
 def test_the_default_list_cannot_be_mutated_by_a_caller() -> None:
     # A mutable default would let one run's edit leak into the next in the

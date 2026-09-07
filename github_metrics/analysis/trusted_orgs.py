@@ -140,7 +140,13 @@ class TrustedOrganizations:
         return self.entries.get(owner.strip().casefold())
 
     def __len__(self) -> int:
-        """Number of trusted owners."""
+        """Number of trusted owners.
+
+        This is why callers must test `registry is None` rather than
+        `registry or ...`: a registry that trusts nobody has length zero and is
+        therefore **falsy**, so `or` would silently replace a caller's explicit
+        "trust nobody" with the built-in list.
+        """
         return len(self.entries)
 
 
@@ -165,7 +171,12 @@ def is_trusted_org(owner: str, registry: TrustedOrganizations | None = None) -> 
         >>> is_trusted_org("cline")
         False
     """
-    return (registry or TrustedOrganizations()).is_trusted(owner)
+    # `is None`, not `or`: this class defines `__len__`, so a registry that
+    # trusts nobody is falsy, and `or` would hand that caller the built-in
+    # three. The constructor already draws the same distinction between "not
+    # supplied" and "supplied empty".
+    active = TrustedOrganizations() if registry is None else registry
+    return active.is_trusted(owner)
 
 
 def score_org_bonus(owner: str, registry: TrustedOrganizations | None = None) -> float:
@@ -191,7 +202,8 @@ def score_org_bonus(owner: str, registry: TrustedOrganizations | None = None) ->
         >>> score_org_bonus("cline")
         0.0
     """
-    active = registry or TrustedOrganizations()
+    # `is None`, not `or`; see `is_trusted_org`.
+    active = TrustedOrganizations() if registry is None else registry
 
     if not active.is_trusted(owner):
         LOGGER.debug("No trusted-organisation bonus for %r", owner)

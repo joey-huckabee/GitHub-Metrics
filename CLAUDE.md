@@ -504,6 +504,16 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   repository. Always inspect `errors`, and classify `NOT_FOUND` separately - a
   deleted or renamed repository is an expected outcome of a valid reference,
   not a defect.
+- **A supplied-but-empty argument is not an absent one.** Test optional
+  parameters with `is None`, never `or`. `TrustedOrganizations` defines
+  `__len__`, so a registry trusting nobody is falsy, and
+  `registry or TrustedOrganizations()` handed that caller the built-in three -
+  ten points of `trusted_org_bonus` their own policy had refused. The
+  constructor had it right sixty lines above (`DEFAULT if entries is None else
+  entries`); the two module-level functions did not. It is the only class in
+  the package defining `__len__`, so the other `param or ...` sites are safe -
+  checked, not assumed.
+
 - **CodeQL reads "trusted" as a secret.** Its sensitive-data heuristic
   classifies a value whose *name* contains that word, and taint tracking then
   reports any log line the value reaches as leaking a secret — it has fired

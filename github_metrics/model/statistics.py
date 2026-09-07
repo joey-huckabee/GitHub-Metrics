@@ -484,8 +484,15 @@ class BudgetStatistics:
       GraphQL call, then 4980 after the next REST call. A scan interleaves both
       across eight threads, so whichever arrived last is what would be read.
 
-    Counting requests locally is not a way out either: pagination happens
-    inside PyGithub, so the pages a contributor list costs are never seen here.
+      Since v0.6.6 the client keeps its own REST reading, taken only from
+      responses whose `x-ratelimit-resource` says `core`, so a point-in-time
+      figure *is* now trustworthy and the pre-flight uses one.
+
+    Counting requests locally is still not a way out, and it is what keeps
+    these null: pagination happens inside PyGithub, so not every REST response
+    passes through this client and the pages a contributor list costs are never
+    seen here. A difference between two readings would therefore understate the
+    spend, which is the one thing a spend figure must not do.
 
     `None` is this package's word for "not measured", used the same way every
     metric column uses it. GraphQL is the binding budget at two points against

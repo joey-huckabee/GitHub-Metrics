@@ -285,9 +285,15 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   against a number that never moves. GraphQL's own `rateLimit { remaining }` is
   authoritative and a document selecting nothing else is **not charged**, so
   the right source is also the free one. REST's `X-RateLimit-Remaining` header
-  is accurate but a GraphQL response overwrites PyGithub's copy of it, which is
-  why `statistics.json` publishes `null` for REST spend rather than a number it
-  cannot stand behind. `rate_limit_snapshot` still calls `/rate_limit`, and
+  is accurate but a GraphQL response overwrites PyGithub's copy of it - one
+  `rate_limiting` serves both budgets, and GitHub reports GraphQL points under
+  the same header names. The pre-flight read that contaminated value until
+  v0.6.6 and was therefore checking the GraphQL figure twice, against a
+  threshold half its own, so its REST half could never fail. `client.py` now
+  records the REST budget itself from responses whose `x-ratelimit-resource`
+  says `core`. `statistics.json` still publishes `null` for REST **spend**,
+  but for the other reason: pagination happens inside PyGithub, so not every
+  REST response passes through the client and a difference would understate. `rate_limit_snapshot` still calls `/rate_limit`, and
   that is correct - it verifies credentials, where only the status code and the
   scope headers matter.
 

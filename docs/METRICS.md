@@ -583,12 +583,18 @@ Design reasoning is in [ADR-0008](adr/0008-statistics-json.md).
 2026-09-05: the REST `/rate_limit` endpoint reported 5000 remaining for both
 budgets while the same token actually had 4988 GraphQL points and 4984 REST
 requests left — it does not track spend at all. The `X-RateLimit-Remaining`
-response header *is* accurate, but only the most recent one is retained and a
-**GraphQL** response overwrites it with the GraphQL budget (observed: 4981,
-then 4976 after one GraphQL call, then 4980 after the next REST call). A scan
-interleaves both across eight threads, so whichever arrived last is what would
-be read. Counting locally does not help either, because pagination happens
-inside the HTTP library.
+response header *is* accurate, but the HTTP library retains only the most
+recent one, in a single field shared by both budgets, and a **GraphQL**
+response overwrites it with the GraphQL budget (observed: 4981, then 4976 after
+one GraphQL call, then 4980 after the next REST call). A scan interleaves both
+across eight threads, so whichever arrived last is what would be read.
+
+Since v0.6.6 the client keeps its own REST reading, taken only from responses
+that say they are about `core`, so a point-in-time figure is trustworthy again
+and the pre-flight uses one. Spend is still not reported, for the reason that
+survives: pagination happens inside the HTTP library, so not every REST
+response reaches the client and a difference between two readings would
+understate what a run spent.
 
 `null` is this document's word for "not measured" everywhere else, and it is
 used here for the same reason. GraphQL binds first at two points against one

@@ -8,6 +8,67 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.6] - 2026-09-06
+
+**The pre-flight's REST figure was the GraphQL figure.** PyGithub keeps
+**one** `rate_limiting` for both budgets, set from whatever response came back
+last, and GitHub reports the GraphQL *points* budget under the same
+`X-RateLimit-*` header names REST uses for its *requests* budget. `check_budget`
+reads the GraphQL budget first, so by the time it read the REST one, PyGithub's
+copy had already been replaced by a number about the other budget.
+
+Reproduced through PyGithub's own header handling, with a REST response
+reporting 1,200 requests and a GraphQL response reporting 4,990 points:
+
+    after a REST call    rate_limit_remaining() = 1200
+    after check_budget   rate_limit_remaining() = 4990
+
+    GraphQL available    4990
+    REST    available    4990
+
+**The REST half of the pre-flight was therefore unreachable, not merely
+wrong.** One number served both clauses, and the REST threshold is half the
+GraphQL one - `MIN_REQUESTS_PER_REPOSITORY` is 1 against
+`MIN_POINTS_PER_REPOSITORY` of 2 - so the GraphQL clause always tripped first.
+Checked exhaustively over every inventory size to 3,000 and every value of a
+single shared figure: **zero** cases where the REST clause is the one that
+refuses a run.
+
+This was documented in three places as the reason `statistics.json` publishes
+`null` for REST spend. What none of them said was that the same overwrite
+reaches the pre-flight, which does not publish the number but does decide on
+it.
+
+### Fixed
+
+- **The client records the REST budget itself**, from REST responses only,
+  identified by `x-ratelimit-resource`. PyGithub's shared `rate_limiting` is no
+  longer read at all, so the order of calls in `check_budget` stops mattering -
+  the fragility that caused this, rather than only its symptom.
+- **An unread REST budget is fetched once** from the rate-limit snapshot, whose
+  *headers* are the accurate source even though its body is not, and which is
+  itself uncounted. A budget no response has reported reads as **spent**, the
+  same safe failure the GraphQL budget already takes: it refuses a run rather
+  than starting one on a number nothing confirmed.
+
+### Changed
+
+- **`L3-STA-010`** states the separation: the REST budget is recorded from REST
+  responses only, not from PyGithub's shared field.
+- **`statistics.json` still publishes `null` for REST spend**, and the reason
+  is now the correct one. The overwrite is no longer a blocker; what remains is
+  that pagination happens inside PyGithub, so not every REST response passes
+  through the client and a difference between two readings would understate the
+  spend. `METRICS.md`, `API-LIMITS.md` and the `BudgetStatistics` docstring
+  each said the old reason and now say this one.
+
+### Notes
+
+A pre-flight can now refuse a run for want of REST budget, which it never could
+before. That is the documented intent - the shortfall message has always named
+both budgets - and it needs a token whose REST budget is drained while its
+GraphQL budget is not, which a REST-heavy earlier run produces.
+
 ## [0.6.5] - 2026-09-06
 
 **One failed page of commit history ended the whole scan.** On the
@@ -1569,7 +1630,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.5...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.6...HEAD
+[0.6.6]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.2...v0.6.3

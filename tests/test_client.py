@@ -38,11 +38,23 @@ class _Requester:
         self.rest: tuple[dict[str, Any], Any] = rest if rest is not None else ({}, [])
         self.queries: list[tuple[str, dict[str, Any]]] = []
         self.requests: list[tuple[str, str, dict[str, Any]]] = []
+        self.rate_limiting = (4984, 5000)
+        self.graphql_remaining = 4990
 
     def graphql_query(self, query: str, variables: dict[str, Any]) -> tuple[dict[str, Any], Any]:
-        """Record and answer a GraphQL query."""
+        """Record and answer a GraphQL query.
+
+        A GraphQL response carries `x-ratelimit-*` too, reporting the *points*
+        budget under the header names REST uses for its *requests* budget - and
+        PyGithub writes both into one `rate_limiting`. The stub does the same,
+        because that overwrite is the thing under test.
+        """
         self.queries.append((query, variables))
-        return {}, self.graphql_payload
+        self.rate_limiting = (self.graphql_remaining, 5000)
+        return {
+            "x-ratelimit-remaining": str(self.graphql_remaining),
+            "x-ratelimit-resource": "graphql",
+        }, self.graphql_payload
 
     # pylint: disable=invalid-name  # PyGithub's spelling; the stub must match it.
     def requestJsonAndCheck(  # noqa: N802
@@ -58,7 +70,12 @@ class _Github:
 
     def __init__(self, requester: _Requester, rate_limiting: tuple[int, int]) -> None:
         self.requester = requester
-        self.rate_limiting = rate_limiting
+        requester.rate_limiting = rate_limiting
+
+    @property
+    def rate_limiting(self) -> tuple[int, int]:
+        """One number for both budgets, as PyGithub really keeps it."""
+        return self.requester.rate_limiting
 
 
 def client_with(
@@ -123,16 +140,90 @@ def test_a_response_with_no_data_at_all_reads_as_spent(
 # ---------------------------------------------------------------------------
 
 
+CORE_HEADERS = {"x-ratelimit-remaining": "4984", "x-ratelimit-resource": "core"}
+
+
 @pytest.mark.requirement("L3-STA-008")
 def test_the_rest_budget_comes_from_the_response_header(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`X-RateLimit-Remaining` tracks spend exactly; `/rate_limit` does not."""
-    client, requester = client_with(monkeypatch, rate_limiting=(4984, 5000))
+    """`X-RateLimit-Remaining` tracks spend exactly; `/rate_limit`'s body does not."""
+    client, requester = client_with(monkeypatch, rest=(CORE_HEADERS, []))
+    client.contributors_page("pypa/virtualenv")
+    before = len(requester.requests)
 
     assert client.rate_limit_remaining() == 4984
-    # Free: the header arrives on responses the run was making anyway.
-    assert not requester.requests
+    # Free: the header arrived on a response the run was making anyway.
+    assert len(requester.requests) == before
+
+
+@pytest.mark.requirement("L3-STA-010")
+def test_a_graphql_call_does_not_move_the_rest_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The defect this separation exists for.
+
+    PyGithub keeps **one** `rate_limiting` for both budgets, set from whatever
+    response came back last, and GitHub reports the GraphQL *points* budget
+    under the same header names REST uses for its *requests* budget. So one
+    GraphQL call replaced the REST figure with a number about the other
+    budget - and `check_budget` reads the GraphQL budget first, so the REST
+    half of the pre-flight was comparing the GraphQL figure against a lower
+    threshold and could never fail.
+    """
+    client, requester = client_with(
+        monkeypatch,
+        graphql_payload={"data": {"rateLimit": {"remaining": 4990}}},
+        rest=(CORE_HEADERS, []),
+    )
+    client.contributors_page("pypa/virtualenv")
+    assert client.rate_limit_remaining() == 4984
+
+    client.graphql_points_remaining()
+
+    assert requester.rate_limiting == (4990, 5000), "PyGithub's copy really is overwritten"
+    assert client.rate_limit_remaining() == 4984, "the REST figure must not follow it"
+
+
+@pytest.mark.requirement("L3-STA-010")
+def test_a_reading_about_another_resource_is_ignored(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`x-ratelimit-resource` is what tells the two budgets apart."""
+    client, _ = client_with(
+        monkeypatch,
+        rest=({"x-ratelimit-remaining": "17", "x-ratelimit-resource": "search"}, []),
+    )
+
+    client.contributors_page("pypa/virtualenv")
+
+    assert client.rate_limit_remaining() == 0, "no core reading was ever seen"
+
+
+@pytest.mark.requirement("L3-STA-010")
+def test_an_unread_rest_budget_is_fetched_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The snapshot is free and is not itself counted, so asking costs nothing."""
+    client, requester = client_with(monkeypatch, rest=(CORE_HEADERS, []))
+
+    assert client.rate_limit_remaining() == 4984
+    assert len(requester.requests) == 1
+
+    assert client.rate_limit_remaining() == 4984
+    assert len(requester.requests) == 1, "the reading is kept, not re-fetched"
+
+
+@pytest.mark.requirement("L3-STA-010")
+def test_an_unreadable_rest_budget_reads_as_spent(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Zero refuses a run rather than letting one start on a number nothing
+    confirmed - the same failure direction the GraphQL budget takes."""
+    client, _ = client_with(monkeypatch, rest=({}, []))
+
+    with caplog.at_level(logging.WARNING, logger=CLIENT_LOGGER):
+        assert client.rate_limit_remaining() == 0
+
+    assert "REST rate limit could not be read" in caplog.text
 
 
 # ---------------------------------------------------------------------------

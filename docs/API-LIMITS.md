@@ -75,11 +75,20 @@ Two consequences, both acted on:
    reads GraphQL's own `rateLimit`, which a bare document is not charged for
    (confirmed by issuing it twice and getting the same `remaining`).
 2. **REST spend cannot be measured reliably at all here.** The header is
-   accurate but only the latest is kept, and a GraphQL response overwrites it
-   with the *GraphQL* budget — observed going 4981, 4976 after a GraphQL call,
-   then 4980 after the next REST call. Across eight interleaving threads the
-   end-of-run value is whichever landed last. `statistics.json` therefore
-   publishes `null` for the REST figures rather than a plausible wrong number.
+   accurate but PyGithub keeps only the latest, in one field shared by both
+   budgets, and a GraphQL response overwrites it with the *GraphQL* budget —
+   observed going 4981, 4976 after a GraphQL call, then 4980 after the next
+   REST call. Across eight interleaving threads the end-of-run value is
+   whichever landed last. `statistics.json` therefore publishes `null` for the
+   REST figures rather than a plausible wrong number.
+
+   **The pre-flight read that contaminated value until v0.6.6**, and since
+   `check_budget` reads the GraphQL budget first, its REST figure was always
+   the GraphQL one — compared against a threshold half its own, so the REST
+   half of the pre-flight could never refuse a run. The client now records the
+   REST budget itself, from responses whose `x-ratelimit-resource` says
+   `core`. Spend stays `null`: pagination happens inside PyGithub, so not every
+   REST response reaches the client and a difference would understate it.
 
 ### What a real repository cost — measured
 

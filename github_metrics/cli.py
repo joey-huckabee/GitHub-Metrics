@@ -44,6 +44,14 @@ from github_metrics.errors import (
     OutputDestinationError,
     RateLimitExhaustedError,
 )
+from github_metrics.exit_codes import (
+    EXIT_DEGRADED,
+    EXIT_ROWS_REJECTED,
+    BadCredentialsError,
+    InputError,
+    NoCredentialsError,
+    RateLimitedError,
+)
 from github_metrics.geo import Geocoder
 from github_metrics.geocache import GeocodeCache
 from github_metrics.logger import LogLevels, reset_logger
@@ -70,47 +78,8 @@ from github_metrics.output.fields import split_selection
 from github_metrics.output.statistics import write_statistics
 from github_metrics.sources import RepositoryRef, ResolvedSources, resolve_sources
 
-# Exit statuses, severity-ordered; the highest applicable one wins. Codes 1 and
-# 2 belong to click (ClickException and UsageError) and are listed for
-# completeness rather than chosen. See docs/adr/0004-exit-code-scheme.md.
 LOGGER = logging.getLogger(__name__)
 
-EXIT_ROWS_REJECTED = 3
-"""Degraded: the input was read but at least one row was rejected."""
-
-EXIT_DEGRADED = 4
-"""Degraded: a usable file was written, and something in it is missing.
-
-**One code for every incomplete outcome**, whatever made it incomplete: a
-repository that could not be read, one the run never reached, or one whose
-contributor list failed so no document was written. Which of those happened is
-in `statistics.json`, per repository, where a caller can act on it.
-
-That is deliberate rather than lazy. The scheme's whole value is the boundary
-at 5 - `$? -ge 3` means something was wrong and `$? -ge 5` means nothing usable
-came out - and the degraded band is only 3 and 4 wide. A third degraded code
-would have to sit above the aborted ones and would break the second test for
-every caller, which is exactly what exit 9 did between v0.6.0 and v0.6.2. See
-`docs/adr/0011-one-degraded-exit-status.md`.
-"""
-
-# Exit 9 is **retired**. It meant "the budget ran out and `--on-exhaustion
-# partial` stopped the run", and it was wrong: it sat above the documented
-# "nothing usable came out" boundary at 5 while producing a perfectly usable
-# file, so a caller following the published test would have discarded it. That
-# outcome now exits 4 like every other degraded one. The number is not reused.
-
-EXIT_RATE_LIMITED = 5
-"""Aborted: the API budget was exhausted, or pre-flight refused the run."""
-
-EXIT_INPUT_UNREADABLE = 6
-"""Aborted: the input file could not be read at all."""
-
-EXIT_NO_CREDENTIALS = 7
-"""Aborted: no GitHub token was supplied, by flag or by environment."""
-
-EXIT_BAD_CREDENTIALS = 8
-"""Aborted: GitHub rejected the token that was supplied."""
 
 DEFAULT_DEEP_THRESHOLD = 10.0
 """Unattributed share, as a percentage, above which deep attribution is
@@ -122,45 +91,6 @@ demonstrably fires on a real case, and it is expected to be tuned once a
 portfolio has been scanned. That it is arbitrary is recorded rather than
 implied by its presence.
 """
-
-
-class InputError(click.ClickException):
-    """A CLI error that exits with `EXIT_INPUT_UNREADABLE`.
-
-    Click's own exit code for a `ClickException` is 1, which a shell cannot
-    tell apart from a generic failure. Reading the input is the one thing that
-    must be distinguishable, so it gets its own status.
-    """
-
-    exit_code = EXIT_INPUT_UNREADABLE
-
-
-class NoCredentialsError(click.ClickException):
-    """A CLI error that exits with `EXIT_NO_CREDENTIALS`.
-
-    Separate from a rejected token because the fix differs: this one means
-    "configure a token", not "your token stopped working".
-    """
-
-    exit_code = EXIT_NO_CREDENTIALS
-
-
-class BadCredentialsError(click.ClickException):
-    """A CLI error that exits with `EXIT_BAD_CREDENTIALS`."""
-
-    exit_code = EXIT_BAD_CREDENTIALS
-
-
-class RepositoryError(click.ClickException):
-    """A CLI error that exits with `EXIT_DEGRADED`.
-
-    A repository that is deleted, renamed or private is an expected outcome of
-    a syntactically valid reference, not a failure of the run. It gets a status
-    below the aborting ones so a caller can tell "some repositories are stale"
-    from "nothing usable came out".
-    """
-
-    exit_code = EXIT_DEGRADED
 
 
 @dataclass(frozen=True, slots=True)
@@ -550,6 +480,13 @@ def _collect(
                 budget=_spend(client, budget.available, guard=guard, policy=policy),
                 geocoding=_geocoding(geocoder),
             )
+    except RateLimitExhaustedError as exc:
+        # The one place the budget's own exception becomes a status. It is
+        # here rather than in `scan_command` because both raise sites are
+        # inside this block - the pre-flight below, and `BudgetGuard` within
+        # `collect_all` - and catching at the call site would leave whichever
+        # one someone forgot.
+        raise RateLimitedError(str(exc)) from exc
     finally:
         # In a finally block because a run that failed still resolved
         # locations, and throwing that away would make the next attempt pay

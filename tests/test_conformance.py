@@ -52,9 +52,10 @@ import pytest
 from click.testing import CliRunner
 from github.GithubException import UnknownObjectException
 
-from github_metrics.cli import EXIT_DEGRADED, main
+from github_metrics.cli import main
 from github_metrics.collect.budget import MIN_POINTS_PER_REPOSITORY
 from github_metrics.collect.exhaustion import VERIFY_MARGIN
+from github_metrics.exit_codes import EXIT_DEGRADED
 from github_metrics.model.scan import ScanIdentifier
 
 CONFORMANCE = Path(__file__).parent / "conformance"

@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from github_metrics.cli import EXIT_DEGRADED, EXIT_ROWS_REJECTED, main
+from github_metrics.cli import main
 from github_metrics.collect.budget import Budget
 from github_metrics.collect.repository import RepoMetaData
 from github_metrics.collect.runner import Outcome
@@ -30,6 +30,7 @@ from github_metrics.errors import (
     RateLimitExhaustedError,
     RepositoryNotFoundError,
 )
+from github_metrics.exit_codes import EXIT_DEGRADED, EXIT_RATE_LIMITED, EXIT_ROWS_REJECTED
 from github_metrics.model.contributor import (
     Address,
     Contributor,
@@ -527,7 +528,7 @@ def test_a_rejected_reference_is_a_lesser_status_than_an_unreadable_one(
     assert (tmp_path / "githubmetrics.csv").is_file()
 
 
-@pytest.mark.requirement("L3-CLI-009")
+@pytest.mark.requirement("L3-CLI-009", "L3-CLI-012")
 def test_an_unaffordable_run_spends_nothing_when_told_to_fail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -535,6 +536,10 @@ def test_an_unaffordable_run_spends_nothing_when_told_to_fail(
 
     Refusing costs one free request, and leaves the quota intact for a smaller
     run or a later one.
+
+    The status is asserted exactly. This test read `!= 0` until v0.6.3, which
+    is true of a traceback, and a traceback is what it had been passing on:
+    `RateLimitExhaustedError` reached the top of the command and exited 1.
     """
     collected: list[Any] = []
 
@@ -551,8 +556,57 @@ def test_an_unaffordable_run_spends_nothing_when_told_to_fail(
 
     result = run("pypa/virtualenv", "--on-exhaustion", "fail")
 
-    assert result.exit_code != 0
+    assert result.exit_code == EXIT_RATE_LIMITED
     assert not collected
+
+
+@pytest.mark.requirement("L3-CLI-012")
+def test_a_refused_run_reports_the_shortfall_rather_than_a_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What the operator sees is the other half of the status.
+
+    A stack trace names the frame that raised, not the budget that is short,
+    and it is the one output no caller can act on.
+    """
+
+    def refuse(_client: Any, count: int) -> None:
+        raise RateLimitExhaustedError(f"{count} repositories need more than remain")
+
+    _patch(monkeypatch, lambda *args, **kwargs: [])
+    monkeypatch.setattr("github_metrics.cli.check_budget", refuse)
+
+    result = run("pypa/virtualenv", "--on-exhaustion", "fail")
+
+    assert isinstance(result.exception, SystemExit), "the exception must not escape the command"
+    assert "1 repositories need more than remain" in result.stderr
+    assert "GM-COL-004" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.requirement("L3-CLI-012")
+def test_a_run_stopped_mid_flight_by_the_budget_aborts_rather_than_writing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`BudgetGuard` under `fail` is the second way the same exception arrives.
+
+    It had no CLI test at all, and it is the harder half to reason about: the
+    run has already spent quota, so "nothing usable came out" has to be
+    established rather than assumed. It holds because the guard raises out of
+    `collect_all`, which is upstream of every write - no CSV, no document, no
+    statistics.
+    """
+
+    def explode(*_args: Any, **_kwargs: Any) -> list[Outcome]:
+        raise RateLimitExhaustedError("The GraphQL budget ran out before pypa/virtualenv")
+
+    _patch(monkeypatch, explode)
+
+    result = run("pypa/virtualenv", "--output", str(tmp_path), "--on-exhaustion", "fail")
+
+    assert result.exit_code == EXIT_RATE_LIMITED
+    assert "The GraphQL budget ran out" in result.stderr
+    assert not list(tmp_path.iterdir()), "an aborted run must not leave a partial artifact"
 
 
 @pytest.mark.requirement("L3-EXH-001")

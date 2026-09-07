@@ -10,7 +10,7 @@ import pytest
 from click.testing import CliRunner
 from github.GithubException import BadCredentialsException, GithubException
 
-from github_metrics.cli import EXIT_BAD_CREDENTIALS, EXIT_NO_CREDENTIALS, main
+from github_metrics.cli import main
 from github_metrics.client import GitHubClient
 from github_metrics.collect.credentials import (
     TOKEN_KINDS,
@@ -19,6 +19,7 @@ from github_metrics.collect.credentials import (
 )
 from github_metrics.config import Settings
 from github_metrics.errors import InvalidCredentialsError
+from github_metrics.exit_codes import EXIT_BAD_CREDENTIALS, EXIT_NO_CREDENTIALS
 
 LOGGER_NAME = "github_metrics.collect.credentials"
 

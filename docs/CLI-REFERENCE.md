@@ -468,7 +468,7 @@ half failed, which is why the run also warns.
 | `0` | Every reference was collected |
 | `3` | An input reference was rejected; the rest were collected |
 | `4` | **Degraded**: a usable file was written and something is missing from it - a repository unreadable, never attempted, or measured but undocumented. `statistics.json` says which |
-| `5` | The budget could not cover the run under `--on-exhaustion fail` |
+| `5` | The budget could not cover the run under `--on-exhaustion fail`, whether the pre-flight refused it or it ran out part-way. No file is written either way |
 | `6` | A source could not be read |
 | `7`, `8` | No token, or a token GitHub rejected |
 
@@ -589,7 +589,7 @@ click and are listed for completeness rather than chosen. See
 | `2` | Usage error - malformed command line | no | all |
 | `3` | Degraded: some input rows were rejected | yes | `validate` |
 | `4` | Degraded: a usable file, with something missing from it | yes | `scan` |
-| `5` | Aborted: API budget exhausted | partial | reserved |
+| `5` | Aborted: API budget exhausted or the run refused | no | `scan` |
 | `6` | Aborted: the input could not be read | no | `validate` |
 | `7` | Aborted: no GitHub token supplied | no | API commands |
 | `8` | Aborted: GitHub rejected the token | no | API commands |

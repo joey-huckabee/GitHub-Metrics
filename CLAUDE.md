@@ -279,6 +279,19 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   `sources/csv_inventory.py`'s per-file summary is the one INFO line in the package, and it is
   per run rather than per row. A test asserts that collecting an unremarkable
   repository emits nothing at INFO or above.
+- **A library that logs without a handler bypasses everything.** Python's
+  handler of last resort writes to stderr at WARNING with no formatter, so
+  such a library obeys neither this package's format nor `LOG_LEVEL`.
+  `geopy` is the one dependency here that attaches no `NullHandler`, and
+  `geopy.extra.rate_limiter` logs each retry with `exc_info=True` - twenty-two
+  unformatted lines and two stack traces per unresolvable location, emitted
+  identically at ERROR, INFO and DEBUG, while the one honest line about the
+  same event was correctly suppressed at ERROR. `reset_logger` adopts the
+  loggers in `THIRD_PARTY_LOGGERS`: our handler, `propagate = False`, and
+  ERROR unless the package level is DEBUG. Add to that list only a library
+  that would otherwise reach the last-resort handler - checked by walking the
+  logger tree, not assumed.
+
 - **Logs go to stderr, always.** The CLI writes JSON to stdout, and an
   interleaved log line corrupts it for every downstream consumer. This is why
   `reset_logger()` defaults to stderr even though a general-purpose logging

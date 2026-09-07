@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 
 import pytest
@@ -168,3 +169,40 @@ def test_no_option_reads_a_variable_that_settings_already_owns() -> None:
 
     assert owned, "this found no environment variables in config.py"
     assert sorted(declared & owned) == []
+
+
+@pytest.mark.requirement("L3-CLI-013")
+def test_no_bad_command_line_produces_a_traceback(tmp_path: Path) -> None:
+    """A traceback is never a correct outcome for this CLI.
+
+    Its job is to turn the package's errors into the published exit codes, and
+    exit 1 with a stack trace fails both documented tests - `$? -ge 3` and
+    `$? -ge 5` read it as a run where nothing went wrong. Three separate
+    defects have taken that shape: an exhausted budget (v0.6.3), a dropped
+    connection (v0.6.7), and a mistyped `--fields` (v0.6.9).
+
+    Every case here reaches the CLI without a token or a network, so this
+    stays a check on the boundary rather than on collection.
+    """
+    empty = tmp_path / "empty.csv"
+    empty.write_text("", encoding="utf-8")
+    occupied = tmp_path / "occupied"
+    occupied.write_text("not a directory", encoding="utf-8")
+
+    invocations = [
+        ["scan", "pypa/virtualenv", "--fields", "badname"],
+        ["scan", "pypa/virtualenv", "--fields", ""],
+        ["scan", "pypa/virtualenv", "--output", str(occupied)],
+        ["scan", str(tmp_path / "absent.csv"), "--fields", "badname"],
+        ["validate", str(tmp_path / "absent.csv")],
+        ["validate", str(empty)],
+        ["bands", "not-a-metric"],
+    ]
+
+    leaked: list[str] = []
+    for argv in invocations:
+        result = CliRunner().invoke(main, ["--env-file", os.devnull, "--token", "ghp_x", *argv])
+        if result.exception is not None and not isinstance(result.exception, SystemExit):
+            leaked.append(f"{' '.join(argv)} -> {type(result.exception).__name__}")
+
+    assert not leaked

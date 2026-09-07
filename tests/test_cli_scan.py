@@ -19,6 +19,7 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
+from github.GithubException import BadCredentialsException
 
 from github_metrics.cli import main
 from github_metrics.collect.budget import Budget
@@ -30,7 +31,12 @@ from github_metrics.errors import (
     RateLimitExhaustedError,
     RepositoryNotFoundError,
 )
-from github_metrics.exit_codes import EXIT_DEGRADED, EXIT_RATE_LIMITED, EXIT_ROWS_REJECTED
+from github_metrics.exit_codes import (
+    EXIT_BAD_CREDENTIALS,
+    EXIT_DEGRADED,
+    EXIT_RATE_LIMITED,
+    EXIT_ROWS_REJECTED,
+)
 from github_metrics.model.contributor import (
     Address,
     Contributor,
@@ -829,3 +835,100 @@ def test_every_degraded_outcome_shares_one_status(
         result = run("pypa/virtualenv", "--output", str(target))
 
         assert result.exit_code == EXIT_DEGRADED, f"{name} did not exit 4"
+
+
+# ---------------------------------------------------------------------------
+# A command line checked before anything is created
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-CLI-013")
+def test_an_unknown_field_is_a_usage_error_rather_than_a_traceback(tmp_path: Path) -> None:
+    """`resolve_fields` writes a better message than this layer could.
+
+    It names the unknown field, suggests the nearest real one and lists every
+    valid name - and the operator never saw it. `UnknownFieldError` is an
+    `OutputError`, not a `ClickException`, so it escaped the command and
+    Python printed a stack trace instead. Exit 2 is what `--format` already
+    gives for the same class of mistake.
+    """
+    result = run("pypa/virtualenv", "--fields", "badname", "--output", str(tmp_path))
+
+    assert result.exit_code == 2
+    assert isinstance(result.exception, SystemExit), "the exception must not escape"
+    assert "unknown field 'badname'" in result.output
+    assert "did you mean 'name'?" in result.output
+    assert "Traceback" not in result.output
+
+
+@pytest.mark.requirement("L3-CLI-013")
+def test_a_rejected_field_leaves_no_output_directory(tmp_path: Path) -> None:
+    """Checking the command line costs nothing and touches nothing.
+
+    `_document_root` ran first, so a typo created the results directory and
+    then refused the run - leaving an empty directory as the only trace of an
+    invocation that never started.
+    """
+    root = tmp_path / "results"
+
+    run("pypa/virtualenv", "--fields", "badname", "--output", str(root))
+
+    assert not root.exists()
+
+
+@pytest.mark.requirement("L3-CLI-013")
+def test_a_field_selection_is_checked_before_the_sources_are_read(tmp_path: Path) -> None:
+    """A bad name is refused whatever else is wrong with the command line."""
+    result = run(str(tmp_path / "absent.csv"), "--fields", "badname", "--output", str(tmp_path))
+
+    assert result.exit_code == 2
+    assert "unknown field" in result.output
+
+
+@pytest.mark.requirement("L3-CLI-013")
+def test_a_token_rejected_after_no_verify_still_exits_the_credentials_status(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Skipping the check costs finding out later, not finding out from a trace.
+
+    The pre-flight and the budget guard call the client directly rather than
+    through `graphql.execute`, so nothing classified a 401 for them: with
+    `--no-verify-token` a rejected token produced a traceback and exit 1,
+    where the scheme publishes 8 for exactly this.
+    """
+
+    class _Rejected:
+        """Refuses every call the way GitHub refuses a bad token."""
+
+        @staticmethod
+        def graphql_points_remaining() -> int:
+            """What the pre-flight asks first."""
+            raise BadCredentialsException(401, {"message": "Bad credentials"}, {})
+
+        def __enter__(self) -> Any:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr("github_metrics.cli.GitHubClient", lambda _settings: _Rejected())
+    monkeypatch.setattr("github_metrics.cli.verify_credentials", lambda _settings: None)
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "--env-file",
+            os.devnull,
+            "--token",
+            "ghp_bad",
+            "--no-verify-token",
+            "scan",
+            "pypa/virtualenv",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == EXIT_BAD_CREDENTIALS
+    assert isinstance(result.exception, SystemExit)
+    assert "rejected the token" in result.output

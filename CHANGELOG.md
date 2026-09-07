@@ -8,6 +8,64 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.9] - 2026-09-07
+
+**A mistyped `--fields` printed a stack trace and left an empty directory
+behind.** `resolve_fields` writes the message the operator needs - it names the
+unknown field, suggests the nearest real one, and lists every valid name - and
+nobody ever saw it:
+
+    $ github-metrics scan pypa/virtualenv --fields badname --output ./results
+    Traceback (most recent call last):
+      ...
+    github_metrics.errors.UnknownFieldError: [GM-OUT-001] unknown field 'badname'; ...
+    $ echo $?
+    1
+    $ ls -d results
+    results
+
+`UnknownFieldError` is an `OutputError`, not a `ClickException`, so it reached
+the top of the command. And `_document_root` ran *before* the check, so a typo
+created the results directory and then refused the run, leaving an empty
+directory as the only trace of an invocation that never started.
+
+Exit 1 also fails both published tests. `$? -ge 3` and `$? -ge 5` read a
+refused command line as a run where nothing went wrong. That is the third
+defect of this shape: an exhausted budget in v0.6.3, a dropped connection in
+v0.6.7, and this.
+
+### Fixed
+
+- **An unrecognised `--fields` name exits 2**, carrying the message
+  `resolve_fields` produced. Exit 2 is what `--format` already gives for the
+  same class of mistake, and `ADR-0004` reserves it for a malformed command
+  line.
+- **The command line is checked before anything is created.** Argument checks
+  cost nothing and touch nothing, so they go first; a rejected `--fields`
+  leaves no directory behind.
+- **A token GitHub rejects now exits 8 even under `--no-verify-token`**, found
+  while reproducing the above. The pre-flight and the budget guard call the
+  client directly rather than through `graphql.execute`, so nothing classified
+  a 401 for them: skipping the check produced a traceback and exit 1, where the
+  scheme publishes 8 for exactly this. Skipping the check is meant to cost
+  finding out later, not finding out from a stack trace.
+
+### Changed
+
+- **`L3-CLI-013`** states it, including the general rule: no invocation shall
+  present the operator with a traceback. A test in `tests/test_cli.py` runs a
+  table of bad command lines - unknown field, empty selection, unwritable
+  output, absent source, empty inventory, unknown band - and fails on any that
+  leaks a non-`SystemExit` exception.
+- **`CLI-REFERENCE.md`** says what an unrecognised `--fields` name does.
+
+### Notes
+
+The three defects of this shape had three different causes - a status declared
+and never raised, a library exception nobody expected, an error type that was
+simply not translated - and one symptom. The table-driven test checks the
+symptom, which is the only thing they had in common.
+
 ## [0.6.8] - 2026-09-06
 
 **Exporting `GITHUB_TOKEN` made `--token-file` a usage error.** Which is to
@@ -1753,7 +1811,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.8...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.9...HEAD
+[0.6.9]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.5...v0.6.6

@@ -485,3 +485,22 @@ def test_an_account_that_publishes_nothing_is_not_unresolvable() -> None:
     )
 
     assert unresolvable_from(stub) == 0
+
+
+@pytest.mark.requirement("L3-ING-009")
+def test_a_recovered_account_already_listed_is_one_person() -> None:
+    """Recovery reads the anonymous tail, and an account can appear there
+    under a no-reply address *and* be listed normally.
+
+    Two records for one person counted their commits twice in
+    `contribution_total` and in every percentage over it, while reading as two
+    contributors. The listed entry wins: its commit count comes from the
+    endpoint that counts them.
+    """
+    stub = _StubClient([_Account("alice", 1, 100)])
+    recovered = (ContributorAccount(login="Alice", github_id="1", contribution=50),)
+
+    people = collect(stub, extra=recovered)
+
+    assert len(people) == 1
+    assert people[0].contribution == 100, "the listed count, not the recovered one"

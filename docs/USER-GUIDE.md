@@ -222,139 +222,37 @@ Each reference carries `source_line`, the physical line it came from, so a
 failure three stages later can still be traced back to the row that asked for
 it.
 
-## Checking a single metric
+## Checking how a metric is scored
 
-Metrics are defined one at a time, and each gets a command of its own so a
-definition can be checked against real repositories before it is wired into a
-full run.
-
-```console
-$ github-metrics closed-issues pypa/virtualenv
-pypa/virtualenv
-  closed issues      1429
-  open issues           0
-  tracker         enabled
-  weight              1.0
-```
-
-The weight is a 0.0-1.0 multiplier, not a final score. To see where it came
-from, ask:
+Each metric is scored from a band table, and `bands` prints them. There is no
+per-metric command: `closed-issues` and `releases` existed while the
+definitions were being argued about, and were retired in v0.3.0 once `scan`
+could produce every column in one run.
 
 ```console
-$ github-metrics closed-issues pypa/virtualenv --explain
-...
-closed-issue bands:
-  <20    -> 0.1
-  <50    -> 0.2
-  <100   -> 0.3
-  <150   -> 0.4
-  <300   -> 0.6
-  <400   -> 0.8
-  <500   -> 0.9
-  >=500  -> 1.0
+$ github-metrics bands releases
 ```
 
-The bands are deliberately uneven. The informative range is at the low end: the
-difference between 10 and 100 closed issues says a great deal about whether a
-project is maintained, while the difference between 3,000 and 4,000 says almost
-nothing.
+With no argument it prints all five tables. The command needs no token, because
+the tables are data in this package rather than anything GitHub reports:
 
-### Two things worth knowing about this number
-
-**Pull requests are excluded.** GitHub's REST API models pull requests as
-issues, so the obvious route counts both. For `cline/cline` that is 3,770
-closed issues against 7,001 closed pull requests - a combined figure nearly
-triples the number and measures development throughput rather than issue
-triage. This tool asks GraphQL, where the two are separate.
-
-**Zero has two meanings.** A repository with its issue tracker turned off
-reports zero closed issues, but that describes its configuration, not its
-maintenance - the project may track work on a mailing list or another forge.
-The command says so rather than leaving you to guess:
-
-```console
-  tracker        DISABLED
-  note: the issue tracker is off, so zero is a configuration fact rather than a maintenance one
+```bash
+github-metrics bands                 # every table
+github-metrics bands closed-issues   # one of them
 ```
 
-For JSON, add `--format json`. Diagnostics go to stderr as always, so the
-output pipes cleanly:
+An unrecognised name is a usage error listing the valid ones. These are the
+same objects the scoring uses, so what this prints is what a run applies - see
+[`METRICS.md`](METRICS.md) for the definitions and the reasoning behind the
+edges.
 
-```console
-$ github-metrics closed-issues cline/cline --format json | jq .closed_issues
-3770
-```
-
-Exit status is 0 when the repository was read and **4** when it could not be -
-deleted, renamed, or private. Syntactic validation at ingestion cannot detect
-any of those, so this is where a stale inventory entry finally surfaces.
-
-### Release cadence
-
-`releases` is the same shape of probe for how often a project ships:
-
-```console
-$ github-metrics releases pypa/virtualenv
-pypa/virtualenv
-  releases                  98
-  tags                     285
-  distinct versions        285
-  weight                   1.0
-  tags with no release     187
-  note: releases + tags would report 383 (1.34x), counting every release twice
-  note: at or above 80 versions the weight is capped at 1.0, so this project is indistinguishable from any other above that line
-```
-
-Three things to read out of that.
-
-**The scored number is 285, not 383.** Publishing a GitHub Release creates a
-tag, so every release is already among the tags and adding the two counts it
-twice. The overstatement is not a constant either - it grows with how
-consistently a project uses the Releases feature, so summing would have
-rewarded a project's tooling rather than its release cadence.
-
-**187 tags have no release.** That is normal and is not a defect. Plenty of
-projects tag every version and publish release notes for only the notable ones,
-and a tag is still a shipped version.
-
-**The weight has saturated.** Anything at or above 80 distinct versions scores
-1.0, so this metric stops separating projects above that line. If your
-inventory is mostly mature software, expect this column to be 1.0 nearly
-everywhere and do your ranking elsewhere.
-
-A repository that has never tagged anything scores 0.0 - a project with nothing
-at all scores nothing, rather than collecting the lowest non-zero band for
-existing.
-
-### Seeing the whole scoring model
-
-Every band table can be printed without a token and without touching the
-network:
-
-```console
-$ github-metrics bands              # all five
-$ github-metrics bands maturity     # just one
-maturity bands (on age in days):
-  <0.25 years (   91.2 days) -> 0.0
-  <0.5  years (  182.5 days) -> 0.2
-  <1.0  years (  365.0 days) -> 0.4
-  <2.0  years (  730.0 days) -> 0.6
-  <3.0  years ( 1095.0 days) -> 0.8
-  <4.0  years ( 1460.0 days) -> 0.9
-  >=4.0 years ( 1460.0 days) -> 1.0
-```
-
-These are rendered from the same tables the scoring code reads, so they cannot
-drift from it. Reviewing the model here before starting a collection run is
-cheaper than discovering a disagreement about a boundary once the results are
-in a spreadsheet.
 
 ## Collecting metrics
 
 This is what the tool is for.
 
 ```console
-$ github-metrics scan inventory.csv --output githubmetrics.csv
+$ github-metrics scan inventory.csv --output ./results
 Wrote 3 rows to githubmetrics.csv
 ```
 
@@ -425,7 +323,7 @@ github-metrics scan big-inventory.csv
 # with a step timeout wants.
 github-metrics scan big-inventory.csv --on-exhaustion fail
 
-# Collects what fits and stops, exiting 9.
+# Collects what fits and stops, exiting 4 - the degraded status.
 github-metrics scan big-inventory.csv --on-exhaustion partial
 ```
 
@@ -777,10 +675,10 @@ detail is in [`CLI-REFERENCE.md`](CLI-REFERENCE.md).
 
 | Flag | Example |
 |---|---|
-| `--env-file` | `github-metrics --env-file ci.env metrics inventory.csv` |
+| `--env-file` | `github-metrics --env-file ci.env scan inventory.csv` |
 | `--token` | `github-metrics --token ghp_xxx rate-limit` |
 | `--token-file` | `github-metrics --token-file /run/secrets/github rate-limit` |
-| `--no-verify-token` | `github-metrics --no-verify-token metrics inventory.csv` |
+| `--no-verify-token` | `github-metrics --no-verify-token scan inventory.csv` |
 | `-V`, `--version` | `github-metrics -V` |
 | `-h`, `--help` | `github-metrics scan --help` |
 
@@ -797,6 +695,7 @@ to stderr, so a pipe stays clean.
 | `--workers` | `github-metrics validate teams/*.csv --workers 1` |
 | `--format` | `github-metrics validate inventory.csv --format json` |
 | `--output` | `github-metrics validate inventory.csv --format json --output report.json` |
+| `--recover-anonymous` / `--no-recover-anonymous` | `github-metrics scan inventory.csv --no-recover-anonymous` |
 
 ### `scan` — the deliverable
 

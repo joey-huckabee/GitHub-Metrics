@@ -29,13 +29,27 @@ repos:
     rev: v0.16.5
     hooks:
       - id: ruff
-        args: [--fix]
+        # No `--fix`. `make lint` and CI run `ruff check .`, which reports;
+        # a hook that quietly rewrites the file instead means the two can
+        # disagree about whether the tree is clean.
+        args: [--no-fix]
 
   - repo: local
     hooks:
       - id: mypy
         name: mypy
         entry: poetry run mypy --config-file mypy.ini
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      # pylint was missing, so the hooks could pass on a tree `make lint`
+      # rejects - and `make check` is meant to be exactly what CI runs. Given
+      # the three names rather than `.`, because pointing pylint at the
+      # directory makes it try to lint the virtualenv.
+      - id: pylint
+        name: pylint
+        entry: poetry run pylint github_metrics tests scripts
         language: system
         types: [python]
         pass_filenames: false

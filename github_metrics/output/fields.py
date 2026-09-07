@@ -21,25 +21,6 @@ from github_metrics.model.software import SoftwareRow
 ALL_FIELDS: Final[tuple[str, ...]] = SoftwareRow.to_header()
 """Every emittable column, in canonical output order."""
 
-IDENTITY_FIELDS: Final[tuple[str, ...]] = (
-    "name",
-    "owner",
-    "url",
-    "scan_date",
-    "scan_id",
-)
-"""Columns that identify the row and the run rather than measuring anything.
-
-Every one of these survives a failed read: they come from the input row and
-from the scan, so a repository that 404s still produces a row that says which
-repository it was. `name` prefers GitHub's value when there is one, and `url`
-is built from `owner` and `name`, so both have an answer either way.
-
-`organization` is deliberately not among them. It reads like identity, but only
-the API can report it — so it costs a call, and it is empty for an
-unfetchable repository like every other collected value.
-"""
-
 
 def resolve_fields(selection: Sequence[str] | None) -> tuple[str, ...]:
     """Turn a caller's field selection into the columns to emit.

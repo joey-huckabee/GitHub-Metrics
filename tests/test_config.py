@@ -122,3 +122,14 @@ def test_an_empty_geocode_cache_path_turns_persistence_off(
     monkeypatch.setenv("GEOCODE_CACHE_PATH", "   ")
 
     assert Settings.from_env(empty_env_file).geocode_cache_path is None
+
+
+@pytest.mark.requirement("L3-CFG-003")
+def test_the_suite_never_resolves_the_developers_own_geocode_cache() -> None:
+    """The autouse fixture sets the variable empty rather than deleting it.
+
+    Deleting is the opposite of isolation: an absent value means "use the
+    platform default", which is the developer's real cache. Before this,
+    running `test_cli_scan.py` alone opened that file 29 times.
+    """
+    assert Settings.from_env(token="x").geocode_cache_path is None

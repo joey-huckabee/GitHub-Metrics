@@ -112,6 +112,16 @@ def count_identities(client: GitHubClient, owner: str, repoid: str) -> int | Non
         LOGGER.debug("%s: %d contributor identities (single page)", slug, len(payload))
         return len(payload)
 
+    if payload is None:
+        # GitHub answers **204 No Content** for a repository with no
+        # contributors at all, and the transport hands that back as `None`
+        # rather than an empty list. Reading it as "could not be read" made a
+        # genuine zero indistinguishable from a failed census - and zero is a
+        # real measurement, which is the same reason every metric column
+        # defaults to `None` rather than `0`.
+        LOGGER.debug("%s: no contributors at all (204)", slug)
+        return 0
+
     LOGGER.warning("%s: contributor identity count could not be read", slug)
     return None
 

@@ -52,8 +52,8 @@ code, a line number and the offending value:
 inventory.csv:7: [GM-ING-014] invalid repoid 'virtualenv.git': may not end in '.git'
 ```
 
-Exit status is `0` for a clean read, `3` when rows were rejected, and `2` when
-a file could not be read at all.
+Exit status is `0` for a clean read, `3` when rows were rejected, and `6` when
+a file could not be read at all. `2` is click's, for a malformed command line.
 
 ### Collect metrics
 
@@ -146,23 +146,26 @@ code and let `reset_logger()` own the configuration.
 ## Library use
 
 ```python
+from github_metrics.analysis.row import build_block, build_row
 from github_metrics.client import GitHubClient
 from github_metrics.collect.contributors import get_contributors
 from github_metrics.collect.repository import get_repository
 from github_metrics.config import Settings
 from github_metrics.model.scan import ScanIdentifier
-from github_metrics.analysis.row import build_row
 from github_metrics.output.documents import build_document
+from github_metrics.sources import RepositoryRef
 
 scan = ScanIdentifier()
 settings = Settings.from_env()
+reference = RepositoryRef(owner="python", repoid="cpython")
 
 with GitHubClient(settings) as client:
-    metadata = get_repository(client, "python", "cpython")
-    people = get_contributors(client, "python", "cpython")
+    metadata = get_repository(client, reference.owner, reference.repoid)
+    # Also reports how many listed logins the detail query could not resolve.
+    people, unresolvable = get_contributors(client, reference.owner, reference.repoid)
 
-row = build_row(reference, metadata, scan, contributors=people)
-document = build_document(row, people)
+row = build_row(reference, metadata, scan)
+document = build_document(row, build_block(people, scan))
 ```
 
 ## Documentation

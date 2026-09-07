@@ -367,7 +367,16 @@ def get_contributors(
     # Recovered accounts join the ranking rather than being appended: they are
     # ordinary contributors that one endpoint declined to name, and a
     # concentration figure computed over an unsorted list would be wrong.
-    accounts = sorted([*listed, *extra], key=lambda account: account.contribution, reverse=True)
+    #
+    # A recovered account can already be in the list: recovery reads the
+    # anonymous tail, and an account may appear there under a no-reply address
+    # *and* be listed normally. Two records for one person would count their
+    # commits twice in `contribution_total` and in every percentage over it,
+    # while looking like two contributors. The listed entry wins because its
+    # commit count comes from the endpoint that counts them.
+    known = {account.login.casefold() for account in listed}
+    merged = [*listed, *(entry for entry in extra if entry.login.casefold() not in known)]
+    accounts = sorted(merged, key=lambda account: account.contribution, reverse=True)
     return build_contributors(client, accounts, slug=slug, geocoder=geocoder)
 
 

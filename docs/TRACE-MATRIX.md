@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 22
 - L2 requirements: 88
-- L3 requirements: 141
-- Verified L2+L3: 229 of 229 (100.0%)
+- L3 requirements: 143
+- Verified L2+L3: 231 of 231 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -78,7 +78,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-CFG-001 | L2-CFG-001 | `tests/test_config.py::test_a_blank_explicit_token_falls_back_to_the_environment`<br>`tests/test_config.py::test_an_explicit_token_beats_the_environment`<br>`tests/test_config.py::test_an_explicit_token_works_with_no_environment_at_all`<br>`tests/test_config.py::test_from_env_honours_overrides`<br>`tests/test_config.py::test_from_env_reads_token`<br>`tests/test_config.py::test_missing_token_raises`<br>`tests/test_config.py::test_the_token_source_is_logged_but_never_the_token` | Implemented |
 | L3-CFG-002 | L2-CFG-004 | `tests/test_credentials.py::test_an_unknown_prefix_is_reported_as_such`<br>`tests/test_credentials.py::test_every_documented_prefix_is_recognised` | Implemented |
-| L3-CFG-003 | L2-CFG-002 | `tests/test_credentials.py::test_a_fine_grained_token_reporting_no_scopes_is_not_a_failure`<br>`tests/test_credentials.py::test_a_good_token_reports_scopes_and_budgets` | Implemented |
+| L3-CFG-003 | L2-CFG-002 | `tests/test_config.py::test_the_suite_never_resolves_the_developers_own_geocode_cache`<br>`tests/test_credentials.py::test_a_fine_grained_token_reporting_no_scopes_is_not_a_failure`<br>`tests/test_credentials.py::test_a_good_token_reports_scopes_and_budgets` | Implemented |
 | L3-CFG-004 | L2-CFG-003 | `tests/test_credentials.py::test_a_borrowed_client_is_not_closed_by_the_check`<br>`tests/test_credentials.py::test_a_rejected_token_raises_with_its_code`<br>`tests/test_credentials.py::test_any_other_api_failure_also_raises_rather_than_passing` | Implemented |
 | L3-CFG-005 | L2-CFG-004 | `tests/test_credentials.py::test_an_empty_scope_list_is_explained_rather_than_left_bare`<br>`tests/test_credentials.py::test_the_diagnostics_that_replace_it_are_logged`<br>`tests/test_credentials.py::test_the_token_never_appears_in_any_log_record` | Implemented |
 | L3-CFG-006 | L2-CFG-003 | `tests/test_credentials.py::test_a_rejected_token_exits_eight`<br>`tests/test_credentials.py::test_no_token_anywhere_exits_seven`<br>`tests/test_credentials.py::test_the_two_credential_failures_have_different_codes` | Implemented |
@@ -119,7 +119,7 @@ through their children, so counting them too would count the same work twice.
 | L3-CLI-010 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_document_is_written_for_every_repository_that_was_read`<br>`tests/test_cli_scan.py::test_both_artifacts_of_one_run_carry_the_same_scan`<br>`tests/test_cli_scan.py::test_the_default_destination_is_a_githubmetrics_directory` | Implemented |
 | L3-CLI-011 | L2-CLI-001 | `tests/test_cli_scan.py::test_a_run_that_lost_its_documents_does_not_report_success`<br>`tests/test_cli_scan.py::test_a_run_that_lost_nothing_still_reports_success`<br>`tests/test_cli_scan.py::test_every_degraded_outcome_shares_one_status` | Implemented |
 | L3-CLI-012 | L2-CLI-007 | `tests/test_cli_scan.py::test_a_refused_run_reports_the_shortfall_rather_than_a_traceback`<br>`tests/test_cli_scan.py::test_a_run_stopped_mid_flight_by_the_budget_aborts_rather_than_writing`<br>`tests/test_cli_scan.py::test_an_unaffordable_run_spends_nothing_when_told_to_fail` | Implemented |
-| L3-CLI-013 | L2-CLI-007 | `tests/test_cli.py::test_no_bad_command_line_produces_a_traceback`<br>`tests/test_cli_scan.py::test_a_field_selection_is_checked_before_the_sources_are_read`<br>`tests/test_cli_scan.py::test_a_rejected_field_leaves_no_output_directory`<br>`tests/test_cli_scan.py::test_a_token_rejected_after_no_verify_still_exits_the_credentials_status`<br>`tests/test_cli_scan.py::test_an_unknown_field_is_a_usage_error_rather_than_a_traceback` | Implemented |
+| L3-CLI-013 | L2-CLI-007 | `tests/test_cli.py::test_no_bad_command_line_produces_a_traceback`<br>`tests/test_cli_scan.py::test_a_field_selection_is_checked_before_the_sources_are_read`<br>`tests/test_cli_scan.py::test_a_rejected_field_leaves_no_output_directory`<br>`tests/test_cli_scan.py::test_a_token_rejected_after_no_verify_still_exits_the_credentials_status`<br>`tests/test_cli_scan.py::test_an_unknown_field_is_a_usage_error_rather_than_a_traceback`<br>`tests/test_cli_validate.py::test_a_report_is_written_with_the_newline_it_asked_for`<br>`tests/test_cli_validate.py::test_an_unwritable_report_destination_is_a_usage_error` | Implemented |
 
 ### CNF: Conformance
 
@@ -246,7 +246,7 @@ through their children, so counting them too would count the same work twice.
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-ING-001 | L1-ING-001 | L3-ING-001 | _(none)_ | Implemented |
+| L2-ING-001 | L1-ING-001 | L3-ING-001, L3-ING-009 | _(none)_ | Implemented |
 | L2-ING-002 | L1-ING-001 | L3-ING-002 | _(none)_ | Implemented |
 | L2-ING-003 | L1-ING-001 | L3-ING-003 | _(none)_ | Implemented |
 | L2-ING-004 | L1-ING-001 | L3-ING-004 | _(none)_ | Implemented |
@@ -266,6 +266,7 @@ through their children, so counting them too would count the same work twice.
 | L3-ING-005 | L2-ING-005 | `tests/test_csv_inventory.py::test_blank_lines_and_padding_are_tolerated` | Implemented |
 | L3-ING-006 | L2-ING-006 | `tests/test_csv_inventory.py::test_duplicates_are_dropped_case_insensitively_keeping_the_first`<br>`tests/test_csv_inventory.py::test_repository_ref_identity_folds_case` | Implemented |
 | L3-ING-007 | L2-ING-007 | `tests/test_csv_inventory.py::test_a_large_inventory_reads_without_special_handling`<br>`tests/test_csv_inventory.py::test_a_quoted_field_containing_a_separator_is_one_cell` | Implemented |
+| L3-ING-009 | L2-ING-001 | `tests/test_contributors.py::test_a_recovered_account_already_listed_is_one_person` | Implemented |
 
 ### LOG: Diagnostic logging
 
@@ -489,7 +490,7 @@ through their children, so counting them too would count the same work twice.
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-STA-001 | L1-STA-001 | L3-CNF-007, L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004, L3-STA-007, L3-STA-009, L3-STA-011 | _(none)_ | Implemented |
+| L2-STA-001 | L1-STA-001 | L3-CNF-007, L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004, L3-STA-007, L3-STA-009, L3-STA-011, L3-STA-012 | _(none)_ | Implemented |
 | L2-STA-002 | L1-STA-001 | L3-STA-005 | _(none)_ | Implemented |
 | L2-STA-003 | L1-STA-001 | L3-STA-006, L3-STA-008, L3-STA-010 | _(none)_ | Implemented |
 
@@ -508,6 +509,7 @@ through their children, so counting them too would count the same work twice.
 | L3-STA-009 | L2-STA-001 | `tests/test_anonymous.py::test_a_failed_page_degrades_the_repository_rather_than_the_run`<br>`tests/test_anonymous.py::test_a_no_reply_address_yields_the_account_it_names`<br>`tests/test_anonymous.py::test_a_repository_with_no_anonymous_tail_reports_nothing`<br>`tests/test_anonymous.py::test_an_address_that_does_not_name_an_account_is_not_recovered`<br>`tests/test_anonymous.py::test_every_page_is_walked_until_a_short_one_ends_it`<br>`tests/test_anonymous.py::test_linked_entries_are_skipped_because_they_are_already_collected`<br>`tests/test_anonymous.py::test_one_account_under_several_addresses_is_merged_and_summed`<br>`tests/test_anonymous.py::test_the_pattern_itself_refuses_the_idless_form`<br>`tests/test_anonymous.py::test_the_tail_is_counted_in_people_and_commits`<br>`tests/test_anonymous.py::test_what_was_recovered_is_logged`<br>`tests/test_statistics.py::test_the_breakdown_counts_identities_even_when_accounts_are_fewer`<br>`tests/test_statistics.py::test_the_breakdown_never_goes_negative_on_inconsistent_input` | Implemented |
 | L3-STA-010 | L2-STA-003 | `tests/test_client.py::test_a_graphql_call_does_not_move_the_rest_budget`<br>`tests/test_client.py::test_a_reading_about_another_resource_is_ignored`<br>`tests/test_client.py::test_an_unread_rest_budget_is_fetched_once`<br>`tests/test_client.py::test_an_unreadable_rest_budget_reads_as_spent`<br>`tests/test_runner.py::test_the_preflight_reads_each_budget_from_its_own_source` | Implemented |
 | L3-STA-011 | L2-STA-001 | `tests/test_contributors.py::test_a_bot_is_not_counted_as_unresolvable`<br>`tests/test_contributors.py::test_a_login_that_does_not_resolve_is_counted`<br>`tests/test_contributors.py::test_an_account_that_publishes_nothing_is_not_unresolvable`<br>`tests/test_statistics.py::test_an_unresolvable_account_is_reported_as_an_exclusion`<br>`tests/test_statistics.py::test_an_unresolvable_account_leaves_the_linked_bucket` | Implemented |
+| L3-STA-012 | L2-STA-001 | `tests/test_census.py::test_a_repository_with_no_contributors_counts_zero_not_unknown` | Implemented |
 
 ### TRU: Trust policy
 

@@ -157,3 +157,24 @@ def test_the_count_is_logged_so_a_surprising_coverage_can_be_traced(
         count(_StubClient(REAL_HEADER))
 
     assert "3310" in caplog.text
+
+
+@pytest.mark.requirement("L3-STA-012")
+def test_a_repository_with_no_contributors_counts_zero_not_unknown() -> None:
+    """GitHub answers 204 No Content, which arrives as `None`, not `[]`.
+
+    Read as "could not be read", a genuine zero was indistinguishable from a
+    failed census - and zero is a real measurement, which is the same reason
+    every metric column defaults to `None` rather than `0`.
+    """
+
+    class _NoContent:
+        """A repository with no contributors at all."""
+
+        @staticmethod
+        def contributors_page(slug: str, **kwargs: Any) -> tuple[Any, Any]:
+            """204 carries no body."""
+            del slug, kwargs
+            return {}, None
+
+    assert count_identities(cast(GitHubClient, _NoContent()), "o", "r") == 0

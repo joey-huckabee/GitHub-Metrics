@@ -18,9 +18,10 @@ this codebase:
    API. It needs a token and it spends rate limit.
 
 v0.1.0 shipped `githubmetrics.csv`. v0.2.0 shipped the contributor dataset:
-one `scan` produces **two artifacts under one scan identity** - that CSV, and
+one `scan` produces **three artifacts under one scan identity** - that CSV,
 one JSON document per repository carrying the same row followed by its
-contributor block. There is no flag selecting between them; see
+contributor block, and `statistics.json` saying how complete the run was
+(v0.6.0). There is no flag selecting between them; see
 `docs/adr/0005-one-scan-command-and-per-repository-json.md` for why.
 
 `foreign` and `adversarial` are emitted as `null` and nothing computes them,
@@ -276,7 +277,9 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   the repository and an inventory holds hundreds, so one INFO line per
   repository is hundreds of lines burying whatever the operator needed to see.
   A value worth explaining is DEBUG; a value worth doubting is a WARNING.
-  `sources/csv_inventory.py`'s per-file summary is the one INFO line in the package, and it is
+  There are eight `LOGGER.info` calls across five modules, each per run or
+  per file rather than per repository; `sources/csv_inventory.py`'s per-file
+  summary is the archetype, and it is
   per run rather than per row. A test asserts that collecting an unremarkable
   repository emits nothing at INFO or above.
 - **A library that logs without a handler bypasses everything.** Python's

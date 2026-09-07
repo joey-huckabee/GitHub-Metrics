@@ -11,6 +11,10 @@ from click.testing import CliRunner
 from github_metrics.cli import main
 from github_metrics.exit_codes import EXIT_INPUT_UNREADABLE, EXIT_ROWS_REJECTED
 
+LF = b"\n"
+CRLF = b"\r\n"
+"""Written as bytes: these assertions are about the bytes."""
+
 DATA = Path(__file__).parent / "data"
 
 
@@ -181,3 +185,35 @@ def test_validate_appears_in_the_command_list() -> None:
     result = CliRunner().invoke(main, ["-h"])
 
     assert "validate" in result.output
+
+
+@pytest.mark.requirement("L3-CLI-013")
+def test_a_report_is_written_with_the_newline_it_asked_for(tmp_path: Path) -> None:
+    """`write_text` translates to `os.linesep`, so this file came out CRLF on
+    Windows while every other artifact the tool writes is LF - a report that
+    diffs against itself across platforms."""
+    inventory = tmp_path / "inventory.csv"
+    inventory.write_bytes(b"owner,repoid" + LF + b"pypa,virtualenv" + LF)
+    destination = tmp_path / "report.txt"
+
+    CliRunner().invoke(main, ["validate", str(inventory), "--output", str(destination)])
+
+    raw = destination.read_bytes()
+    assert CRLF not in raw
+    assert raw.endswith(LF)
+
+
+@pytest.mark.requirement("L3-CLI-013")
+def test_an_unwritable_report_destination_is_a_usage_error(tmp_path: Path) -> None:
+    """It raised a raw `FileNotFoundError`: traceback, exit 1, and a status
+    that fails both published tests."""
+    inventory = tmp_path / "inventory.csv"
+    inventory.write_bytes(b"owner,repoid" + LF + b"pypa,virtualenv" + LF)
+
+    result = CliRunner().invoke(
+        main, ["validate", str(inventory), "--output", str(tmp_path / "absent" / "r.txt")]
+    )
+
+    assert result.exit_code == 2
+    assert isinstance(result.exception, SystemExit)
+    assert "could not write --output" in result.output

@@ -199,8 +199,8 @@ def _resolve_columns(header: Sequence[str], source: Path) -> tuple[int, int]:
     return indices[OWNER_COLUMN], indices[REPOID_COLUMN]
 
 
-def _read_rows(source: Path) -> list[list[str]]:
-    """Read every physical row of a CSV, translating failures to our errors.
+def _read_rows(source: Path) -> list[tuple[int, list[str]]]:
+    """Read every row of a CSV with its line, translating failures to our errors.
 
     The whole file is materialised rather than streamed. Repository lists are
     inventories - hundreds or thousands of short rows - so the memory cost is
@@ -211,7 +211,13 @@ def _read_rows(source: Path) -> list[list[str]]:
         source: File to read.
 
     Returns:
-        Rows as lists of cells.
+        Each row as `(line, cells)`, where `line` is the **physical** line
+        the row starts on - what the analyst's editor shows. It is read
+        from the reader rather than counted, because a quoted field may
+        span lines and a row is then not one line. Deriving it from the
+        row index made every line after such a field wrong by the number
+        of extra lines it spanned, and the field does not have to be in a
+        column this module reads.
 
     Raises:
         SourceNotFoundError: The path does not exist.
@@ -255,13 +261,23 @@ def _read_rows(source: Path) -> list[list[str]]:
             f"{source} is not valid UTF-8 at byte {exc.start}; re-export the list as UTF-8"
         ) from exc
 
+    # newline="" hands newline handling to the csv module, which is what lets
+    # it keep a newline inside a quoted field instead of splitting the row
+    # there - and is exactly why a row's line has to come from the reader.
+    reader = csv.reader(io.StringIO(text, newline=""))
+    rows: list[tuple[int, list[str]]] = []
     try:
-        # newline="" hands newline handling to the csv module, which is what
-        # lets it keep a newline inside a quoted field instead of splitting the
-        # row there.
-        return list(csv.reader(io.StringIO(text, newline="")))
+        consumed = 0
+        for row in reader:
+            # `line_num` is the *last* line the row occupied, so the line it
+            # starts on is one past whatever the previous row ended at. That is
+            # the line to report: a defect in `owner` or `repoid` is on the
+            # row's first line, and it is where the analyst edits.
+            rows.append((consumed + 1, row))
+            consumed = reader.line_num
     except csv.Error as exc:
         raise MalformedCsvError(f"{source} is not parseable as CSV: {exc}") from exc
+    return rows
 
 
 def _is_blank(row: Sequence[str]) -> bool:
@@ -363,14 +379,14 @@ def read_repository_csv(source: Path | str, *, strict: bool = False) -> IngestRe
     path = Path(source)
     rows = _read_rows(path)
 
-    header_index = next((i for i, row in enumerate(rows) if not _is_blank(row)), None)
+    header_index = next((i for i, (_, row) in enumerate(rows) if not _is_blank(row)), None)
     if header_index is None:
         raise SourceEmptyError(
             f"{path} contains no header row; expected a first line naming "
             f"{', '.join(REQUIRED_COLUMNS)}"
         )
 
-    owner_at, repoid_at = _resolve_columns(_normalise_header(rows[header_index]), path)
+    owner_at, repoid_at = _resolve_columns(_normalise_header(rows[header_index][1]), path)
     widest_required = max(owner_at, repoid_at)
 
     result = IngestResult(source=str(path))
@@ -384,11 +400,13 @@ def read_repository_csv(source: Path | str, *, strict: bool = False) -> IngestRe
         LOGGER.debug("%s", issue)
         result.issues.append(issue)
 
-    # The physical line number is derived from the row index because every row
-    # here consumed exactly one line. A quoted field spanning lines would make
-    # that drift, but such a field cannot occur in a valid owner or repoid, and
-    # a row containing one is rejected anyway.
-    for line, row in enumerate(rows[header_index + 1 :], start=header_index + 2):
+    # The line comes from the reader, not from the row's position. It used to
+    # be derived, on the reasoning that a quoted field spanning lines "cannot
+    # occur in a valid owner or repoid, and a row containing one is rejected
+    # anyway" - which is true of those two columns and irrelevant, because such
+    # a field in any *other* column makes a perfectly valid row consume several
+    # lines and every line after it wrong by that many.
+    for line, row in rows[header_index + 1 :]:
         if _is_blank(row):
             continue
 

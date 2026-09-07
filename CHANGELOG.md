@@ -8,6 +8,56 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.11] - 2026-09-07
+
+**Line numbers stopped being physical after any multi-line quoted field.** The
+line was derived from the row's index, so a row that occupied more than one
+line shifted every diagnostic after it:
+
+    a note spanning two lines, in an ignored column   reported 3, actual 4
+    two multi-line notes before the bad row           reported 4, actual 6
+    no multi-line field at all (the control)          reported 3, actual 3
+
+The drift accumulates: one line per extra line consumed, for the whole rest of
+the file.
+
+A comment in `csv_inventory.py` justified the derivation - *"a quoted field
+spanning lines ... cannot occur in a valid owner or repoid, and a row
+containing one is rejected anyway"*. That is true of those two columns and
+beside the point. The field only has to be in **some** column: a `note` column
+spanning two lines leaves a perfectly valid row, and moves every line after it.
+
+`L3-ING-001` already required `source_line` to be "the row's 1-based physical
+line", and `L2-ERR-002` already said physical "so that it matches what the
+analyst's editor shows". The requirement was there; nothing checked the one
+case where a row is not a line.
+
+### Fixed
+
+- **The line comes from `csv.reader.line_num`**, captured per row while
+  iterating, rather than from the row's position. `_read_rows` returns
+  `(line, cells)` pairs; the reported line is the one the row **starts** on,
+  which is where the analyst edits.
+- **A duplicate names the physical line of the occurrence it repeats.** That
+  back-reference is the entire reason every row is held in memory, and naming
+  a line the analyst cannot find is worse than naming none.
+
+### Changed
+
+- **`L3-ING-001` and `L3-ERR-002` say what "physical" has to survive**, since
+  the word alone did not: read from the reader rather than derived, so a quoted
+  field spanning lines in *any* column does not shift what follows.
+- **`tests/data/multiline-fields.csv`** is a new byte-exact CRLF fixture whose
+  bad row sits on line 5 behind a two-line note. Derived from the index it
+  reported as line 4.
+
+### Notes
+
+Nothing changes for an inventory with no multi-line field, which is every
+fixture in the suite and almost every inventory in practice - which is why this
+survived. Line endings are unaffected: the reader already owned newline
+handling, and that is exactly why the row and the line had come apart.
+
 ## [0.6.10] - 2026-09-07
 
 **`--strict` reached only the CSV reader.** It is documented as *"fail the
@@ -1858,7 +1908,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.10...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.11...HEAD
+[0.6.11]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.10...v0.6.11
 [0.6.10]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.7...v0.6.8

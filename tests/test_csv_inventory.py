@@ -30,6 +30,9 @@ from github_metrics.sources.csv_inventory import (
     read_repository_csvs,
 )
 
+LF = b"\n"
+"""One byte, written explicitly: these fixtures are byte-exact inputs."""
+
 DATA = Path(__file__).parent / "data"
 
 
@@ -416,3 +419,51 @@ def test_a_quoted_field_containing_a_separator_is_one_cell(tmp_path: Path) -> No
     # an extra field. Getting that wrong would silently shift every column.
     assert codes(result) == [ISSUE_INVALID_OWNER]
     assert "pypa,inc" in result.issues[0].message
+
+
+# ---------------------------------------------------------------------------
+# Physical line numbers, across a row that is not one line
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-ING-001", "L3-ERR-002")
+def test_a_line_number_survives_a_multi_line_quoted_field() -> None:
+    """The line has to be the one the analyst's editor shows.
+
+    It was derived from the row's index, on the reasoning that a quoted field
+    spanning lines "cannot occur in a valid owner or repoid, and a row
+    containing one is rejected anyway". True of those two columns, and
+    irrelevant: such a field in any other column makes a perfectly valid row
+    consume several lines, and every line after it was wrong by that many.
+
+    The fixture is CRLF and byte-exact, and its bad row sits on line 5 behind
+    a two-line note. Derived from the index it reported as line 4.
+    """
+    result = read_repository_csv(DATA / "multiline-fields.csv")
+
+    assert [issue.line for issue in result.issues] == [5]
+    assert [reference.source_line for reference in result.repositories] == [2, 4, 8]
+
+
+@pytest.mark.requirement("L3-ERR-002")
+def test_a_duplicate_points_at_the_physical_line_it_repeats(tmp_path: Path) -> None:
+    """The back-reference is the whole reason every row is held in memory.
+
+    Naming a line the analyst cannot find is worse than naming none.
+    """
+    inventory = tmp_path / "inventory.csv"
+    inventory.write_bytes(
+        b"owner,repoid,note"
+        + LF
+        + b'pypa,virtualenv,"a'
+        + LF
+        + b'b"'
+        + LF
+        + b"pypa,virtualenv,plain"
+        + LF
+    )
+
+    result = read_repository_csv(inventory)
+
+    assert [issue.line for issue in result.issues] == [4]
+    assert "already appears on line 2" in result.issues[0].message

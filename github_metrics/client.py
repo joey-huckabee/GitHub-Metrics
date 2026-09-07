@@ -28,10 +28,12 @@ only its status code and scope headers matter.
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from github import Auth, Github
+from github.GithubException import GithubException
 
 from github_metrics.config import Settings
 
@@ -71,6 +73,9 @@ class GitHubClient:
             base_url=settings.api_url,
             per_page=PER_PAGE,
         )
+        # Shared across the worker pool, so the last reading needs a lock.
+        self._observed_lock = threading.Lock()
+        self._observed: tuple[int, datetime | None] | None = None
 
     def repository(self, full_name: str) -> Repository:
         """Fetch a repository by its `owner/name` identifier.
@@ -104,7 +109,50 @@ class GitHubClient:
             HTTP 200 either way, so the caller must inspect it.
         """
         LOGGER.debug("GraphQL request with variables %r", variables)
-        return self._github.requester.graphql_query(query, variables)
+        try:
+            headers, payload = self._github.requester.graphql_query(query, variables)
+        except GithubException as exc:
+            # A failed response still reports the budget, and a failure is
+            # exactly when the budget is worth knowing.
+            self._observe(exc.data)
+            raise
+        self._observe(payload)
+        return headers, payload
+
+    def _observe(self, payload: Any) -> None:
+        """Record a `rateLimit` reading that arrived with a response.
+
+        Every collection document selects `rateLimit`, which costs nothing -
+        the price of a query counts connections, and this adds none - so the
+        true remaining budget arrives with the answer rather than needing a
+        round trip of its own. This is the only place it is recorded, because
+        this is the one method every GraphQL query in the package goes through.
+
+        Args:
+            payload: A response body, or anything else; a shape that carries
+                no reading is ignored rather than guessed at.
+        """
+        if not isinstance(payload, dict):
+            return
+        data = payload.get("data")
+        limit = data.get("rateLimit") if isinstance(data, dict) else None
+        if not isinstance(limit, dict) or limit.get("remaining") is None:
+            return
+        with self._observed_lock:
+            self._observed = (int(limit["remaining"]), _reset_at(limit.get("resetAt")))
+
+    def observed_budget(self) -> tuple[int, datetime | None] | None:
+        """Return the most recent budget reading, without asking the API.
+
+        Returns:
+            Points remaining and the reset instant as of the last response
+            seen, or `None` if no response has carried a reading yet. The
+            value is a *lower* bound on nothing: queries in flight may have
+            spent since, which is why the guard keeps its own reservation on
+            top rather than trusting this alone.
+        """
+        with self._observed_lock:
+            return self._observed
 
     def graphql_points_remaining(self) -> int:
         """Return the GraphQL points still available this hour.

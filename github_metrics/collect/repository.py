@@ -83,6 +83,7 @@ query($owner: String!, $name: String!) {
     tags: refs(refPrefix: "refs/tags/") { totalCount }
     defaultBranchRef { target { ... on Commit { history { totalCount } } } }
   }
+  rateLimit { remaining resetAt }
 }
 """
 """Every field a row needs, plus the commit total the statistics artifact needs.

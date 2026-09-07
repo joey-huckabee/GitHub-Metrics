@@ -413,3 +413,14 @@ def test_pages_are_requested_at_the_endpoint_maximum() -> None:
     requests and 17 for a 500-contributor repository.
     """
     assert PER_PAGE == 100
+
+
+@pytest.mark.requirement("L3-EXH-004")
+def test_the_query_reports_the_budget_it_spends() -> None:
+    """`rateLimit` rides along free, and it is what keeps the guard honest.
+
+    Price counts connections and this selection adds none, so the true
+    remaining budget arrives with every answer instead of needing a round trip
+    the guard cannot afford to make per repository.
+    """
+    assert "rateLimit" in _details_query(DETAIL_CHUNK_SIZE)

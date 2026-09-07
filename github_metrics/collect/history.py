@@ -80,6 +80,7 @@ query($owner: String!, $name: String!, $cursor: String) {{
       }}
     }}
   }}
+  rateLimit {{ remaining resetAt }}
 }}
 """
 """One page of commits, each with the account its author resolves to.

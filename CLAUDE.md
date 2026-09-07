@@ -290,6 +290,20 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   cannot stand behind. `rate_limit_snapshot` still calls `/rate_limit`, and
   that is correct - it verifies credentials, where only the status code and the
   scope headers matter.
+
+  **And it is read from the answers, not predicted from a cost model** (v0.6.4).
+  Every collection document selects `rateLimit`; it adds no connection, so it
+  adds no cost, and `GitHubClient._observe` records what each response reports.
+  `BudgetGuard` takes the lower of that and its own per-repository reservation.
+  Predicting instead is the defect this replaced: decrementing by
+  `MIN_POINTS_PER_REPOSITORY` while a repository really spends about nine made
+  the estimate an *upper* bound on what remained, so the guard reached its
+  verification margin after ~2,480 repositories against a budget that died at
+  556 - it never verified, never waited and never stopped. A per-repository
+  cost is not knowable in advance (nine ordinarily, 321 measured for a
+  32,016-commit repository under `--deep-attribution`), so do not reintroduce a
+  constant here; `RATE_LIMITED` from the API is the backstop for a repository
+  whose own cost crosses the line.
 - **Counts come from GraphQL, never REST.** REST cannot count closed issues
   correctly at any price: the repository object has no closed count, its
   `open_issues_count` includes pull requests, the issues endpoint returns pull

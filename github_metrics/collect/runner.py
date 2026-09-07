@@ -37,7 +37,11 @@ from github_metrics.collect.contributors import (
 from github_metrics.collect.exhaustion import BudgetGuard, Decision
 from github_metrics.collect.history import HistoryAttribution, attribute_from_history
 from github_metrics.collect.repository import RepoMetaData, get_repository
-from github_metrics.errors import CollectionError, ContributorCollectionError
+from github_metrics.errors import (
+    CollectionError,
+    ContributorCollectionError,
+    RateLimitExhaustedError,
+)
 from github_metrics.geo import Geocoder
 from github_metrics.model.contributor import Contributor
 from github_metrics.model.statistics import AttributionMethod
@@ -188,7 +192,48 @@ def collect_one(
         return Outcome(reference=reference, attempted=False)
 
     try:
+        return _attempt(client, reference, geocoder=geocoder, options=options)
+    except RateLimitExhaustedError:
+        # The budget ran out *inside* this repository, which no pre-flight
+        # estimate can rule out: the cost is not known until the work is done.
+        # The guard applies the policy, and under `wait` the repository is
+        # tried once more rather than being recorded as a failure of its own -
+        # nothing was wrong with it but the hour.
+        if guard is None:
+            raise
+        if guard.ran_dry(reference.full_name) is Decision.SKIP:
+            return Outcome(reference=reference, attempted=False)
+        LOGGER.debug("%s: retrying after the budget reset", reference.full_name)
+
+    try:
+        return _attempt(client, reference, geocoder=geocoder, options=options)
+    except RateLimitExhaustedError as exc:
+        # Twice in one repository, having already waited out a reset. Recorded
+        # rather than waited on again, so a token another process is draining
+        # cannot hold the run for ever.
+        LOGGER.warning("%s: the budget ran out again after waiting: %s", reference.full_name, exc)
+        return Outcome(reference=reference, error=exc)
+
+
+def _attempt(
+    client: GitHubClient,
+    reference: RepositoryRef,
+    *,
+    geocoder: Geocoder | None,
+    options: CollectionOptions,
+) -> Outcome:
+    """Collect one repository once, letting an exhausted budget through.
+
+    Split from `collect_one` so the whole sequence can be retried after a
+    wait. Every other failure is still turned into an outcome here; only
+    `RateLimitExhaustedError` escapes, because it is the one failure that is
+    about the run rather than about this repository.
+    """
+    try:
         metadata = get_repository(client, reference.owner, reference.repoid)
+    # pylint: disable-next=try-except-raise  # ordering: the handler below is broader
+    except RateLimitExhaustedError:
+        raise
     except CollectionError as exc:
         # Every reference produces an outcome. Letting this propagate would
         # abandon the repositories after it and lose the ones before it.
@@ -220,6 +265,9 @@ def collect_one(
                 limit=options.contributor_limit,
                 extra=tally.recovered if tally else (),
             )
+    # pylint: disable-next=try-except-raise  # ordering: the handler below is broader
+    except RateLimitExhaustedError:
+        raise
     except ContributorCollectionError as exc:
         # The measurements survive; only the document is lost. Warned
         # rather than swallowed, because the missing file would otherwise

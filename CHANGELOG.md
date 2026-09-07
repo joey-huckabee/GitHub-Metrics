@@ -8,6 +8,95 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.4] - 2026-09-06
+
+**The budget guard could not see the budget.** `--on-exhaustion wait` is the
+default and the reason a large inventory can be scanned at all. It never
+waited. Neither did `partial` stop, or `fail` fail, on any inventory anyone
+would actually run.
+
+`BudgetGuard` kept a local estimate and decremented it by the per-repository
+*minimum* - two GraphQL points - while a measured repository spends about
+**nine**. Subtracting a lower bound on cost gives an *upper* bound on what
+remains, so the estimate outran the truth by seven points a repository and
+reached its verification margin after roughly **2,480** repositories, against a
+5,000-point budget that really dies at **556**. The API was therefore never
+asked. Simulated against the guard itself:
+
+    real cost/repo   9      real budget dies at repository 556
+    estimate         3600   API reads 0   sleeps 0   exhausted False
+    proceeded        700/700
+
+Under `--deep-attribution` the wall arrives sooner: one point per hundred
+commits, **321** measured for a 32,016-commit repository, so about sixteen of
+them exhaust the hour while the estimate moves by thirty-two.
+
+Past the wall every query failed. GraphQL answers an exhausted budget with a
+`RATE_LIMITED` error, nothing classified it, so it collapsed into a generic
+query failure, became an identity-only row, and the run carried on doing that
+for every remaining repository - with the guard never told. The artifact then
+said the opposite of what had happened: `statistics.json` reported
+`exhausted: false` and `incomplete_because_exhausted: false`, because those
+come from a flag only the guard sets.
+
+**The design was right and the implementation diverged from it.** ADR-0009's
+first implementation note reads *"Exhaustion is detected from the response, not
+predicted: GitHub reports remaining budget on every call, and the runner
+already reads it."* What shipped predicted. The word "floor" then propagated
+from `L2-EXH-001`'s rationale into `L3-EXH-001`, the module docstring, an
+inline comment and a test name - `test_the_estimate_is_a_floor_so_it_reaches_
+the_margin_early` - and that test passed, because its stub's budget could not
+diverge from the estimate it was checking. Five documents asserted the property
+and none of them measured it.
+
+### Fixed
+
+- **The guard reads the budget instead of predicting it.** Every collection
+  document now selects `rateLimit`, which is free inside a charged document -
+  price counts connections and it adds none - so the true remaining budget
+  arrives with each answer. `GitHubClient` records it in the one method every
+  query passes through, and the guard takes the lower of that and its own
+  per-repository reservation. An observation may only lower the working figure,
+  never raise it.
+- **`RATE_LIMITED` is classified as exhaustion**, whatever the caller asked to
+  tolerate, and is not translated into a contributor failure. It is the
+  backstop for the repository whose own cost crosses the line mid-collection,
+  which no figure known in advance can bound.
+- **A repository stopped by the budget reaches the guard.** Under `wait` it is
+  retried once after the reset, because nothing was wrong with it but the hour;
+  under `partial` it is recorded as unattempted rather than failed, which is
+  the same fact as every repository after it; under `fail` the run stops with
+  exit 5. A second refusal after waiting gives up on that repository, so a
+  token another process is draining cannot hold a run for ever.
+- **`statistics.json` tells the truth about exhaustion again**, because the
+  flag it reads is now set by something that can observe it.
+
+### Changed
+
+- **`L2-EXH-004`** makes detection its own obligation: exhaustion SHALL be
+  detected from what the API reports and SHALL NOT be inferred from a local
+  estimate of cost. There was no such requirement, which is why an estimate
+  could satisfy every requirement there was. `L3-EXH-004` and `L3-EXH-005`
+  carry the two mechanisms.
+- **`L3-EXH-001` no longer claims the estimate is a floor**, and
+  `L2-EXH-001`'s rationale no longer recommends one.
+- **The conformance recording is re-keyed** onto the documents the code now
+  sends. The captured payloads are untouched; only the request key moved,
+  because the replay matches on document text and every document changed. The
+  expected artifacts are byte-identical, which is the check that this release
+  changes nothing for a run that never runs short.
+
+### Notes
+
+The pre-flight is unchanged and is still a floor, deliberately: it refuses a
+run that cannot afford its minimum and promises nothing more. What changed is
+what happens after it, where a floor was never the right shape.
+
+**A patch release, because nothing documented changes.** `wait` has been the
+documented default since v0.6.0 and `API-LIMITS.md` has said a 1,000-repository
+run waits for a reset since then; this is the release where that becomes true.
+v0.7.0 stays with `--resume` in `ROADMAP.md`.
+
 ## [0.6.3] - 2026-09-06
 
 **A status that was never wired up.** Exit `5` has meant "the API budget could
@@ -1414,7 +1503,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.0...v0.6.1

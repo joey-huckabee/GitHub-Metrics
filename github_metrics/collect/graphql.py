@@ -53,6 +53,7 @@ from github_metrics.client import GitHubClient
 from github_metrics.errors import (
     GitHubMetricsError,
     GraphQLQueryError,
+    RateLimitExhaustedError,
     RepositoryNotFoundError,
 )
 
@@ -60,6 +61,16 @@ LOGGER = logging.getLogger(__name__)
 
 NOT_FOUND_TYPE = "NOT_FOUND"
 """The `type` GitHub sets on a GraphQL error for a repository that is absent."""
+
+RATE_LIMITED_TYPE = "RATE_LIMITED"
+"""The `type` GitHub sets once the hourly GraphQL budget is gone.
+
+Classified separately because it is the one failure that is about the *run*
+rather than about the repository named. Read as a generic query failure it
+became an identity-only row and the run carried on spending nothing on every
+repository after it, with the budget guard never told; see
+`collect/exhaustion.py`.
+"""
 
 
 def _errors_in(data: Any) -> list[dict[str, Any]]:
@@ -75,6 +86,11 @@ def _errors_in(data: Any) -> list[dict[str, Any]]:
 def _summarise(errors: list[dict[str, Any]]) -> str:
     """Join the API's own error messages into one line."""
     return "; ".join(str(error.get("message", error)) for error in errors)
+
+
+def _mentions_rate_limited(data: Any) -> bool:
+    """True if any error in a response says the budget is gone."""
+    return any(error.get("type") == RATE_LIMITED_TYPE for error in _errors_in(data))
 
 
 def _mentions_not_found(data: Any) -> bool:
@@ -141,6 +157,9 @@ def execute(
     Raises:
         RepositoryNotFoundError: The query named a repository that does not
             exist, is private to this token, or was renamed.
+        RateLimitExhaustedError: The hourly GraphQL budget is gone. Raised
+            whatever the caller asked to tolerate, because it is a fact about
+            the run rather than about any selection in the document.
         GraphQLQueryError: Any other error reported by the API, or a response
             carrying no `data` at all.
     """
@@ -207,6 +226,12 @@ def _classify(
         send an operator to fix an inventory that is correct.
     """
     message = _summarise(_errors_in(payload)) or fallback
+    if _mentions_rate_limited(payload):
+        # Checked first, and regardless of `tolerate_missing`: a budget
+        # that has run out is a fact about the run, so no document can
+        # opt into treating it as an expected answer about one selection.
+        LOGGER.debug("GraphQL %s: rate limited", description)
+        return RateLimitExhaustedError(f"{description}: {message}")
     if _mentions_not_found(payload) and not tolerate_missing:
         LOGGER.debug("GraphQL %s: not found", description)
         return RepositoryNotFoundError(f"{description}: {message}")

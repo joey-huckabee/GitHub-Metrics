@@ -9,7 +9,11 @@ from typing import Any, cast
 import pytest
 
 from github_metrics.client import GitHubClient
-from github_metrics.collect.repository import RepoMetaData, get_repository
+from github_metrics.collect.repository import (
+    REPOSITORY_QUERY,
+    RepoMetaData,
+    get_repository,
+)
 from github_metrics.errors import (
     GraphQLQueryError,
     RepositoryMovedError,
@@ -370,3 +374,14 @@ def test_a_disabled_tracker_is_still_reported_here(
         collect(_StubClient(payload(issues_enabled=False, closed=0)))
 
     assert "issue tracker disabled" in caplog.text
+
+
+@pytest.mark.requirement("L3-EXH-004")
+def test_the_query_reports_the_budget_it_spends() -> None:
+    """`rateLimit` rides along free, and it is what keeps the guard honest.
+
+    Price counts connections and this selection adds none, so the true
+    remaining budget arrives with every answer instead of needing a round trip
+    the guard cannot afford to make per repository.
+    """
+    assert "rateLimit" in REPOSITORY_QUERY

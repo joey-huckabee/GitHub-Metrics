@@ -7,10 +7,11 @@ import threading
 from typing import Any, cast
 
 import pytest
+from github.GithubException import GithubException
 
 from github_metrics.client import GitHubClient
 from github_metrics.collect.budget import Budget, check_budget
-from github_metrics.collect.exhaustion import BudgetGuard, Decision
+from github_metrics.collect.exhaustion import BudgetGuard, Decision, ExhaustionPolicy
 from github_metrics.collect.runner import collect_all, collect_one
 from github_metrics.errors import RateLimitExhaustedError, RepositoryNotFoundError
 from github_metrics.sources import RepositoryRef
@@ -115,9 +116,17 @@ class _StubClient:
         del full_name
         return _StubRepository(self.contributors)
 
+    @staticmethod
+    def observed_budget() -> None:
+        """No response in these tests reports a budget."""
+
     def graphql_points_remaining(self) -> int:
         """Mimic the GraphQL budget lookup."""
         return self.points
+
+    def graphql_budget(self) -> tuple[int, None]:
+        """What the guard reads when it verifies, or when a query is refused."""
+        return self.points, None
 
     def rate_limit_remaining(self) -> int:
         """Mimic the REST budget lookup."""
@@ -378,3 +387,102 @@ def test_a_stopped_guard_skips_a_repository_without_collecting_it() -> None:
     assert not outcome.attempted
     assert not outcome.ok
     assert not stub.calls, "a skipped repository must cost nothing"
+
+
+# ---------------------------------------------------------------------------
+# A budget that runs out inside a repository
+# ---------------------------------------------------------------------------
+
+
+class _DryClient(_StubClient):
+    """Refuses the repository query the way GitHub refuses a spent budget.
+
+    `refusals` queries are refused; the rest succeed, so a test can make the
+    wall fall in the middle of a repository and then let the retry through.
+    """
+
+    def __init__(self, refusals: int = 1) -> None:
+        super().__init__()
+        self.refusals = refusals
+        self.refused = 0
+
+    def graphql(
+        self, query: str, variables: dict[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Answer with `RATE_LIMITED` until the refusals are used up."""
+        if "owner" in variables and self.refused < self.refusals:
+            self.refused += 1
+            raise GithubException(
+                403,
+                {"errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]},
+                {},
+            )
+        return super().graphql(query, variables)
+
+
+def _guard(client: Any, policy: ExhaustionPolicy) -> BudgetGuard:
+    """A guard whose waiting is recorded rather than performed."""
+    return BudgetGuard(
+        cast(GitHubClient, client),
+        policy,
+        available=5000,
+        sleeper=lambda _seconds: None,
+    )
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_repository_that_exhausts_the_budget_is_retried_after_the_wait() -> None:
+    """Nothing was wrong with the repository but the hour.
+
+    Recording it as a failed repository would put an identity-only row in the
+    CSV for one that a wait of a few minutes collects perfectly, and would
+    leave the guard believing the budget was fine.
+    """
+    client = _DryClient(refusals=1)
+    guard = _guard(client, ExhaustionPolicy.WAIT)
+
+    outcome = collect_one(
+        cast(GitHubClient, client), RepositoryRef("pypa", "virtualenv", 1), guard=guard
+    )
+
+    assert outcome.ok, "the retry should have collected it"
+    assert outcome.metadata is not None
+    assert guard.exhausted, "the run must still report that it hit the wall"
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_repository_that_exhausts_a_partial_run_is_unattempted_not_failed() -> None:
+    """It is the same fact as every repository after it: never measured."""
+    client = _DryClient(refusals=1)
+    guard = _guard(client, ExhaustionPolicy.PARTIAL)
+
+    outcome = collect_one(
+        cast(GitHubClient, client), RepositoryRef("pypa", "virtualenv", 1), guard=guard
+    )
+
+    assert not outcome.attempted
+    assert outcome.error is None, "a spent budget is not a defect of this repository"
+    assert guard.stopped
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_repository_that_exhausts_a_failing_run_stops_the_run() -> None:
+    client = _DryClient(refusals=1)
+    guard = _guard(client, ExhaustionPolicy.FAIL)
+
+    with pytest.raises(RateLimitExhaustedError):
+        collect_one(cast(GitHubClient, client), RepositoryRef("pypa", "virtualenv", 1), guard=guard)
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_budget_still_empty_after_waiting_gives_up_on_that_repository() -> None:
+    """A token another process is draining must not hold the run for ever."""
+    client = _DryClient(refusals=2)
+    guard = _guard(client, ExhaustionPolicy.WAIT)
+
+    outcome = collect_one(
+        cast(GitHubClient, client), RepositoryRef("pypa", "virtualenv", 1), guard=guard
+    )
+
+    assert isinstance(outcome.error, RateLimitExhaustedError)
+    assert client.refused == 2, "exactly one retry, not a loop"

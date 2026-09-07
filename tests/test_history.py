@@ -217,3 +217,14 @@ def test_a_malformed_payload_is_treated_as_nothing_to_walk() -> None:
     stub = _StubClient({"repository": {}})
 
     assert walk(stub).commits_walked == 0
+
+
+@pytest.mark.requirement("L3-EXH-004")
+def test_the_query_reports_the_budget_it_spends() -> None:
+    """`rateLimit` rides along free, and it is what keeps the guard honest.
+
+    Price counts connections and this selection adds none, so the true
+    remaining budget arrives with every answer instead of needing a round trip
+    the guard cannot afford to make per repository.
+    """
+    assert "rateLimit" in HISTORY_QUERY

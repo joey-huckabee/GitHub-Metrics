@@ -1,0 +1,90 @@
+name: Soak
+
+# Long-running checks against the live GitHub API.
+#
+# The ordinary suite runs in seconds against stubs, and every defect fixed
+# between v0.6.3 and v0.6.15 lived on a path those stubs cannot reach: a budget
+# running out, a connection dropping, a history page failing. This is where
+# those paths get exercised for real.
+#
+# **It gates nothing.** A failure here is a question - it can mean the tool
+# broke, or that GitHub was slow, or that someone else was spending the token.
+# It runs on its own schedule, reports, and is read by a person.
+
+on:
+  schedule:
+    # Sundays, early UTC. Weekly rather than nightly because each run spends
+    # real budget and the failures it looks for are regressions in code that
+    # changes rarely, not flakes that come and go.
+    - cron: "17 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "quick (minutes, small budget) or exhaustion (>1h, a token's whole hourly quota)"
+        required: true
+        default: quick
+        type: choice
+        options: [quick, exhaustion]
+
+# Never two at once: they share a token, and a second run would spend the
+# budget the first is measuring.
+concurrency:
+  group: soak
+  cancel-in-progress: false
+
+env:
+  POETRY_VERSION: "2.3.4"
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    name: ${{ inputs.profile || 'quick' }}
+    runs-on: ubuntu-latest
+    # A ceiling, not a target: the quick profile finishes in minutes. It is
+    # this high because the exhaustion profile waits out an hourly reset by
+    # design, and a flat number cannot be got wrong by an expression that is
+    # evaluated differently on a schedule than on a dispatch.
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Poetry
+        run: pipx install poetry==${{ env.POETRY_VERSION }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install --with dev --no-interaction
+
+      - name: soak
+        env:
+          # A token of its own, not the workflow's `GITHUB_TOKEN`. The default
+          # token cannot read the GraphQL fields a scan needs, and the
+          # exhaustion profile deliberately drains whatever it is given - which
+          # is not something to do to a token anything else depends on.
+          GITHUB_TOKEN: ${{ secrets.SOAK_GITHUB_TOKEN }}
+          SOAK_PROFILE: ${{ inputs.profile || 'quick' }}
+          # Named so a Nominatim operator can tell who this is. The policy
+          # penalty is blocking the agent, which would fail every later run
+          # rather than this one.
+          GEOCODER_USER_AGENT: github-metrics-soak (+https://github.com/joey-huckabee/GitHub-Metrics)
+          # Off the runner's default path so a cached home directory cannot
+          # carry geocode results between runs and hide a lookup that broke.
+          GEOCODE_CACHE_PATH: ${{ runner.temp }}/soak-geocode.json
+        run: poetry run pytest -m soak -v --no-cov
+
+      - name: artifacts from the run
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: soak-${{ inputs.profile || 'quick' }}
+          path: |
+            /tmp/pytest-of-runner/**/githubmetrics.csv
+            /tmp/pytest-of-runner/**/statistics.json
+          if-no-files-found: ignore
+          retention-days: 30

@@ -16,6 +16,7 @@ every requirement must sit in the section its own id names.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import re
 import sys
@@ -181,3 +182,52 @@ def test_the_tables_of_categories_agree_with_the_section_headings() -> None:
         used = {req.split("-")[1] for req in ids}
         table = dict(CATEGORY_ROW.findall(doc.read_text(encoding="utf-8")))
         assert table == {code: titles[code] for code in used}
+
+
+@pytest.mark.requirement("L3-COL-001")
+def test_no_requirement_rests_only_on_a_test_the_gate_never_runs() -> None:
+    """The soak checks add coverage; they must not be the only coverage.
+
+    They are marked `soak` and CI deselects them, so a requirement whose sole
+    artifact lived there would read **Implemented** in the matrix on the
+    strength of something no merge ever runs. That is this repository's most
+    persistent failure - a marker claiming coverage the assertion does not
+    provide - in a new place, and it is cheap to refuse.
+    """
+    trace = GENERATOR.load_trace()
+    soak = set(_soak_tests())
+    # Without this the check passes by finding nothing - the failure mode of
+    # every guard in this file, and the reason each one asserts it looked.
+    assert soak, "no soak tests were found; this guard would pass vacuously"
+
+    unbacked = sorted(
+        requirement
+        for requirement, artifacts in trace.markers.items()
+        if artifacts and all(artifact in soak for artifact in artifacts)
+    )
+
+    assert unbacked == []
+
+
+def _soak_tests() -> set[str]:
+    """Every `path::name` the gate deselects for being a soak check."""
+    found: set[str] = set()
+    for path in sorted((ROOT / "tests").rglob("test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        relative = path.relative_to(ROOT).as_posix()
+        module_wide = any(
+            "soak" in {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)}
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(getattr(target, "id", "") == "pytestmark" for target in node.targets)
+        )
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            marked = module_wide or any(
+                "soak" in {n.attr for n in ast.walk(decorator) if isinstance(n, ast.Attribute)}
+                for decorator in node.decorator_list
+            )
+            if marked:
+                found.add(f"{relative}::{node.name}")
+    return found

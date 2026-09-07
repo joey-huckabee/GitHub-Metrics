@@ -283,6 +283,28 @@ half of the collection failed. The repository's row in `githubmetrics.csv` is
 **complete** - every column of it was collected - so the comparable table is
 unaffected and the repository still ranks correctly.
 
+### `GM-COL-006` - No answer from the API
+
+**Class**: `TransportError`
+**Exit status**: 4
+**Meaning**: The request never completed. The connection failed, DNS did not
+resolve, or the read timed out.
+**Typical cause**: A network interruption longer than a moment - a VPN
+reconnecting, a laptop sleeping, a proxy dropping idle connections. The HTTP
+library retries ten times with no backoff, so those ten attempts pass in
+milliseconds and cover a dropped packet, not an outage.
+**Resolution**: Re-run when the network is back. Repositories collected before
+the interruption keep their rows.
+
+Distinct from every other collection code because **nothing was refused**:
+GitHub was never reached, so there is nothing to classify and nothing about the
+repository to learn. The next step is the network rather than the inventory.
+
+Until v0.6.7 this was not a code at all. `requests` raises these, PyGithub does
+not wrap them, and they are not `GithubException` - so they escaped every
+`except GithubException` in the package, left the worker, and ended the run
+with a traceback, exit 1 and no CSV.
+
 No document is written, for the reason `METRICS.md` gives: a document carrying
 an empty contributor array and a `contribution_total` of zero cannot be told
 from a repository that genuinely has no contributors. The absent file and the

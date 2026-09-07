@@ -217,6 +217,7 @@ An address has **three states that must not be collapsed**:
 | Metrics failed | yes, identity only | **no** |
 | Metrics fine, contributors failed | yes, complete | **no** |
 | Metrics fine, history walk failed (`--deep-attribution`) | yes, complete | **no** |
+| Connection dropped or timed out | as far as it got | **no** |
 
 **A row without a document means "named, not fully measured."** A CSV row is
 positional so omitting one would shift every later row's meaning; a directory

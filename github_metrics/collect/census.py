@@ -45,7 +45,7 @@ from typing import Final
 
 from github.GithubException import GithubException
 
-from github_metrics.client import GitHubClient
+from github_metrics.client import TRANSPORT_ERRORS, GitHubClient
 from github_metrics.errors import ContributorCollectionError
 
 LOGGER = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ def count_identities(client: GitHubClient, owner: str, repoid: str) -> int | Non
         headers, payload = client.contributors_page(
             slug, page=1, per_page=CENSUS_PER_PAGE, anonymous=True
         )
-    except GithubException as exc:
+    except (GithubException, *TRANSPORT_ERRORS) as exc:
         raise ContributorCollectionError(
             f"{slug}: could not count contributor identities: {exc}"
         ) from exc

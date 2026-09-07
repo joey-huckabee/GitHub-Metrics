@@ -8,6 +8,67 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.7] - 2026-09-06
+
+**A network interruption ended the run and lost every row.** PyGithub speaks
+HTTP through `requests` and does not wrap what it raises, so a dropped
+connection, a DNS failure or a read timeout surfaces as a
+`requests.RequestException` - which is **not** a `GithubException`. All six
+`except GithubException` handlers in the package let it straight through, past
+the per-repository handling, out of the worker and out of the run.
+
+Reproduced through the CLI on a three-repository inventory whose network goes
+away after the first response:
+
+    exit_code : 1
+    exception : ConnectionError
+    files     : []
+
+The first repository had been collected successfully. Its work went with the
+rest.
+
+**Retries were not cover.** PyGithub's default `GithubRetry` is `total=10` with
+`backoff_factor=0`, so ten attempts happen essentially at once: they absorb a
+single dropped packet and nothing longer. A VPN reconnecting, a laptop
+sleeping, a proxy dropping an idle connection - each outlasts them and raises.
+
+Nothing linked the six sites. They are not related by inheritance, they are not
+near each other in the source, and every one of them was individually
+reasonable: catching what the library documents itself as raising.
+
+### Fixed
+
+- **`GM-COL-006` / `TransportError`**, a `CollectionError` so that the
+  per-repository handling already in the runner applies to it. Distinct from
+  every other collection code because **nothing was refused**: GitHub was never
+  reached, so there is nothing to classify and nothing about the repository to
+  learn. A run that previously exited 1 with no file now exits 4 with a full
+  CSV and keeps what it had collected.
+- **A REST transport failure degrades the repository**, translated to
+  `ContributorCollectionError` at each of the three REST sites, exactly as an
+  API refusal already was.
+- **An unreachable API is no longer reported as a rejected token.** Credential
+  verification raised `InvalidCredentialsError` for a failure that never
+  reached GitHub, sending an operator to rotate a token that was fine.
+
+### Changed
+
+- **`TRANSPORT_ERRORS` lives in `client.py`**, the module that owns the
+  transport, and `collect/` imports the tuple rather than importing `requests`.
+  One place knows what the transport is.
+- **`requests` is now a declared dependency.** It was imported only
+  transitively through PyGithub before; a package this now names in its own
+  exception handling should not arrive by accident.
+- **`L3-COL-004`** states the obligation, including the general form: every
+  `try` that handles `GithubException` shall handle the transport errors too.
+  A test walks the package's AST and fails any that does not - the check that
+  would have caught this, and the one that catches the next one.
+
+### Notes
+
+Geocoding is unaffected: it goes through `geopy`, not PyGithub, and
+`Geocoder._ask` already tells a service failure apart from a genuine miss.
+
 ## [0.6.6] - 2026-09-06
 
 **The pre-flight's REST figure was the GraphQL figure.** PyGithub keeps
@@ -1630,7 +1691,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.6...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.7...HEAD
+[0.6.7]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.3...v0.6.4

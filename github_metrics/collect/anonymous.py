@@ -54,7 +54,7 @@ from typing import Any, Final
 
 from github.GithubException import GithubException
 
-from github_metrics.client import PER_PAGE, GitHubClient
+from github_metrics.client import PER_PAGE, TRANSPORT_ERRORS, GitHubClient
 from github_metrics.collect.contributors import ContributorAccount
 from github_metrics.errors import ContributorCollectionError
 
@@ -206,7 +206,7 @@ def _page(client: GitHubClient, slug: str, *, page: int, per_page: int) -> list[
     """Fetch one page of the anonymous-inclusive contributor list."""
     try:
         _, payload = client.contributors_page(slug, page=page, per_page=per_page, anonymous=True)
-    except GithubException as exc:
+    except (GithubException, *TRANSPORT_ERRORS) as exc:
         raise ContributorCollectionError(
             f"{slug}: could not read anonymous contributors: {exc}"
         ) from exc

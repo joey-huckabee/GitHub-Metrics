@@ -199,6 +199,23 @@ class ContributorCollectionError(CollectionError):
     code = "GM-COL-005"
 
 
+class TransportError(CollectionError):
+    """No answer arrived at all: the connection failed, or timed out.
+
+    Distinct from every other collection error because nothing was refused -
+    GitHub was never reached, or never finished replying, so there is nothing
+    to classify and nothing about the repository to learn. The operator's next
+    step is the network, not the inventory.
+
+    It is a `CollectionError` so that the per-repository handling already in
+    the runner applies to it. `requests` raises these, PyGithub does not wrap
+    them, and they are not `GithubException` - so until v0.6.7 they escaped
+    every worker and one interruption ended a run with no CSV at all.
+    """
+
+    code = "GM-COL-006"
+
+
 class OutputError(GitHubMetricsError):
     """Base class for failures producing output."""
 

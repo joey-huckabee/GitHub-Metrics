@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 22
 - L2 requirements: 88
-- L3 requirements: 138
-- Verified L2+L3: 226 of 226 (100.0%)
+- L3 requirements: 139
+- Verified L2+L3: 227 of 227 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -462,7 +462,7 @@ through their children, so counting them too would count the same work twice.
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
 | L2-SRC-001 | L1-ING-004 | L3-SRC-001, L3-SRC-002 | _(none)_ | Implemented |
-| L2-SRC-002 | L1-ING-004 | L3-SRC-003, L3-SRC-004 | _(none)_ | Implemented |
+| L2-SRC-002 | L1-ING-004 | L3-SRC-003, L3-SRC-004, L3-SRC-006 | _(none)_ | Implemented |
 | L2-SRC-003 | L1-CON-001 | L3-SRC-005 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
@@ -474,6 +474,7 @@ through their children, so counting them too would count the same work twice.
 | L3-SRC-003 | L2-SRC-002 | `tests/test_resolve.py::test_a_mistyped_path_reports_a_missing_file_not_a_bad_name`<br>`tests/test_resolve.py::test_an_existing_file_is_read_even_without_a_csv_suffix`<br>`tests/test_resolve.py::test_the_rules_are_checked_in_order` | Implemented |
 | L3-SRC-004 | L2-SRC-002 | `tests/test_resolve.py::test_counts_cover_every_kind_of_source`<br>`tests/test_resolve.py::test_sources_of_different_kinds_mix_in_the_order_written`<br>`tests/test_resolve.py::test_the_same_arguments_always_resolve_the_same_way` | Implemented |
 | L3-SRC-005 | L2-SRC-003 | `tests/test_resolve.py::test_a_repetition_across_two_files_is_caught`<br>`tests/test_resolve.py::test_a_repository_named_twice_is_collected_once`<br>`tests/test_resolve.py::test_repetition_ignores_case_as_github_does`<br>`tests/test_resolve.py::test_the_first_mention_is_the_one_that_survives` | Implemented |
+| L3-SRC-006 | L2-SRC-002 | `tests/test_cli_validate.py::test_strict_mode_reaches_a_reference_named_on_the_command_line`<br>`tests/test_cli_validate.py::test_strict_mode_reaches_a_repetition_across_two_sources`<br>`tests/test_resolve.py::test_a_clean_run_resolves_the_same_either_way`<br>`tests/test_resolve.py::test_strict_promotes_a_bad_reference_named_on_the_command_line`<br>`tests/test_resolve.py::test_strict_promotes_a_repetition_across_two_sources`<br>`tests/test_resolve.py::test_strict_promotes_the_earliest_problem_in_argument_order` | Implemented |
 
 ### STA: Scan statistics
 

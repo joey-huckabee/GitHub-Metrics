@@ -339,8 +339,14 @@ def read_repository_csv(source: Path | str, *, strict: bool = False) -> IngestRe
 
     Args:
         source: Path to the CSV.
-        strict: When true, the first row-level issue raises `StrictModeError`
-            instead of being collected. File-level problems raise either way.
+        strict: When true, the first row-level issue raises `StrictModeError`.
+            This is the single-file promise, for a library caller reading one
+            inventory. The CLI does not use it: `resolve_sources` promotes
+            instead, because it can also see a bad reference on the command
+            line and a repetition across two sources, and because the problem
+            promoted has to be the earliest in argument order rather than the
+            earliest in whichever file finished reading first. Not dead code -
+            a different scope. File-level problems raise either way.
 
     Returns:
         The accepted references and any row-level issues.

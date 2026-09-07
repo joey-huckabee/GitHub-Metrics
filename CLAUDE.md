@@ -379,6 +379,17 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   `contribution_total` be a plain number rather than an optional one: a
   document exists only where the list was read.
 
+- **A flag has to reach every path it claims.** `--strict` was passed only to
+  `read_repository_csvs`, so it abandoned a bad row in a file and ignored the
+  identical defect named on the command line or found across two sources -
+  where it changed nothing at all, the same exit code and the same report with
+  the flag and without it. `resolve_sources._record` is the one place an issue
+  is promoted now, and the files are read *without* strict so the problem
+  promoted is the earliest in **argument order** rather than the earliest in
+  whichever file finished reading first. `read_repository_csv(strict=...)`
+  stays for a library caller reading one inventory; that is a different scope,
+  not dead code.
+
 - **A traceback is never a correct outcome for the CLI.** Its job is to turn
   the package's errors into the published statuses, and exit 1 with a stack
   trace fails both documented tests - `$? -ge 3` and `$? -ge 5` read it as a

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from github_metrics.errors import ISSUE_DUPLICATE, IngestError
+from github_metrics.errors import ISSUE_DUPLICATE, IngestError, StrictModeError
 from github_metrics.sources.resolve import is_csv_source, resolve_sources
 
 DATA = Path(__file__).parent / "data"
@@ -158,3 +158,75 @@ def test_the_run_reports_its_outcome_once_at_info(caplog: pytest.LogCaptureFixtu
 
     assert len(caplog.records) == 1
     assert "Resolved 2 repositories" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# strict, which used to reach only the CSV reader
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-SRC-006")
+def test_strict_promotes_a_bad_reference_named_on_the_command_line() -> None:
+    """`--strict` is documented as "fail the pipeline on any defect".
+
+    It was passed only to `read_repository_csvs`, so it abandoned a bad row in
+    a file and ignored the identical defect written as an argument -
+    `validate --strict gitlab.com/a/b` exited 3, the status for "read, but
+    degraded", rather than 6.
+    """
+    with pytest.raises(StrictModeError) as caught:
+        resolve_sources(["gitlab.com/a/b"], strict=True)
+
+    assert "strict mode" in str(caught.value)
+
+
+@pytest.mark.requirement("L3-SRC-006")
+def test_strict_promotes_a_repetition_across_two_sources(tmp_path: Path) -> None:
+    """The duplicate check runs outside the reader, so strict never saw it.
+
+    Without this the flag changed nothing at all for a repetition: the same
+    exit code, the same report, with `--strict` and without it.
+    """
+    inventory = tmp_path / "inventory.csv"
+    inventory.write_text("owner,repoid\npypa,virtualenv\n", encoding="utf-8")
+
+    with pytest.raises(StrictModeError) as caught:
+        resolve_sources([str(inventory), "pypa/virtualenv"], strict=True)
+
+    assert ISSUE_DUPLICATE in str(caught.value)
+
+
+@pytest.mark.requirement("L3-SRC-006")
+def test_strict_promotes_the_earliest_problem_in_argument_order(tmp_path: Path) -> None:
+    """Files are read before the arguments are walked, so the reader's own
+    strict mode would abandon a file named third before a slug named first."""
+    inventory = tmp_path / "inventory.csv"
+    inventory.write_text("owner,repoid\ngitlab.com,\n", encoding="utf-8")
+
+    with pytest.raises(StrictModeError) as caught:
+        resolve_sources(["gitlab.com/a/b", str(inventory)], strict=True)
+
+    assert "<argument>" in str(caught.value), "the slug came first"
+
+    with pytest.raises(StrictModeError) as second:
+        resolve_sources([str(inventory), "gitlab.com/a/b"], strict=True)
+
+    assert "inventory.csv" in str(second.value), "and here the file did"
+
+
+@pytest.mark.requirement("L3-SRC-006")
+def test_a_clean_run_resolves_the_same_either_way(tmp_path: Path) -> None:
+    """Strict changes what happens to a problem, never what a good run yields."""
+    inventory = tmp_path / "inventory.csv"
+    inventory.write_text("owner,repoid\npypa,virtualenv\n", encoding="utf-8")
+
+    lenient = resolve_sources([str(inventory), "psf/requests"])
+    strict = resolve_sources([str(inventory), "psf/requests"], strict=True)
+
+    assert names_of(lenient) == names_of(strict)
+    assert not strict.issues
+
+
+def names_of(resolved: object) -> list[str]:
+    """The accepted references, by full name."""
+    return [reference.full_name for reference in resolved.repositories]  # type: ignore[attr-defined]

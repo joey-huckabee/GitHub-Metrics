@@ -21,6 +21,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   these and nothing else. This is the same shape as every defect the file was
   written to catch - a check that passes on the one route where it cannot fail.
 
+- **A soak check read a key `statistics.json` does not carry.**
+  `budget["graphql_points_remaining"]` was invented; the published name is
+  `graphql_remaining`. The assertion before it had already passed, so the first
+  run that actually reached the API drove three checks green and died on a typo
+  in the fourth.
+
+### Added
+
+- **`tests/test_soak_contract.py`** binds every key the soak reads against the
+  mapping the code publishes, offline and in milliseconds. The soak's
+  assertions are about live behaviour and can only be checked live; the *names*
+  it reads can be checked in the gate, and finding a typo there costs nothing
+  instead of costing a dispatch and a wait.
+
 No package change: the tool itself is untouched.
 
 ## [0.6.17] - 2026-09-07

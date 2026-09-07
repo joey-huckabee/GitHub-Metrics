@@ -141,6 +141,32 @@ def test_strict_mode_reports_the_first_bad_row_and_stops() -> None:
     assert "bokeh/bokeh" not in result.output
 
 
+@pytest.mark.requirement("L3-SRC-006")
+def test_strict_mode_reaches_a_reference_named_on_the_command_line() -> None:
+    """The reported defect: `--strict` only ever reached the CSV reader.
+
+    `validate --strict gitlab.com/a/b` exited 3 - the status meaning the
+    sources loaded and are usable but degraded - for a command line the flag
+    is documented to fail the pipeline on.
+    """
+    result = CliRunner().invoke(main, ["validate", "gitlab.com/a/b", "--strict"])
+
+    assert result.exit_code == EXIT_INPUT_UNREADABLE
+    assert "strict mode" in result.output
+
+
+@pytest.mark.requirement("L3-SRC-006")
+def test_strict_mode_reaches_a_repetition_across_two_sources(tmp_path: Path) -> None:
+    """Without this the flag changed nothing at all for a duplicate."""
+    inventory = tmp_path / "inventory.csv"
+    inventory.write_text("owner,repoid\npypa,virtualenv\n", encoding="utf-8")
+
+    result = CliRunner().invoke(main, ["validate", str(inventory), "pypa/virtualenv", "--strict"])
+
+    assert result.exit_code == EXIT_INPUT_UNREADABLE
+    assert "strict mode" in result.output
+
+
 @pytest.mark.requirement("L3-CLI-001")
 def test_validate_requires_at_least_one_source() -> None:
     result = CliRunner().invoke(main, ["validate"])

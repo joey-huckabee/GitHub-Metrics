@@ -8,6 +8,53 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.10] - 2026-09-07
+
+**`--strict` reached only the CSV reader.** It is documented as *"fail the
+pipeline on any defect"*, and it did that for a bad row in a file. For the same
+defect written on the command line, or found across two sources, it did
+nothing:
+
+    case                                     exit
+    a bad row in a CSV                          6
+    a bad reference on the command line         3
+    a duplicate across two sources              3
+    a duplicate, no --strict                    3
+
+The last two rows are the same. For a repetition, `--strict` produced an
+identical exit code and an identical report with the flag and without it - a
+flag that could be given or omitted with no observable difference.
+
+`sources/resolve.py` passed `strict` to `read_repository_csvs` and to nothing
+else, while the reference parser and the cross-source duplicate check sat in
+the same function appending their issues directly.
+
+### Fixed
+
+- **Every problem `resolve_sources` can report is now subject to `--strict`**:
+  a row in a file, a reference written on the command line, and a repetition
+  across two sources. `_record` is the one place an issue is promoted.
+- **The problem promoted is the earliest in argument order.** Files are read
+  *before* the arguments are walked, so letting the reader abort would raise
+  for a file named third ahead of a bad slug named first. The files are now
+  read without `strict` and every issue is promoted in the loop, which is what
+  puts the reporting back in the order the operator wrote.
+
+### Changed
+
+- **`L3-SRC-006`** states both halves.
+- **`CLI-REFERENCE.md`** describes what `--strict` covers rather than only
+  "the first bad row", which was the reading the code had taken.
+- **`read_repository_csv(strict=...)` is documented as a different scope, not
+  dead code.** The CLI no longer reaches it; it remains the single-file promise
+  for a library caller reading one inventory.
+
+### Notes
+
+Nothing changes without `--strict`: the same references are accepted, the same
+issues reported, in the same order. A clean run resolves identically either
+way, which is asserted rather than assumed.
+
 ## [0.6.9] - 2026-09-07
 
 **A mistyped `--fields` printed a stack trace and left an empty directory
@@ -1811,7 +1858,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.9...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.10...HEAD
+[0.6.10]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.6...v0.6.7

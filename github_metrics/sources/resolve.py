@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
-from github_metrics.errors import ISSUE_DUPLICATE, RowIssue
+from github_metrics.errors import ISSUE_DUPLICATE, RowIssue, StrictModeError
 from github_metrics.sources.csv_inventory import RepositoryRef, read_repository_csvs
 from github_metrics.sources.reference import looks_like_a_url, parse_reference
 
@@ -102,7 +102,10 @@ def resolve_sources(
 
     Args:
         values: The arguments, in the order they were written.
-        strict: Promote the first problem to an exception, as ingestion does.
+        strict: Promote the first problem to an exception, whatever named it
+            - a row in a file, a reference on the command line, or a
+            repetition across two sources. The problem promoted is the
+            earliest in argument order.
         max_workers: Threads for reading CSV files. Defaults to
             `min(files, 8)`.
 
@@ -113,9 +116,11 @@ def resolve_sources(
         IngestError: In strict mode, or when a file cannot be read at all.
     """
     paths = [Path(value) for value in values if is_csv_source(value)]
-    per_file = (
-        list(read_repository_csvs(paths, strict=strict, max_workers=max_workers)) if paths else []
-    )
+    # Read without `strict` and promote below, so one place decides and the
+    # problem promoted is the earliest **in argument order**. Letting the
+    # reader abort would raise for a file named third before a bad slug named
+    # first, since the files are read before the arguments are walked.
+    per_file = list(read_repository_csvs(paths, max_workers=max_workers)) if paths else []
 
     LOGGER.debug(
         "Resolving %d source(s): %d file(s), %d named directly",
@@ -132,16 +137,17 @@ def resolve_sources(
         if is_csv_source(value):
             result = next(files)
             resolved.rows_read += result.rows_read
-            resolved.issues.extend(result.issues)
-            _keep(resolved, result.repositories, seen, str(result.source))
+            for issue in result.issues:
+                _record(resolved, issue, strict=strict)
+            _keep(resolved, result.repositories, seen, str(result.source), strict=strict)
             continue
 
         resolved.rows_read += 1
         parsed = parse_reference(value, source=ARGUMENT_SOURCE)
         if isinstance(parsed, RowIssue):
-            resolved.issues.append(parsed)
+            _record(resolved, parsed, strict=strict)
             continue
-        _keep(resolved, [parsed], seen, ARGUMENT_SOURCE)
+        _keep(resolved, [parsed], seen, ARGUMENT_SOURCE, strict=strict)
 
     LOGGER.info(
         "Resolved %d repositories from %d source(s) (%d rejected)",
@@ -152,11 +158,37 @@ def resolve_sources(
     return resolved
 
 
+def _record(resolved: ResolvedSources, issue: RowIssue, *, strict: bool) -> None:
+    """Keep an issue, or promote it to an exception in strict mode.
+
+    Every problem this module can report passes through here, which is the
+    point. `strict` used to reach only `read_repository_csvs`, so it abandoned
+    a bad row in a file and ignored the same defect named on the command line
+    or found across two sources - and `--strict` is documented as "fail the
+    pipeline on any defect". A duplicate produced identical output with the
+    flag and without it.
+
+    Args:
+        resolved: What has been resolved so far.
+        issue: The problem to record.
+        strict: Whether the caller asked for the first problem to abort.
+
+    Raises:
+        StrictModeError: When `strict` is set. The message matches the one
+            `read_repository_csv` raises, because it is the same promise.
+    """
+    if strict:
+        raise StrictModeError(f"{issue} (strict mode)")
+    resolved.issues.append(issue)
+
+
 def _keep(
     resolved: ResolvedSources,
     references: Sequence[RepositoryRef],
     seen: dict[tuple[str, str], str],
     source: str,
+    *,
+    strict: bool = False,
 ) -> None:
     """Add references, refusing one already named by an earlier source.
 
@@ -169,7 +201,8 @@ def _keep(
     for reference in references:
         first = seen.get(reference.key)
         if first is not None:
-            resolved.issues.append(
+            _record(
+                resolved,
                 RowIssue(
                     code=ISSUE_DUPLICATE,
                     message=(
@@ -178,7 +211,8 @@ def _keep(
                     ),
                     line=reference.source_line,
                     source=source,
-                )
+                ),
+                strict=strict,
             )
             continue
         seen[reference.key] = source

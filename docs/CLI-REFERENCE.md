@@ -188,7 +188,7 @@ produce two identical rows.
 
 | Option | Default | Description |
 |---|---|---|
-| `--strict` | off | Abort on the first bad row instead of reporting all of them. |
+| `--strict` | off | Abort on the first problem instead of reporting all of them: a bad row in a file, a reference written on the command line, or a repetition across two sources. The one reported is the earliest in argument order. |
 | `--workers N` | `min(files, 8)` | Threads used to read multiple CSV files. Has no effect on the result. |
 | `--format {text,json}` | `text` | Report format. |
 | `--output PATH` | stdout | Write the report here instead. |

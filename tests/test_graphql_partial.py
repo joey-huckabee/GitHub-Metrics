@@ -275,7 +275,9 @@ class _BotClient:
 
 @pytest.mark.requirement("L3-MET-021")
 def test_a_bot_contributor_keeps_its_commits_and_costs_no_one_else_their_detail() -> None:
-    collected = get_contributors(cast(GitHubClient, _BotClient()), "NousResearch", "hermes-agent")
+    collected, _ = get_contributors(
+        cast(GitHubClient, _BotClient()), "NousResearch", "hermes-agent"
+    )
 
     assert len(collected) == 3
     # The accounts either side of the bot keep the detail GitHub returned.

@@ -273,15 +273,24 @@ def gaps_from_outcome(outcome: Outcome) -> IdentityGaps:
     `None`: a zero would claim the tail contributed nothing. Recovery walks the
     pages, so it reports both - and how many of those entries named an account
     through a no-reply address.
+
+    Separately from the ceiling: a login GitHub listed that the detail query
+    could not resolve is an account deleted or suspended between the two
+    calls. Those are counted here rather than left to fall into
+    `linked_by_github`, which is derived as the remainder and had been
+    absorbing them - reporting an account that is gone as one GitHub linked.
+    Bots are excluded, because a `Bot` never resolves to a `User` and that is
+    a fact about the account type rather than a gap in the data.
     """
     tally = outcome.anonymous
     identities = outcome.identities
+    unresolvable = outcome.unresolvable
     if identities is None and tally is not None:
         # Walking the tail counts it exactly, so a failed census is not fatal
         # to the denominator when recovery ran.
         identities = len(outcome.contributors) + tally.unrecoverable_people
     if identities is None:
-        return IdentityGaps()
+        return IdentityGaps(unresolvable=unresolvable)
 
     if tally is None:
         missing = max(0, identities - len(outcome.contributors))
@@ -290,6 +299,7 @@ def gaps_from_outcome(outcome: Outcome) -> IdentityGaps:
             unrecoverable=(
                 Exclusion(ExclusionReason.ANONYMOUS_NO_ACCOUNT, people=missing) if missing else None
             ),
+            unresolvable=unresolvable,
         )
 
     # The pages were walked, so the tail's commits are measured rather than
@@ -306,6 +316,7 @@ def gaps_from_outcome(outcome: Outcome) -> IdentityGaps:
             else None
         ),
         recovered=tally.recovered_identities,
+        unresolvable=unresolvable,
     )
 
 

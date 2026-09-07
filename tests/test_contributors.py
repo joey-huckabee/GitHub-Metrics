@@ -113,8 +113,19 @@ class _StubGeocoder:
 
 
 def collect(stub: _StubClient, **kwargs: Any) -> Any:
-    """Collect against a stub client."""
-    return get_contributors(cast(GitHubClient, stub), "pypa", "virtualenv", **kwargs)
+    """Collect against a stub client, keeping only the records.
+
+    `get_contributors` also reports how many listed logins did not resolve;
+    `unresolvable_from` is for the tests that care about that number.
+    """
+    contributors, _ = get_contributors(cast(GitHubClient, stub), "pypa", "virtualenv", **kwargs)
+    return contributors
+
+
+def unresolvable_from(stub: _StubClient, **kwargs: Any) -> int:
+    """How many listed logins the detail query could not resolve."""
+    _, unresolvable = get_contributors(cast(GitHubClient, stub), "pypa", "virtualenv", **kwargs)
+    return unresolvable
 
 
 # ---------------------------------------------------------------------------
@@ -424,3 +435,53 @@ def test_the_query_reports_the_budget_it_spends() -> None:
     the guard cannot afford to make per repository.
     """
     assert "rateLimit" in _details_query(DETAIL_CHUNK_SIZE)
+
+
+@pytest.mark.requirement("L3-STA-011")
+def test_a_login_that_does_not_resolve_is_counted() -> None:
+    """The count is the only place the failure is visible.
+
+    The record is kept either way, with the login standing in for the name -
+    deliberately, since a record with no name cannot be told from one whose
+    account is gone - so nothing downstream can distinguish a vanished account
+    from one that publishes nothing. Uncounted, `statistics.json` reported it
+    as linked by GitHub.
+    """
+    stub = _StubClient(
+        [_Account("alice", 1, 120), _Account("ghost", 2, 5)],
+        details={"u0": {"databaseId": 1, "name": "Alice"}, "u1": None},
+    )
+
+    assert unresolvable_from(stub) == 1
+
+
+@pytest.mark.requirement("L3-STA-011")
+def test_a_bot_is_not_counted_as_unresolvable() -> None:
+    """A `Bot` never resolves to a `User`.
+
+    That is a fact about the account type rather than a gap in the data, and
+    bots are reported separately. Counting them here would turn the number
+    into a bot census and bury the accounts it exists to surface - a large
+    repository is more likely to have a bot than not.
+    """
+    stub = _StubClient(
+        [_Account("dependabot[bot]", 1, 30, "Bot")],
+        details={"u0": None},
+    )
+
+    assert unresolvable_from(stub) == 0
+
+
+@pytest.mark.requirement("L3-STA-011")
+def test_an_account_that_publishes_nothing_is_not_unresolvable() -> None:
+    """Resolved-and-blank is a different fact from never-resolved.
+
+    A resolved account always carries at least `databaseId`, which is what
+    keeps the two apart.
+    """
+    stub = _StubClient(
+        [_Account("quiet", 1, 5)],
+        details={"u0": {"databaseId": 1, "name": None, "company": None, "location": None}},
+    )
+
+    assert unresolvable_from(stub) == 0

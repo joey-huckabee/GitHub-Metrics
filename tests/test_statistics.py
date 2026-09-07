@@ -521,3 +521,32 @@ def test_the_breakdown_never_goes_negative_on_inconsistent_input() -> None:
     )
 
     assert gaps.breakdown(collected=1)["linked_by_github"] == 0
+
+
+@pytest.mark.requirement("L3-STA-011")
+def test_an_unresolvable_account_leaves_the_linked_bucket() -> None:
+    """`linked_by_github` is the remainder, so it had been absorbing them.
+
+    An account deleted or suspended between the two calls was reported as one
+    GitHub had linked and the detail query had resolved - the opposite of what
+    happened to it. `METRICS.md` tells the reader a large
+    `unresolvable_accounts` means accounts are disappearing and is "a defect
+    worth investigating"; the number could not be anything but zero.
+    """
+    gaps = IdentityGaps(identities=10, unresolvable=2)
+
+    breakdown = gaps.breakdown(collected=10)
+
+    assert breakdown["unresolvable_accounts"] == 2
+    assert breakdown["linked_by_github"] == 8
+    assert sum(breakdown.values()) == 10
+
+
+@pytest.mark.requirement("L3-STA-011")
+def test_an_unresolvable_account_is_reported_as_an_exclusion() -> None:
+    """The `account_unresolvable` branch was unreachable for the same reason."""
+    stats = build(person("a", 10), gaps=IdentityGaps(identities=3, unresolvable=1))
+
+    reasons = [exclusion.reason for exclusion in stats.exclusions]
+
+    assert ExclusionReason.ACCOUNT_UNRESOLVABLE in reasons

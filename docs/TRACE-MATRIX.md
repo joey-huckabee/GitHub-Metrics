@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 22
 - L2 requirements: 88
-- L3 requirements: 139
-- Verified L2+L3: 227 of 227 (100.0%)
+- L3 requirements: 140
+- Verified L2+L3: 228 of 228 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -488,7 +488,7 @@ through their children, so counting them too would count the same work twice.
 
 | L2 ID | Parent | L3 Children | Test Artifacts | Status |
 |-------|--------|-------------|----------------|--------|
-| L2-STA-001 | L1-STA-001 | L3-CNF-007, L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004, L3-STA-007, L3-STA-009 | _(none)_ | Implemented |
+| L2-STA-001 | L1-STA-001 | L3-CNF-007, L3-STA-001, L3-STA-002, L3-STA-003, L3-STA-004, L3-STA-007, L3-STA-009, L3-STA-011 | _(none)_ | Implemented |
 | L2-STA-002 | L1-STA-001 | L3-STA-005 | _(none)_ | Implemented |
 | L2-STA-003 | L1-STA-001 | L3-STA-006, L3-STA-008, L3-STA-010 | _(none)_ | Implemented |
 
@@ -506,6 +506,7 @@ through their children, so counting them too would count the same work twice.
 | L3-STA-008 | L2-STA-003 | `tests/test_client.py::test_a_contributors_page_can_ask_for_anonymous_entries`<br>`tests/test_client.py::test_a_response_with_no_data_at_all_reads_as_spent`<br>`tests/test_client.py::test_an_unreadable_graphql_budget_reads_as_spent`<br>`tests/test_client.py::test_anonymous_contributors_are_not_requested_by_default`<br>`tests/test_client.py::test_pages_are_requested_at_the_endpoint_maximum_by_default`<br>`tests/test_client.py::test_the_graphql_budget_is_read_from_graphql`<br>`tests/test_client.py::test_the_rest_budget_comes_from_the_response_header` | Implemented |
 | L3-STA-009 | L2-STA-001 | `tests/test_anonymous.py::test_a_failed_page_degrades_the_repository_rather_than_the_run`<br>`tests/test_anonymous.py::test_a_no_reply_address_yields_the_account_it_names`<br>`tests/test_anonymous.py::test_a_repository_with_no_anonymous_tail_reports_nothing`<br>`tests/test_anonymous.py::test_an_address_that_does_not_name_an_account_is_not_recovered`<br>`tests/test_anonymous.py::test_every_page_is_walked_until_a_short_one_ends_it`<br>`tests/test_anonymous.py::test_linked_entries_are_skipped_because_they_are_already_collected`<br>`tests/test_anonymous.py::test_one_account_under_several_addresses_is_merged_and_summed`<br>`tests/test_anonymous.py::test_the_pattern_itself_refuses_the_idless_form`<br>`tests/test_anonymous.py::test_the_tail_is_counted_in_people_and_commits`<br>`tests/test_anonymous.py::test_what_was_recovered_is_logged`<br>`tests/test_statistics.py::test_the_breakdown_counts_identities_even_when_accounts_are_fewer`<br>`tests/test_statistics.py::test_the_breakdown_never_goes_negative_on_inconsistent_input` | Implemented |
 | L3-STA-010 | L2-STA-003 | `tests/test_client.py::test_a_graphql_call_does_not_move_the_rest_budget`<br>`tests/test_client.py::test_a_reading_about_another_resource_is_ignored`<br>`tests/test_client.py::test_an_unread_rest_budget_is_fetched_once`<br>`tests/test_client.py::test_an_unreadable_rest_budget_reads_as_spent`<br>`tests/test_runner.py::test_the_preflight_reads_each_budget_from_its_own_source` | Implemented |
+| L3-STA-011 | L2-STA-001 | `tests/test_contributors.py::test_a_bot_is_not_counted_as_unresolvable`<br>`tests/test_contributors.py::test_a_login_that_does_not_resolve_is_counted`<br>`tests/test_contributors.py::test_an_account_that_publishes_nothing_is_not_unresolvable`<br>`tests/test_statistics.py::test_an_unresolvable_account_is_reported_as_an_exclusion`<br>`tests/test_statistics.py::test_an_unresolvable_account_leaves_the_linked_bucket` | Implemented |
 
 ### TRU: Trust policy
 

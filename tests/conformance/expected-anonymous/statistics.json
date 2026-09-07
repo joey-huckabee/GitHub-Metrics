@@ -51,10 +51,10 @@
         "collected": 157,
         "coverage_percent": 97.52,
         "breakdown": {
-          "linked_by_github": 156,
+          "linked_by_github": 155,
           "recovered_from_noreply": 1,
           "anonymous_unrecoverable": 4,
-          "unresolvable_accounts": 0
+          "unresolvable_accounts": 1
         },
         "truncated_by_github": true
       },
@@ -68,6 +68,11 @@
           "reason": "anonymous_no_account",
           "people": 4,
           "commits": 4
+        },
+        {
+          "reason": "account_unresolvable",
+          "people": 1,
+          "commits": null
         },
         {
           "reason": "no_location_published",

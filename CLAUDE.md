@@ -504,6 +504,16 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   repository. Always inspect `errors`, and classify `NOT_FOUND` separately - a
   deleted or renamed repository is an expected outcome of a valid reference,
   not a defect.
+- **A published statistic needs a call site, not just a field.**
+  `IdentityGaps.unresolvable` existed, `to_mapping` published it,
+  `METRICS.md` told the reader a large value was "a defect worth
+  investigating", and the `ACCOUNT_UNRESOLVABLE` exclusion branch was written
+  for it - and nothing ever passed it, so it was structurally zero and the
+  accounts it describes fell into `linked_by_github`, which is derived as the
+  remainder. A derived remainder will absorb whatever nobody counts, silently
+  and while still summing correctly. When adding a bucket, check that
+  something constructs it with a non-default value.
+
 - **A supplied-but-empty argument is not an absent one.** Test optional
   parameters with `is None`, never `or`. `TrustedOrganizations` defines
   `__len__`, so a registry trusting nobody is falsy, and

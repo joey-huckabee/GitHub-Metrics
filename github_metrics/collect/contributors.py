@@ -337,7 +337,7 @@ def get_contributors(
     geocoder: Geocoder | None = None,
     limit: int | None = DEFAULT_CONTRIBUTOR_LIMIT,
     extra: Sequence[ContributorAccount] = (),
-) -> list[Contributor]:
+) -> tuple[list[Contributor], int]:
     """Collect the contributor block for one repository.
 
     Args:
@@ -355,8 +355,9 @@ def get_contributors(
             no extra request beyond the chunk they land in.
 
     Returns:
-        The contributors, most commits first. The run identity is not stamped
-        here; `analysis.row` applies it alongside the row's own.
+        The contributors, most commits first, and how many listed logins the
+        detail query could not resolve. The run identity is not stamped here;
+        `analysis.row` applies it alongside the row's own.
 
     Raises:
         ContributorCollectionError: The contributor list could not be read.
@@ -376,7 +377,7 @@ def build_contributors(
     *,
     slug: str,
     geocoder: Geocoder | None = None,
-) -> list[Contributor]:
+) -> tuple[list[Contributor], int]:
     """Turn accounts into contributor records: detail, then location.
 
     The half of collection that does not care **where the accounts came from**.
@@ -393,21 +394,37 @@ def build_contributors(
             which stays distinguishable from a lookup that found nothing.
 
     Returns:
-        The contributors, in the order given. The run identity is not stamped
-        here; `analysis.row` applies it alongside the row's own.
+        The contributors in the order given, and how many listed logins the
+        detail query could not resolve. The run identity is not stamped here;
+        `analysis.row` applies it alongside the row's own.
+
+        That count is the only place the failure is visible. The record is kept
+        either way, with the login standing in for the name - deliberately,
+        since a record with no name at all cannot be told from one belonging to
+        an account that is gone - so nothing downstream could otherwise
+        distinguish a vanished account from one that publishes nothing, and
+        `statistics.json` reported it as linked.
+
+        Bots are excluded: a `Bot` never resolves to a `User`, which is a fact
+        about the account type rather than a gap in the data, and they are
+        reported separately.
     """
     details = get_account_details(client, list(accounts), slug=slug)
 
     contributors = [
         _build(account, details.get(account.login, {}), geocoder) for account in accounts
     ]
+    unresolvable = sum(
+        1 for account in accounts if not account.is_bot and account.login not in details
+    )
     LOGGER.debug(
-        "%s: %d contributors, %d commits between them",
+        "%s: %d contributors, %d commits between them, %d unresolvable",
         slug,
         len(contributors),
         sum(entry.contribution or 0 for entry in contributors),
+        unresolvable,
     )
-    return contributors
+    return contributors, unresolvable
 
 
 def _build(

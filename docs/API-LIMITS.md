@@ -43,6 +43,13 @@ directly with `rateLimit { cost }`:
 This settles what `ROADMAP.md` carried from v0.2.0 to v0.5.0 as calculated
 rather than measured.
 
+**`rateLimit` is free inside a charged document too**, for the same reason: it
+adds no connection, so it cannot move a price that counts them. Every
+collection document selects it, which is how the budget guard knows what is
+left without spending a round trip per repository (v0.6.4). Before that it
+predicted the spend instead, decrementing by the floor of two while a
+repository really took nine - so it never noticed a budget running out at all.
+
 **The consequence is counter-intuitive and worth stating plainly:**
 `DETAIL_CHUNK_SIZE` **costs** points rather than saving them. Splitting 396
 accounts into 8 chunks of 50 costs 8 points; one document of 396 aliases would

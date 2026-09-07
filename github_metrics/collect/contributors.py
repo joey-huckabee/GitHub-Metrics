@@ -79,7 +79,11 @@ from github.GithubException import GithubException
 
 from github_metrics.client import GitHubClient
 from github_metrics.collect.graphql import execute
-from github_metrics.errors import CollectionError, ContributorCollectionError
+from github_metrics.errors import (
+    CollectionError,
+    ContributorCollectionError,
+    RateLimitExhaustedError,
+)
 from github_metrics.model.contributor import Address, Contributor
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -173,7 +177,7 @@ def _details_query(count: int) -> str:
     selections = "\n".join(
         f"  u{index}: user(login: $login{index}) {fields}" for index in range(count)
     )
-    return f"query({variables}) {{\n{selections}\n}}\n"
+    return f"query({variables}) {{\n{selections}\n  rateLimit {{ remaining resetAt }}\n}}\n"
 
 
 def get_contributor_accounts(
@@ -255,9 +259,14 @@ def get_account_details(
         read - is absent.
 
     Raises:
-        ContributorCollectionError: A chunk could not be read. Raised as
-            this type specifically so the runner degrades the repository to
-            a row without a document rather than abandoning the run.
+        RateLimitExhaustedError: The budget ran out. Passed through untouched,
+            because it is a fact about the run rather than about this
+            repository's contributors, and translating it would hide it from
+            the guard.
+        ContributorCollectionError: A chunk could not be read for any other
+            reason. Raised as this type specifically so the runner degrades
+            the repository to a row without a document rather than abandoning
+            the run.
     """
     if not accounts:
         return {}
@@ -279,6 +288,13 @@ def get_account_details(
                 # repository, so a NOT_FOUND in it cannot mean one.
                 tolerate_missing=True,
             )
+        except RateLimitExhaustedError:
+            # Not translated. An exhausted budget is a fact about the run, not
+            # about this repository's contributors, and dressing it as one
+            # would hide it from the guard: the row would be degraded, the run
+            # would carry on, and every repository after it would fail the
+            # same way for the same unreported reason.
+            raise
         except CollectionError as exc:
             # Translated rather than propagated. `execute` raises errors
             # that are not `ContributorCollectionError`, and the runner

@@ -21,9 +21,9 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 ## Coverage summary
 
 - L1 requirements: 22
-- L2 requirements: 87
-- L3 requirements: 131
-- Verified L2+L3: 218 of 218 (100.0%)
+- L2 requirements: 88
+- L3 requirements: 133
+- Verified L2+L3: 221 of 221 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -206,7 +206,7 @@ through their children, so counting them too would count the same work twice.
 
 | L1 ID | L2 Children | Test Artifacts | Status |
 |-------|-------------|----------------|--------|
-| L1-EXH-001 | L2-EXH-001, L2-EXH-002, L2-EXH-003 | _(none)_ | Implemented |
+| L1-EXH-001 | L2-EXH-001, L2-EXH-002, L2-EXH-003, L2-EXH-004 | _(none)_ | Implemented |
 
 **L2 → L3 → Verification Artifacts**
 
@@ -215,14 +215,17 @@ through their children, so counting them too would count the same work twice.
 | L2-EXH-001 | L1-EXH-001 | L3-EXH-001 | _(none)_ | Implemented |
 | L2-EXH-002 | L1-EXH-001 | L3-CNF-006, L3-EXH-002 | _(none)_ | Implemented |
 | L2-EXH-003 | L1-EXH-001 | L3-EXH-003 | _(none)_ | Implemented |
+| L2-EXH-004 | L1-EXH-001 | L3-EXH-004, L3-EXH-005 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
 | L3 ID | Parent | Test Artifacts | Status |
 |-------|--------|----------------|--------|
-| L3-EXH-001 | L2-EXH-001 | `tests/test_cli_scan.py::test_an_unaffordable_run_starts_anyway_by_default`<br>`tests/test_exhaustion.py::test_a_run_far_from_the_edge_never_asks_the_api`<br>`tests/test_exhaustion.py::test_the_api_is_asked_once_the_estimate_reaches_the_margin`<br>`tests/test_exhaustion.py::test_the_estimate_is_a_floor_so_it_reaches_the_margin_early` | Implemented |
+| L3-EXH-001 | L2-EXH-001 | `tests/test_cli_scan.py::test_an_unaffordable_run_starts_anyway_by_default`<br>`tests/test_exhaustion.py::test_a_repository_costing_more_than_the_floor_still_reaches_the_margin`<br>`tests/test_exhaustion.py::test_a_run_far_from_the_edge_never_asks_the_api`<br>`tests/test_exhaustion.py::test_the_api_is_asked_once_the_estimate_reaches_the_margin`<br>`tests/test_exhaustion.py::test_the_estimate_reaches_the_margin_on_the_reserved_minimum_alone` | Implemented |
 | L3-EXH-002 | L2-EXH-002 | `tests/test_exhaustion.py::test_a_run_that_never_ran_short_reports_neither`<br>`tests/test_exhaustion.py::test_exhaustion_is_recorded_even_when_the_policy_recovered_from_it`<br>`tests/test_exhaustion.py::test_fail_stops_at_the_first_sign_of_exhaustion`<br>`tests/test_exhaustion.py::test_once_stopped_nothing_else_is_attempted_or_asked`<br>`tests/test_exhaustion.py::test_partial_stops_collecting_and_says_which_repository_it_stopped_at`<br>`tests/test_runner.py::test_a_stopped_guard_skips_a_repository_without_collecting_it` | Implemented |
 | L3-EXH-003 | L2-EXH-003 | `tests/test_exhaustion.py::test_a_missing_reset_time_waits_a_full_window`<br>`tests/test_exhaustion.py::test_a_reset_already_past_does_not_sleep_at_all`<br>`tests/test_exhaustion.py::test_an_implausible_reset_is_capped_rather_than_hanging_the_run`<br>`tests/test_exhaustion.py::test_wait_sleeps_to_the_reset_and_then_continues`<br>`tests/test_exhaustion.py::test_waking_into_a_still_empty_budget_waits_again` | Implemented |
+| L3-EXH-004 | L2-EXH-004 | `tests/test_client.py::test_a_refused_query_still_reports_the_budget`<br>`tests/test_client.py::test_a_response_carrying_a_budget_is_recorded`<br>`tests/test_client.py::test_a_response_without_a_budget_leaves_the_last_reading_alone`<br>`tests/test_contributors.py::test_the_query_reports_the_budget_it_spends`<br>`tests/test_exhaustion.py::test_a_repository_costing_more_than_the_floor_still_reaches_the_margin`<br>`tests/test_exhaustion.py::test_the_estimate_never_rises_to_meet_a_stale_reading`<br>`tests/test_history.py::test_the_query_reports_the_budget_it_spends`<br>`tests/test_repository.py::test_the_query_reports_the_budget_it_spends` | Implemented |
+| L3-EXH-005 | L2-EXH-004 | `tests/test_exhaustion.py::test_a_budget_that_ran_out_mid_repository_fails_a_failing_run`<br>`tests/test_exhaustion.py::test_a_budget_that_ran_out_mid_repository_stops_a_partial_run`<br>`tests/test_exhaustion.py::test_a_budget_that_ran_out_mid_repository_waits_and_says_try_again`<br>`tests/test_exhaustion.py::test_a_stopped_run_is_not_restarted_by_a_late_arrival`<br>`tests/test_graphql_partial.py::test_a_rate_limit_is_classified_however_the_caller_asked_to_tolerate`<br>`tests/test_graphql_partial.py::test_a_rate_limit_on_the_detail_query_reaches_the_guard`<br>`tests/test_graphql_partial.py::test_a_rate_limited_error_is_exhaustion_rather_than_a_query_failure`<br>`tests/test_runner.py::test_a_budget_still_empty_after_waiting_gives_up_on_that_repository`<br>`tests/test_runner.py::test_a_repository_that_exhausts_a_failing_run_stops_the_run`<br>`tests/test_runner.py::test_a_repository_that_exhausts_a_partial_run_is_unattempted_not_failed`<br>`tests/test_runner.py::test_a_repository_that_exhausts_the_budget_is_retried_after_the_wait` | Implemented |
 
 ### ING: Repository inventory ingestion
 

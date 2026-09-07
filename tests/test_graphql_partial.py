@@ -27,6 +27,7 @@ from github_metrics.collect.graphql import execute
 from github_metrics.errors import (
     ContributorCollectionError,
     GraphQLQueryError,
+    RateLimitExhaustedError,
     RepositoryNotFoundError,
 )
 
@@ -145,10 +146,10 @@ def test_a_missing_repository_is_still_a_missing_repository() -> None:
 
 @pytest.mark.requirement("L3-MET-021")
 def test_an_error_that_is_not_not_found_still_raises_even_when_tolerating() -> None:
-    """Tolerance is for one error type. A rate limit is not a missing account."""
+    """Tolerance is for one error type. A forbidden field is not a missing account."""
     payload = {
         "data": {"u0": None},
-        "errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}],
+        "errors": [{"type": "FORBIDDEN", "message": "Resource not accessible"}],
     }
 
     stub = _StubClient(raises=GithubException(403, payload, {}))
@@ -169,13 +170,50 @@ def test_a_mixed_error_list_is_a_failure_and_never_a_missing_repository() -> Non
         "data": {"u0": None, "u1": None},
         "errors": [
             {"type": "NOT_FOUND", "path": ["u0"], "message": "Could not resolve to a User"},
-            {"type": "RATE_LIMITED", "message": "API rate limit exceeded"},
+            {"type": "FORBIDDEN", "message": "Resource not accessible"},
         ],
     }
 
     stub = _StubClient(raises=GithubException(403, payload, {}))
 
     with pytest.raises(GraphQLQueryError):
+        run(stub, tolerate_missing=True)
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_rate_limited_error_is_exhaustion_rather_than_a_query_failure() -> None:
+    """The one GraphQL error that is about the run and not the repository.
+
+    Read as a generic failure it became an identity-only row, and the run
+    carried on producing them for every repository after the wall while the
+    budget guard was never told.
+    """
+    payload = {"errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]}
+
+    stub = _StubClient(raises=GithubException(403, payload, {}))
+
+    with pytest.raises(RateLimitExhaustedError):
+        run(stub)
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_rate_limit_is_classified_however_the_caller_asked_to_tolerate() -> None:
+    """`tolerate_missing` is a statement about NOT_FOUND in one document.
+
+    A budget that has run out is not a fact about one aliased account, so no
+    document can opt into treating it as one.
+    """
+    payload = {
+        "data": {"u0": None},
+        "errors": [
+            {"type": "NOT_FOUND", "path": ["u0"], "message": "Could not resolve to a User"},
+            {"type": "RATE_LIMITED", "message": "API rate limit exceeded"},
+        ],
+    }
+
+    stub = _StubClient(raises=GithubException(403, payload, {}))
+
+    with pytest.raises(RateLimitExhaustedError):
         run(stub, tolerate_missing=True)
 
 
@@ -259,7 +297,7 @@ class _BrokenDetailClient(_BotClient):
         del query, variables
         raise GithubException(
             403,
-            {"errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]},
+            {"errors": [{"type": "FORBIDDEN", "message": "Resource not accessible"}]},
             {},
         )
 
@@ -270,10 +308,41 @@ def test_a_detail_failure_degrades_the_repository_instead_of_killing_the_run() -
 
     `execute` raises this package's own errors, none of which is a
     `ContributorCollectionError`, and the runner catches only that one for the
-    contributor half. Without translation here, a rate limit on the detail
-    query takes down every other repository in the inventory too.
+    contributor half. Without translation here, a forbidden field on the
+    detail query takes down every other repository in the inventory too.
+
+    An exhausted budget is the one exception, and it is deliberate: see
+    `test_a_rate_limit_on_the_detail_query_reaches_the_guard`.
     """
     client = cast(GitHubClient, _BrokenDetailClient())
 
     with pytest.raises(ContributorCollectionError):
         get_contributors(client, "NousResearch", "hermes-agent")
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_rate_limit_on_the_detail_query_reaches_the_guard() -> None:
+    """The one failure the contributor half must not dress as its own.
+
+    Every other detail failure becomes a `ContributorCollectionError`, which
+    is the contract of a row and no document. Translating an exhausted budget
+    that way would hide it from the guard: this repository would degrade, the
+    run would carry on, and every repository after it would fail identically
+    for a reason nothing had recorded.
+    """
+
+    class _RateLimited(_BotClient):
+        """Lists contributors fine, then reports the budget is gone."""
+
+        @staticmethod
+        def graphql(query: str, variables: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+            """Refuse the way GitHub refuses a spent budget."""
+            del query, variables
+            raise GithubException(
+                403,
+                {"errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]},
+                {},
+            )
+
+    with pytest.raises(RateLimitExhaustedError):
+        get_contributors(cast(GitHubClient, _RateLimited()), "pypa", "virtualenv")

@@ -23,12 +23,27 @@ Asking GitHub for the remaining budget is free in points but is still an HTTP
 round trip, and doing it before every repository would add one to a run that
 already makes several per repository.
 
-So the guard keeps a local estimate, decrements it by the known per-repository
-minimum, and only asks the API once that estimate falls inside
-`VERIFY_MARGIN`. Near the edge - the only place precision matters - every check
-is a real reading; far from it, none are. The estimate is deliberately a
-*floor*: it subtracts the minimum cost, so it reaches the margin sooner than
-the true spend does and never overshoots into a wall it did not see coming.
+So the guard keeps a local estimate and only asks the API once that estimate
+falls inside `VERIFY_MARGIN`. Near the edge - the only place precision matters
+- every check is a real reading; far from it, none are.
+
+The estimate is kept honest by the answers, not by arithmetic. Every
+collection document selects `rateLimit`, which costs nothing because price
+counts connections and that adds none, so each response carries the true
+remaining budget; the guard takes the lower of that and its own running
+figure. Between responses it reserves the per-repository minimum, which is a
+floor over an interval bounded by the workers in flight.
+
+Subtracting the minimum was, until v0.6.4, the *whole* mechanism, and it was
+backwards. To bound remaining from below you subtract an upper bound on cost;
+subtracting the minimum bounds it from above. A repository measured at nine
+points moved the estimate by two, so the estimate outran the truth by seven
+per repository and reached the margin only after ~2,480 of them, while a
+5,000-point budget really died at 556. The guard therefore never verified,
+never waited and never stopped, `statistics.json` reported `exhausted: false`
+for runs that had run dry, and every repository past the wall became an
+identity-only row. The word "floor" appeared in this docstring, in the
+requirement and in a test name; none of them made it one.
 
 One thread waits, the rest queue behind it
 ------------------------------------------
@@ -162,13 +177,59 @@ class BudgetGuard:
             if self._stopped:
                 return Decision.SKIP
 
+            self._absorb_observation()
             if self._estimate > VERIFY_MARGIN:
-                # Far from the edge. Spend the estimate rather than a round
-                # trip; it is a floor, so it arrives at the margin early.
+                # Far from the edge, and the last response already said so.
+                # Reserve the minimum for the repository about to start; the
+                # next response corrects it.
                 self._estimate -= MIN_POINTS_PER_REPOSITORY
                 return Decision.PROCEED
 
             return self._verify(slug)
+
+    def _absorb_observation(self) -> None:
+        """Pull in the budget the last response reported. Lock held.
+
+        This is what stops the estimate drifting above the truth. Subtracting
+        the per-repository *minimum* makes it fall slower than real spend - a
+        repository measured at nine points moves it by two - so on its own it
+        is an over-estimate that grows more wrong with every repository, and
+        the guard reached its margin only after ~2,480 of them. Every
+        collection document now carries `rateLimit`, so the true figure
+        arrives with each answer at no cost, and taking the lower of the two
+        makes the estimate a floor for real rather than by assertion.
+        """
+        observed = self._client.observed_budget()
+        if observed is not None:
+            self._estimate = min(self._estimate, observed[0])
+
+    def ran_dry(self, slug: str) -> Decision:
+        """Apply the policy to a budget that ran out *inside* a repository.
+
+        No estimate survives a repository whose cost it cannot know in
+        advance: an ordinary one takes nine points, one under
+        `--deep-attribution` takes a point per hundred commits, and the guard
+        decides before any of that is known. So the API's own `RATE_LIMITED`
+        error is the backstop, and it arrives here rather than being recorded
+        as a failure of the repository that happened to be running.
+
+        Args:
+            slug: The repository whose query was refused.
+
+        Returns:
+            `PROCEED` when the policy waited and the caller should try again,
+            `SKIP` when the run has stopped.
+
+        Raises:
+            RateLimitExhaustedError: Under `fail`.
+        """
+        with self._lock:
+            if self._stopped:
+                return Decision.SKIP
+            self.exhausted = True
+            self._estimate = 0
+            _, reset_at = self._client.graphql_budget()
+            return self._exhausted(slug, reset_at)
 
     def _verify(self, slug: str) -> Decision:
         """Ask the API what is really left, and act on the answer.

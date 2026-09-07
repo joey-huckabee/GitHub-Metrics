@@ -161,6 +161,24 @@ refusing a run the token could have finished is weak.
 
 * Exhaustion is detected from the response, not predicted: GitHub reports
   remaining budget on every call, and the runner already reads it.
+
+  **This note was correct and the implementation did not follow it, from
+  v0.6.0 to v0.6.4.** What shipped predicted: a local estimate decremented by
+  the per-repository *minimum*, verified against the API only once it fell
+  inside a margin. Since a repository really costs about nine points and the
+  estimate moved by two, it reached that margin after roughly 2,480
+  repositories against a budget that died at 556 - so the API was never asked,
+  `wait` never waited, `partial` never stopped, and `statistics.json` reported
+  `exhausted: false` for runs that had run dry. Nothing detected it: the
+  estimate was self-consistent, and the test that should have caught it was
+  written against a stub whose budget could not diverge from it.
+
+  It is true now. Every collection document selects `rateLimit`, which adds no
+  connection and so no cost, and `GitHubClient` records the reading each
+  response carries; the guard takes the lower of that and its own reservation.
+  A `RATE_LIMITED` error is the backstop for the repository whose own cost
+  crossed the line mid-collection, since no figure known in advance can
+  bound that. See `L2-EXH-004`.
 * Under `wait`, sleep to `X-RateLimit-Reset` plus a small margin, then
   re-check. Never busy-poll.
 * **Secondary rate limits are a different mechanism** (403 with `Retry-After`,

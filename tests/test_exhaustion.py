@@ -45,6 +45,24 @@ class _StubClient:
         self.readings = list(readings) or [5000]
         self.reset_at = reset_at
         self.reads = 0
+        self.observed: tuple[int, datetime | None] | None = None
+        """What the last response reported, as the real client records it."""
+
+    def spend(self, points: int) -> None:
+        """Charge a repository's real cost, the way a live token would.
+
+        Both faces of the budget move together, because on a real token they
+        are one number: what a response reports, and what a verification read
+        would return.
+        """
+        current = self.observed[0] if self.observed else self.readings[0]
+        remaining = max(0, current - points)
+        self.observed = (remaining, self.reset_at)
+        self.readings = [remaining]
+
+    def observed_budget(self) -> tuple[int, datetime | None] | None:
+        """The reading that arrives free with every collection response."""
+        return self.observed
 
     def graphql_budget(self) -> tuple[int, datetime | None]:
         """Answer the guard's verification."""
@@ -105,9 +123,8 @@ def test_the_api_is_asked_once_the_estimate_reaches_the_margin() -> None:
 
 
 @pytest.mark.requirement("L3-EXH-001")
-def test_the_estimate_is_a_floor_so_it_reaches_the_margin_early() -> None:
-    """It subtracts the per-repository *minimum*, and a real repository costs
-    more, so the guard arrives at the margin before the true spend does."""
+def test_the_estimate_reaches_the_margin_on_the_reserved_minimum_alone() -> None:
+    """With nothing observed yet, the reservation is all the guard has."""
     stub = _StubClient(5000)
     # One repository's minimum above the margin: the first call spends the
     # estimate down onto the margin, and the second must verify.
@@ -117,6 +134,59 @@ def test_the_estimate_is_a_floor_so_it_reaches_the_margin_early() -> None:
     assert stub.reads == 0
     guard.before("owner/second")
 
+    assert stub.reads == 1
+
+
+@pytest.mark.requirement("L3-EXH-001", "L3-EXH-004")
+def test_a_repository_costing_more_than_the_floor_still_reaches_the_margin() -> None:
+    """The defect this mechanism was rebuilt for, at its measured cost.
+
+    Subtracting the per-repository minimum was once the whole estimate, and it
+    is an *upper* bound on what remains rather than a floor: a repository
+    measured at nine points moved it by two. The estimate outran the truth by
+    seven a repository and reached the margin after ~2,480 of them, while a
+    5,000-point budget really died at 556. So the guard never verified, never
+    waited, and never stopped - it approved every repository in any inventory
+    anyone would actually scan.
+
+    The responses now carry the real figure, and the guard takes the lower.
+    """
+    stub = _StubClient(5000)
+    # `partial` rather than `wait`, so detection shows up as the run stopping
+    # rather than as a sleep this test would have to unpick.
+    guard = guard_for(stub, ExhaustionPolicy.PARTIAL, available=5000)
+
+    approved = 0
+    for index in range(700):
+        if guard.before(f"owner/repo{index}") is not Decision.PROCEED:
+            break
+        approved += 1
+        stub.spend(9)  # measured, API-LIMITS.md
+
+    # 5,000 points at 9 a repository is 555 of them. The guard stops within a
+    # repository of that, where the old one approved all 700 without ever
+    # asking. It cannot stop *before* the last one overruns - the cost is not
+    # known until the work is done - which is what `ran_dry` is for.
+    assert 550 <= approved <= 560, approved
+    assert guard.exhausted
+    assert guard.stopped
+
+
+@pytest.mark.requirement("L3-EXH-004")
+def test_the_estimate_never_rises_to_meet_a_stale_reading() -> None:
+    """Observations may only lower it. Between them the reservation stands."""
+    stub = _StubClient(5000)
+    guard = guard_for(stub, available=5000)
+    # Two reservations above the margin, so the third decision lands on it.
+    stub.observed = (VERIFY_MARGIN + 2 * MIN_POINTS_PER_REPOSITORY, None)
+
+    guard.before("owner/first")
+    stub.observed = (4000, None)  # a reading from before the last spend
+    guard.before("owner/second")
+
+    # Still inside the margin, so this decision is a real reading rather than
+    # a stale 4,000 the guard had talked itself back up to.
+    guard.before("owner/third")
     assert stub.reads == 1
 
 
@@ -263,3 +333,61 @@ def test_a_run_that_never_ran_short_reports_neither() -> None:
     assert not guard.exhausted
     assert not guard.stopped
     assert guard.waits == 0
+
+
+# ---------------------------------------------------------------------------
+# ran_dry: the backstop for a repository whose cost nothing could predict
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_budget_that_ran_out_mid_repository_waits_and_says_try_again() -> None:
+    """No estimate can rule this out, so the API's own refusal is the signal.
+
+    A repository's cost is not known until it is collected: nine points
+    ordinarily, one per hundred commits under `--deep-attribution`. The guard
+    decides before any of that is known, so a repository can begin inside the
+    budget and end outside it.
+    """
+    slept: list[float] = []
+    stub = _StubClient(0, 5000, reset_at=NOW + timedelta(minutes=30))
+    guard = guard_for(stub, ExhaustionPolicy.WAIT, slept=slept)
+
+    assert guard.ran_dry("pypa/virtualenv") is Decision.PROCEED
+
+    assert slept, "wait must sleep before telling the caller to try again"
+    assert guard.exhausted
+    assert not guard.stopped
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_budget_that_ran_out_mid_repository_stops_a_partial_run() -> None:
+    stub = _StubClient(0, reset_at=NOW)
+    guard = guard_for(stub, ExhaustionPolicy.PARTIAL)
+
+    assert guard.ran_dry("pypa/virtualenv") is Decision.SKIP
+
+    assert guard.exhausted
+    assert guard.stopped
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_budget_that_ran_out_mid_repository_fails_a_failing_run() -> None:
+    stub = _StubClient(0, reset_at=NOW)
+    guard = guard_for(stub, ExhaustionPolicy.FAIL)
+
+    with pytest.raises(RateLimitExhaustedError) as caught:
+        guard.ran_dry("pypa/virtualenv")
+
+    assert "pypa/virtualenv" in str(caught.value)
+    assert guard.exhausted
+
+
+@pytest.mark.requirement("L3-EXH-005")
+def test_a_stopped_run_is_not_restarted_by_a_late_arrival() -> None:
+    """Eight workers can be inside a repository when the run stops."""
+    stub = _StubClient(0, reset_at=NOW)
+    guard = guard_for(stub, ExhaustionPolicy.PARTIAL)
+    guard.ran_dry("pypa/virtualenv")
+
+    assert guard.ran_dry("psf/requests") is Decision.SKIP

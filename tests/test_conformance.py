@@ -185,6 +185,10 @@ class ReplayClient:
         """The recorded contributor list for one repository."""
         return _Repository(self.recording["contributors"].get(slug, []))
 
+    @staticmethod
+    def observed_budget() -> None:
+        """Replayed responses carry no budget; the guard keeps its own figure."""
+
     def graphql_points_remaining(self) -> int:
         """What the pre-flight reads, before any repository is collected."""
         return self.budget[0] if self.budget else 5000

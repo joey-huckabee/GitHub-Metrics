@@ -18,6 +18,7 @@ import logging
 from typing import Any
 
 import pytest
+from github.GithubException import GithubException
 
 from github_metrics.client import GRAPHQL_BUDGET_QUERY, PER_PAGE, GitHubClient
 from github_metrics.config import Settings
@@ -181,3 +182,68 @@ def test_pages_are_requested_at_the_endpoint_maximum_by_default(
     client.contributors_page("pypa/virtualenv")
 
     assert requester.requests[0][2]["per_page"] == PER_PAGE
+
+
+# ---------------------------------------------------------------------------
+# The budget that arrives with every answer
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.requirement("L3-EXH-004")
+def test_a_response_carrying_a_budget_is_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """This is what replaced estimating what a repository costs.
+
+    Every collection document selects `rateLimit`, which adds no connection
+    and so no cost, so the true remaining budget arrives with the answer. The
+    guard reads it here rather than spending a round trip per repository.
+    """
+    payload = {"data": {"repository": {"name": "x"}, "rateLimit": {"remaining": 4712}}}
+    client, _ = client_with(monkeypatch, graphql_payload=payload)
+
+    assert client.observed_budget() is None, "nothing has been asked yet"
+    client.graphql("query { x }", {})
+
+    observed = client.observed_budget()
+    assert observed is not None
+    assert observed[0] == 4712
+
+
+@pytest.mark.requirement("L3-EXH-004")
+def test_a_response_without_a_budget_leaves_the_last_reading_alone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A shape that carries no reading is ignored rather than guessed at."""
+    client, requester = client_with(
+        monkeypatch, graphql_payload={"data": {"rateLimit": {"remaining": 40}}}
+    )
+    client.graphql("query { x }", {})
+
+    requester.graphql_payload = {"data": {"repository": {"name": "x"}}}
+    client.graphql("query { x }", {})
+
+    observed = client.observed_budget()
+    assert observed is not None
+    assert observed[0] == 40
+
+
+@pytest.mark.requirement("L3-EXH-004")
+def test_a_refused_query_still_reports_the_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failure is exactly when the remaining budget is worth knowing."""
+    client, requester = client_with(monkeypatch)
+
+    def refuse(query: str, variables: dict[str, Any]) -> tuple[dict[str, Any], Any]:
+        del query, variables
+        raise GithubException(
+            403,
+            {"data": {"rateLimit": {"remaining": 0}}, "errors": [{"type": "RATE_LIMITED"}]},
+            {},
+        )
+
+    monkeypatch.setattr(requester, "graphql_query", refuse)
+
+    with pytest.raises(GithubException):
+        client.graphql("query { x }", {})
+
+    observed = client.observed_budget()
+    assert observed is not None
+    assert observed[0] == 0

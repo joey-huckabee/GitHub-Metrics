@@ -117,6 +117,11 @@ class _NullClient:
     """Stands in for a real client, without a socket in sight."""
 
     @staticmethod
+    def observed_budget() -> None:
+        """No response in these tests reports a budget."""
+        return
+
+    @staticmethod
     def graphql_points_remaining() -> int:
         """Read at the end of a run to measure what it spent."""
         return 4991

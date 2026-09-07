@@ -47,7 +47,7 @@ is testable without credentials.
 ```
 
 The two halves meet only at the CLI. `sources/` imports nothing that can open a
-socket; `metrics` imports nothing that parses a file format. Neither imports
+socket; `collect/` imports nothing that parses a file format. Neither imports
 the other.
 
 ## Why the halves are separate
@@ -82,17 +82,20 @@ someone will look.
 
 | Module | Responsibility | Network | Notes |
 |---|---|---|---|
-| `cli` | Argument parsing, rendering, exit codes | via `metrics` | The only place the two halves meet |
+| `cli` | Argument parsing, rendering, exit codes | via `collect/` | The only place the two halves meet |
 | `sources/` | Slugs, URLs, CSV → validated `RepositoryRef` values | never | Also owns concurrency across files |
 | `validation` | Account and repository name grammar | never | Pure functions; returns reasons, not booleans |
 | `errors` | Code taxonomy, exceptions, `RowIssue` | never | Imported by both halves |
 | `logger` | Logging configuration | never | Configured once, at startup |
 | `config` | `Settings` from environment | never | Requires `GITHUB_TOKEN` |
 | `client` | Authenticated PyGithub wrapper | yes | |
-| `metrics` | Collection over the API | via `client` | |
+| `exit_codes` | The status scheme and the exceptions carrying it | never | One owner, so a status cannot be published without a raiser |
+| `collect/` | Collection over the API: repository, counts, contributors, history, budget, the run | via `client` | `budget.py` refuses a run the token cannot cover; `runner.py` returns results in input order |
+| `analysis/` | Scoring, row assembly, `statistics.json` | never | `row.py` is where a collected repository becomes an output row |
+| `model/` | `ScanIdentifier`, `SoftwareRow`, `Contributor`, `Address`, statistics | never | Serializable result types |
+| `output/` | CSV, JSON, console, per-repository documents, destinations | never | Column set derived from `SoftwareRow`, never a parallel list |
 | `geo` | Location → coordinates | yes | Nominatim, paced at 1/sec |
 | `geocache` | The cache file behind `geo` | never | Owns the format so `geo` need not |
-| `models` | Serializable result types | never | |
 
 ## Ingestion data flow
 
@@ -107,7 +110,7 @@ bytes ─▶ NUL check ─▶ UTF-8 decode ─▶ csv.reader ─▶ header ─�
   │          │             │              │            └─ locate owner/repoid
   │          │             │              │               by name
   │          │             │              └─ quoting, embedded newlines
-  │          │             └─ GM-ING-005          
+  │          │             └─ GM-ING-005
   │          └─ GM-ING-006
   └─ GM-ING-001 / 002
 ```

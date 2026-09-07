@@ -8,6 +8,97 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.6.15] - 2026-09-07
+
+**An audit's worth of drift, and the tests were reading the developer's own
+files.** One reviewer pass over the whole tree; this release closes what it
+found.
+
+### Fixed
+
+- **The suite read the developer's real geocode cache.** `GEOCODE_CACHE_PATH`
+  was not isolated, and `config` reads an *absent* value as "use the platform
+  default" - so running `tests/test_cli_scan.py` alone opened
+  `~/AppData/Local/github-metrics/geocode.json` **29 times**. Nothing failed
+  only because a scan test geocodes nothing and `save` is guarded by a dirty
+  flag; the first test to resolve a location would have written it.
+
+  **Deleting the variable is the wrong fix and was worth getting right**: an
+  unset value *is* the platform default. The fixture now sets it empty, which
+  is what turns persistence off. Measured after: 0 of 29 loads touch a real
+  path.
+
+- **A recovered account already in the contributor list became two records.**
+  Recovery reads the anonymous tail, and an account can appear there under a
+  no-reply address *and* be listed normally. Two records for one person counted
+  their commits twice in `contribution_total` and in every percentage over it,
+  while reading as two contributors. The listed entry wins - its count comes
+  from the endpoint that counts them.
+
+- **A repository with no contributors reported its count as unreadable.**
+  GitHub answers `204 No Content`, which arrives as `None` rather than `[]`, so
+  a genuine zero was indistinguishable from a failed census. Zero is a
+  measurement - the same reason every metric column defaults to `None` rather
+  than `0`.
+
+- **An unwritable output destination exited 6**, the status meaning the input
+  could not be read, where `ERROR-CATALOG.md` says 2 for `GM-OUT-002` and
+  `GM-OUT-003`. Where the results go is a command-line question.
+
+- **`validate --output` wrote CRLF on Windows** - `write_text` translates to
+  `os.linesep`, so this one file differed from every other artifact the tool
+  writes - **and raised a raw `FileNotFoundError`** for a missing parent
+  directory: traceback, exit 1. Both fixed; the second is now exit 2, and the
+  table-driven guard from v0.6.9 has gained that row, since it is precisely the
+  case it exists to catch.
+
+- **`IDENTITY_FIELDS` is removed.** A hand-maintained parallel column list,
+  referenced nowhere - the exact mechanism `CLAUDE.md` names as how the CSV,
+  JSON and console formats drift apart. Vulture does not report an unused
+  module constant, so nothing had noticed.
+
+- **`.pre-commit-config.yaml` ran no pylint and passed `--fix` to ruff**, so
+  the hooks could pass on a tree `make lint` rejects. `make check` is meant to
+  be exactly what CI runs.
+
+### Documentation
+
+- **`USER-GUIDE.md`** documented `closed-issues` and `releases`, removed in
+  v0.3.0; called the command `metrics`; showed `scan --output` taking a file
+  when it takes a directory; said `--on-exhaustion partial` exits 9, retired in
+  v0.6.2; and omitted `--recover-anonymous`.
+- **`README.md`**'s library snippet called `build_row` and `build_document`
+  with signatures that do not exist, and gave 2 for an unreadable file where it
+  is 6. The snippet is rewritten and every call in it now binds against the
+  real signature - checked mechanically, not by eye. The same wrong exit code
+  was in `validate`'s help text.
+- **`ARCHITECTURE.md`** listed `metrics` and `models` modules that do not
+  exist and omitted `collect/`, `analysis/`, `model/`, `output/` and
+  `exit_codes`.
+- **`METRICS.md`**'s second reference row was missing the `url` column, and the
+  trusted-organisation header called `trusted_org_bonus` unsettled while the
+  table two hundred lines above marks it **Settled**.
+- **ADRs 0008, 0009 and 0010** were still `proposed` for features shipped in
+  v0.6.0. `CHANGELOG.md` lacked the `[0.5.1]` link. `SCAN-PROCESS.md` described
+  `--on-exhaustion` as unshipped.
+- **`CLAUDE.md`** claimed one INFO line in the package - there are eight across
+  five modules - and said `scan` produces two artifacts where it produces
+  three.
+
+### Notes
+
+**Two reported items are not defects.** `test_graphql_partial.py:562` does not
+exist: the file is 350 lines, so that line number is from a snapshot predating
+v0.6.3, and the intended test could not be identified - say which and it will
+be looked at. And `METRICS.md`'s "2.0 for zero issues" appears in a table
+comparing the *original* implementation against the current one and in a
+described-then-rejected alternative, both correctly labelled;
+`score_prevalence(0, 0)` returns `0.0`, as the document says elsewhere.
+
+No golden artifact changed: replaying the recorded traffic produces the same
+statistics, documents and CSV as before, which is the check that these fixes
+reach only what they were meant to.
+
 ## [0.6.14] - 2026-09-07
 
 **Two stack traces per unresolvable location, outside the logger entirely.**
@@ -2077,7 +2168,8 @@ trusted list.
   `scripts/build-trace-matrix.py` and `github_metrics/errors.py` are harmless
   and stay, but they were never necessary.
 
-[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.14...HEAD
+[Unreleased]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.15...HEAD
+[0.6.15]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.14...v0.6.15
 [0.6.14]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.13...v0.6.14
 [0.6.13]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.12...v0.6.13
 [0.6.12]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.11...v0.6.12
@@ -2093,6 +2185,7 @@ trusted list.
 [0.6.2]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.5.0...v0.6.0
+[0.5.1]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/joey-huckabee/GitHub-Metrics/compare/v0.3.0...v0.4.0

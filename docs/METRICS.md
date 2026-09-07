@@ -212,7 +212,7 @@ The reference row above is therefore superseded in those two columns. Current
 output for the same repository is:
 
 ```csv
-cline,cline,cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false
+cline,cline,cline,https://github.com/cline/cline,2026-07-12 20:33:07.254804+00:00,ca219015-79a4-4bd6-b37e-272fa74bd8c2,64574,6900,736.5466017006597,8.10177526,0,825,20.0,10.0,15.0,12.0,15.0,0.0,72.0,false
 ```
 
 Every other column is unchanged. A test asserts this exact line, so the
@@ -1460,7 +1460,7 @@ versions and 500 closed issues are both cleared by any established project.
 
 ## Trusted organisations
 
-**Status: `is_trusted_org` is settled. `trusted_org_bonus` is not** - the
+**Status: both `is_trusted_org` and `trusted_org_bonus` are settled** - the
 points a trusted owner earns have not been supplied.
 
 ### The list

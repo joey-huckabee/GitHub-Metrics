@@ -463,7 +463,12 @@ def _destination(root: Path, *, output_format: str) -> Path | None:
     try:
         return resolve_destination(root, json_format=output_format == "json")
     except OutputDestinationError as exc:
-        raise InputError(str(exc)) from exc
+        # Exit 2, as `ERROR-CATALOG.md` says for GM-OUT-002 and GM-OUT-003.
+        # `InputError` is exit 6 - "the input file could not be read" - which
+        # is a statement about the inventory, not about where the results were
+        # asked to go. Same class of mistake as a bad `--fields` name, and it
+        # gets the same status.
+        raise click.UsageError(str(exc)) from exc
 
 
 def _collect(
@@ -889,8 +894,8 @@ def validate_command(
     before any rate limit is spent on it, and by someone who has no token.
 
     Exit status is 0 when every reference was accepted, 3 when the sources were
-    read but some references were rejected, and 2 when a file could not be read
-    at all.
+    read but some references were rejected, and 6 when a file could not be read
+    at all. A malformed command line is click's 2.
     """
     try:
         resolved = resolve_sources(sources, strict=strict, max_workers=workers)
@@ -900,7 +905,18 @@ def validate_command(
     report = _render_json(resolved) if output_format == "json" else _render_text(resolved)
 
     if output is not None:
-        output.write_text(report + "\n", encoding="utf-8")
+        try:
+            # `write_text` translates the newline to `os.linesep`, so on
+            # Windows this report came out CRLF while every other artifact the
+            # tool writes is LF - a file that diffs against itself across
+            # platforms. Bytes, so the newline written is the one asked for.
+            output.write_bytes((report + "\n").encode("utf-8"))
+        except OSError as exc:
+            # A missing parent directory raised a raw `FileNotFoundError` out
+            # of the command: traceback, exit 1, and a status failing both
+            # published tests. Where the results go is a command-line
+            # question, so it is a usage error like the rest of them.
+            raise click.UsageError(f"could not write --output {output}: {exc}") from exc
         click.echo(f"Wrote {output}")
     else:
         click.echo(report)

@@ -196,6 +196,10 @@ def test_no_bad_command_line_produces_a_traceback(tmp_path: Path) -> None:
         ["scan", str(tmp_path / "absent.csv"), "--fields", "badname"],
         ["validate", str(tmp_path / "absent.csv")],
         ["validate", str(empty)],
+        # Added in v0.6.15: `--output` into a directory that does not
+        # exist raised a raw FileNotFoundError. The rule was already
+        # stated; this row is why a table-driven guard is worth having.
+        ["validate", str(empty), "--output", str(tmp_path / "nope" / "r.txt")],
         ["bands", "not-a-metric"],
     ]
 

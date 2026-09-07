@@ -13,6 +13,22 @@ from github_metrics.logger import PACKAGE_LOGGER_NAME
 
 ENV_VARS = ("GITHUB_TOKEN", "GITHUB_API_URL", "GEOCODER_USER_AGENT", "LOG_LEVEL")
 
+GEOCODE_CACHE_VAR = "GEOCODE_CACHE_PATH"
+"""Set to empty for every test, and deliberately **not** in `ENV_VARS`.
+
+Deleting it is the wrong move and the opposite of isolation: `config` reads an
+absent variable as "use the platform default", which is the developer's real
+cache - `~/AppData/Local/github-metrics/geocode.json` or its equivalent. An
+empty value is what turns persistence off, so the tests get a cache with no
+path: nothing to read, and `save` returns early because there is nowhere to
+write.
+
+Measured before this existed: running `tests/test_cli_scan.py` alone opened the
+real cache 29 times. Nothing failed, because a scan test geocodes nothing and
+`save` is guarded by a dirty flag - so the suite was reading a developer's file
+and would have written it the moment a test resolved a location.
+"""
+
 
 @pytest.fixture
 def empty_env_file(tmp_path: Path) -> Path:
@@ -24,9 +40,11 @@ def empty_env_file(tmp_path: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Remove project environment variables for every test."""
+    """Isolate every test from the developer's own environment."""
     for name in ENV_VARS:
         monkeypatch.delenv(name, raising=False)
+    # Set, not deleted: see `GEOCODE_CACHE_VAR`.
+    monkeypatch.setenv(GEOCODE_CACHE_VAR, "")
 
 
 @pytest.fixture

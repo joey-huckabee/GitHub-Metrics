@@ -68,8 +68,10 @@ cannot afford `MIN_POINTS_PER_REPOSITORY` (2) and `MIN_REQUESTS_PER_REPOSITORY`
 > points against a floor of 2.
 
 **Where this can mislead you:** a run that exhausts the budget partway produces
-a file that is part measurement and part absence. Until `--on-exhaustion`
-lands ([ADR-0009](adr/0009-rate-limit-exhaustion-policy.md)) the run fails at
+a file that is part measurement and part absence. `--on-exhaustion`
+([ADR-0009](adr/0009-rate-limit-exhaustion-policy.md)) decides what happens
+instead, and has since v0.6.0: `wait` sleeps to the reset and continues,
+`partial` stops and marks the rest unmeasured, `fail` refuses. Before it, the run failed at
 that point, and rows already written are on disk while the rest were never
 attempted. **Check the row count against your inventory count.**
 

@@ -22,8 +22,8 @@ with `--check`, so the matrix cannot drift from the suite that backs it.
 
 - L1 requirements: 22
 - L2 requirements: 88
-- L3 requirements: 144
-- Verified L2+L3: 232 of 232 (100.0%)
+- L3 requirements: 145
+- Verified L2+L3: 233 of 233 (100.0%)
 
 L1 rows are excluded from the denominator: they are verified transitively
 through their children, so counting them too would count the same work twice.
@@ -51,7 +51,7 @@ through their children, so counting them too would count the same work twice.
 |-------|--------|----------------|--------|
 | L3-ATT-001 | L2-ATT-001 | `tests/test_history.py::test_a_commit_with_no_account_is_counted_rather_than_dropped`<br>`tests/test_history.py::test_a_malformed_payload_is_treated_as_nothing_to_walk`<br>`tests/test_history.py::test_a_repository_with_no_default_branch_attributes_nothing`<br>`tests/test_history.py::test_accounts_come_back_ranked_by_commits`<br>`tests/test_history.py::test_commits_are_counted_per_account`<br>`tests/test_history.py::test_pages_are_the_endpoint_maximum_because_a_page_is_a_point`<br>`tests/test_history.py::test_pages_are_the_points_spent`<br>`tests/test_history.py::test_paging_follows_the_cursor_until_the_history_ends`<br>`tests/test_history.py::test_this_is_the_one_query_that_asks_for_nodes` | Implemented |
 | L3-ATT-002 | L2-ATT-002 | `tests/test_history.py::test_a_bot_is_recognised_from_its_reserved_login_suffix`<br>`tests/test_history.py::test_an_endless_history_stops_rather_than_spending_the_whole_budget` | Implemented |
-| L3-ATT-003 | L2-ATT-001 | `tests/test_history.py::test_a_failed_page_degrades_the_repository_instead_of_killing_the_run`<br>`tests/test_history.py::test_a_repository_that_vanished_mid_walk_is_the_same_kind_of_failure`<br>`tests/test_history.py::test_an_exhausted_budget_is_not_dressed_as_an_attribution_failure`<br>`tests/test_runner.py::test_a_deep_attribution_failure_does_not_take_the_run_with_it` | Implemented |
+| L3-ATT-003 | L2-ATT-001 | `tests/test_history.py::test_a_failed_page_degrades_the_repository_instead_of_killing_the_run`<br>`tests/test_history.py::test_a_repository_that_vanished_mid_walk_is_the_same_kind_of_failure`<br>`tests/test_history.py::test_an_exhausted_budget_is_not_dressed_as_an_attribution_failure`<br>`tests/test_history.py::test_the_403_shape_of_exhaustion_also_reaches_the_guard`<br>`tests/test_runner.py::test_a_deep_attribution_failure_does_not_take_the_run_with_it` | Implemented |
 
 ### CFG: Credentials
 
@@ -220,7 +220,7 @@ through their children, so counting them too would count the same work twice.
 | L2-EXH-001 | L1-EXH-001 | L3-EXH-001 | _(none)_ | Implemented |
 | L2-EXH-002 | L1-EXH-001 | L3-CNF-006, L3-EXH-002 | _(none)_ | Implemented |
 | L2-EXH-003 | L1-EXH-001 | L3-EXH-003 | _(none)_ | Implemented |
-| L2-EXH-004 | L1-EXH-001 | L3-EXH-004, L3-EXH-005 | _(none)_ | Implemented |
+| L2-EXH-004 | L1-EXH-001 | L3-EXH-004, L3-EXH-005, L3-EXH-006 | _(none)_ | Implemented |
 
 **L3 → Verification Artifacts**
 
@@ -231,6 +231,7 @@ through their children, so counting them too would count the same work twice.
 | L3-EXH-003 | L2-EXH-003 | `tests/test_exhaustion.py::test_a_missing_reset_time_waits_a_full_window`<br>`tests/test_exhaustion.py::test_a_reset_already_past_does_not_sleep_at_all`<br>`tests/test_exhaustion.py::test_an_implausible_reset_is_capped_rather_than_hanging_the_run`<br>`tests/test_exhaustion.py::test_wait_sleeps_to_the_reset_and_then_continues`<br>`tests/test_exhaustion.py::test_waking_into_a_still_empty_budget_waits_again` | Implemented |
 | L3-EXH-004 | L2-EXH-004 | `tests/test_client.py::test_a_refused_query_still_reports_the_budget`<br>`tests/test_client.py::test_a_response_carrying_a_budget_is_recorded`<br>`tests/test_client.py::test_a_response_without_a_budget_leaves_the_last_reading_alone`<br>`tests/test_contributors.py::test_the_query_reports_the_budget_it_spends`<br>`tests/test_exhaustion.py::test_a_repository_costing_more_than_the_floor_still_reaches_the_margin`<br>`tests/test_exhaustion.py::test_the_estimate_never_rises_to_meet_a_stale_reading`<br>`tests/test_history.py::test_the_query_reports_the_budget_it_spends`<br>`tests/test_repository.py::test_the_query_reports_the_budget_it_spends`<br>`tests/test_soak.py::test_a_run_that_reaches_the_wall_stops_and_says_so` | Implemented |
 | L3-EXH-005 | L2-EXH-004 | `tests/test_exhaustion.py::test_a_budget_that_ran_out_mid_repository_fails_a_failing_run`<br>`tests/test_exhaustion.py::test_a_budget_that_ran_out_mid_repository_stops_a_partial_run`<br>`tests/test_exhaustion.py::test_a_budget_that_ran_out_mid_repository_waits_and_says_try_again`<br>`tests/test_exhaustion.py::test_a_stopped_run_is_not_restarted_by_a_late_arrival`<br>`tests/test_graphql_partial.py::test_a_rate_limit_is_classified_however_the_caller_asked_to_tolerate`<br>`tests/test_graphql_partial.py::test_a_rate_limit_on_the_detail_query_reaches_the_guard`<br>`tests/test_graphql_partial.py::test_a_rate_limited_error_is_exhaustion_rather_than_a_query_failure`<br>`tests/test_history.py::test_an_exhausted_budget_is_not_dressed_as_an_attribution_failure`<br>`tests/test_runner.py::test_a_budget_still_empty_after_waiting_gives_up_on_that_repository`<br>`tests/test_runner.py::test_a_repository_that_exhausts_a_failing_run_stops_the_run`<br>`tests/test_runner.py::test_a_repository_that_exhausts_a_partial_run_is_unattempted_not_failed`<br>`tests/test_runner.py::test_a_repository_that_exhausts_the_budget_is_retried_after_the_wait`<br>`tests/test_soak.py::test_a_run_that_reaches_the_wall_stops_and_says_so` | Implemented |
+| L3-EXH-006 | L2-EXH-004 | `tests/test_graphql_partial.py::test_a_403_naming_the_primary_limit_is_exhaustion`<br>`tests/test_graphql_partial.py::test_a_secondary_limit_is_not_exhaustion`<br>`tests/test_graphql_partial.py::test_the_primary_limit_is_exhaustion_however_the_caller_asked_to_tolerate`<br>`tests/test_history.py::test_the_403_shape_of_exhaustion_also_reaches_the_guard` | Implemented |
 
 ### ING: Repository inventory ingestion
 

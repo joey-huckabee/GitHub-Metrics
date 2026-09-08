@@ -522,6 +522,21 @@ These are the non-obvious ones. Most were learned by getting them wrong first.
   repository. Always inspect `errors`, and classify `NOT_FOUND` separately - a
   deleted or renamed repository is an expected outcome of a valid reference,
   not a defect.
+- **Exhaustion arrives in two shapes, and the message is what tells them
+  apart.** GitHub reports a spent GraphQL budget either as a typed
+  `RATE_LIMITED` error or as a 403 whose body carries only
+  `{"message": "API rate limit already exceeded for user ID ..."}` - no
+  `errors` array, so nothing typed to read. Classifying only the first is how
+  a run reached zero remaining points and published `exhausted: false`: no
+  `RateLimitExhaustedError`, so `BudgetGuard` was never told, `--on-exhaustion`
+  did nothing on the deep route, and five repositories were reported as
+  unrelated contributor failures. Do **not** key this off PyGithub's exception
+  type: `isPrimaryRateLimitError` tests `startswith("api rate limit
+  exceeded")`, the live wording says *already* exceeded, and PyGithub therefore
+  misses it too. And a **secondary** limit is the same status and the same
+  PyGithub exception meaning the opposite - too fast, clearing in seconds -
+  so it is excluded explicitly rather than left to fall through; reading it as
+  exhaustion would make `wait` sleep an hour over a pause.
 - **A published statistic needs a call site, not just a field.**
   `IdentityGaps.unresolvable` existed, `to_mapping` published it,
   `METRICS.md` told the reader a large value was "a defect worth

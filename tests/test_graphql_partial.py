@@ -348,3 +348,72 @@ def test_a_rate_limit_on_the_detail_query_reaches_the_guard() -> None:
 
     with pytest.raises(RateLimitExhaustedError):
         get_contributors(cast(GitHubClient, _RateLimited()), "pypa", "virtualenv")
+
+
+# ---------------------------------------------------------------------------
+# The other shape exhaustion arrives in, found by the soak
+# ---------------------------------------------------------------------------
+
+PRIMARY_403: dict[str, Any] = {
+    "message": "API rate limit already exceeded for user ID 138994589.",
+    "documentation_url": "https://docs.github.com/en/rest/overview/rate-limits",
+}
+"""Verbatim from the run that found this, on 2026-09-07.
+
+No `errors` array, so no `type` to read - and the wording is *already*
+exceeded, which PyGithub's `isPrimaryRateLimitError` does not match either, so
+the exception it raises is a plain `GithubException`.
+"""
+
+SECONDARY_403: dict[str, Any] = {
+    "message": (
+        "You have exceeded a secondary rate limit and have been temporarily "
+        "blocked from content creation. Please retry your request again later."
+    ),
+    "documentation_url": "https://docs.github.com/en/rest/overview/rate-limits",
+}
+"""The 403 that looks the same and means the opposite: slow down, not stop."""
+
+
+@pytest.mark.requirement("L3-EXH-006")
+def test_a_403_naming_the_primary_limit_is_exhaustion() -> None:
+    """The defect the soak found: this went to `GraphQLQueryError`.
+
+    So `RateLimitExhaustedError` was never raised, the guard was never told,
+    and a run whose budget had reached zero published `exhausted: false`. Five
+    repositories were reported as unrelated contributor failures instead of
+    one budget event.
+    """
+    stub = _StubClient(raises=GithubException(403, PRIMARY_403, {}))
+
+    with pytest.raises(RateLimitExhaustedError):
+        run(stub)
+
+
+@pytest.mark.requirement("L3-EXH-006")
+def test_a_secondary_limit_is_not_exhaustion() -> None:
+    """Same status, same exception from PyGithub, opposite response.
+
+    A spent budget is gone until the hourly reset; a secondary limit clears in
+    seconds. Reading this one as exhaustion would make `--on-exhaustion wait`
+    sleep an hour over a pause, and `partial` abandon an inventory it could
+    have finished.
+    """
+    stub = _StubClient(raises=GithubException(403, SECONDARY_403, {}))
+
+    with pytest.raises(GraphQLQueryError):
+        run(stub)
+
+
+@pytest.mark.requirement("L3-EXH-006")
+def test_the_primary_limit_is_exhaustion_however_the_caller_asked_to_tolerate() -> None:
+    """`tolerate_missing` is about NOT_FOUND, and cannot opt into a spent budget.
+
+    Asserted for this shape too, because the equivalent guarantee for the typed
+    error is what `L3-EXH-005` already covers - and covering only the typed one
+    is how this defect existed.
+    """
+    stub = _StubClient(raises=GithubException(403, PRIMARY_403, {}))
+
+    with pytest.raises(RateLimitExhaustedError):
+        run(stub, tolerate_missing=True)

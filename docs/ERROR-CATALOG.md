@@ -268,6 +268,22 @@ halfway has already spent what it had and produced a file that is part
 measurement and part absence, with nothing in it to tell the two apart.
 Refusing costs one free request and leaves the quota intact for a smaller run.
 
+**Two shapes, and only one used to be recognised.** GitHub reports a spent
+GraphQL budget either as a typed `RATE_LIMITED` error or as a 403 whose body
+carries only `{"message": "API rate limit already exceeded for user ID ..."}`.
+Until v0.6.18 the second was read as `GM-COL-002`, so no
+`RateLimitExhaustedError` was raised, the guard was never told, and a run whose
+budget had reached zero published `exhausted: false`. Note *already* exceeded:
+PyGithub's own `isPrimaryRateLimitError` matches `api rate limit exceeded` and
+so misses this wording too, which is why the check is on the message here and
+not on the exception type.
+
+A **secondary** rate limit is a 403 as well, and is deliberately **not** this
+error. It means the requests are too fast, not that the budget is gone, and it
+clears in seconds - so it stays `GM-COL-002` and the repository degrades. If
+it were read as exhaustion, `--on-exhaustion wait` would sleep to the hourly
+reset over a pause of a few seconds.
+
 ### `GM-COL-005` - Contributor list unreadable
 
 **Class**: `ContributorCollectionError`

@@ -293,3 +293,22 @@ def test_an_exhausted_budget_is_not_dressed_as_an_attribution_failure() -> None:
 
     with pytest.raises(RateLimitExhaustedError):
         walk(cast(_StubClient, stub))
+
+
+@pytest.mark.requirement("L3-ATT-003", "L3-EXH-006")
+def test_the_403_shape_of_exhaustion_also_reaches_the_guard() -> None:
+    """The test above passed while this route was broken.
+
+    It used the typed error, and that is the shape the deep walk never gets:
+    live, on 2026-09-07, every one of five repositories was refused with a 403
+    whose body carried only a message. Each became an ordinary attribution
+    failure - a row, no document - the guard was never told, and the run
+    published `exhausted: false` beside a remaining budget of zero.
+
+    A verification that only covers the shape a route cannot produce is the
+    recurring defect in this repository, not an unlucky one.
+    """
+    stub = _FailingClient({"message": "API rate limit already exceeded for user ID 138994589."})
+
+    with pytest.raises(RateLimitExhaustedError):
+        walk(cast(_StubClient, stub))

@@ -45,6 +45,7 @@ comparable in practice while the GraphQL one buys far more per unit.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from github.GithubException import GithubException
@@ -89,9 +90,70 @@ def _summarise(errors: list[dict[str, Any]]) -> str:
     return "; ".join(str(error.get("message", error)) for error in errors)
 
 
+PRIMARY_RATE_LIMIT = re.compile(r"^api rate limit (?:already )?exceeded", re.IGNORECASE)
+"""The other shape exhaustion arrives in: a 403 whose body carries a bare message.
+
+GitHub reports a spent GraphQL budget in two different ways, and only one of
+them is the typed error above. The deep-attribution route met the other one
+live: a 403 whose body is `{"message": "API rate limit already exceeded for
+user ID ..."}` - no `errors` array, so no `type` to read. It was classified as
+an ordinary query failure, which meant `RateLimitExhaustedError` was never
+raised, the guard was never told, and `statistics.json` published
+`exhausted: false` while the remaining budget was zero. That is the v0.6.4
+defect's own signature on a route the v0.6.4 fix did not cover.
+
+**`already` is why this is our regex and not PyGithub's check.**
+`Requester.isPrimaryRateLimitError` tests `startswith("api rate limit
+exceeded")`, and the message GitHub actually sent says *"API rate limit already
+exceeded"* - so PyGithub does not recognise it either, and raises a plain
+`GithubException` rather than `RateLimitExceededException`. Keying this off the
+exception type would have looked right and fixed nothing.
+"""
+
+SECONDARY_RATE_LIMIT = re.compile(
+    r"^you have exceeded a secondary rate limit"
+    r"|please retry your request again later\.$"
+    r"|please wait a few minutes before you try again\.$",
+    re.IGNORECASE,
+)
+"""A secondary limit, which is **not** exhaustion and must never be read as it.
+
+Both arrive as a 403 and PyGithub raises the same exception for either, but
+they call for opposite responses: a spent budget is gone until the hourly
+reset, while a secondary limit is "you are going too fast" and clears in
+seconds. Treating one as the other would make `--on-exhaustion wait` sleep an
+hour over a pause, and `partial` abandon an inventory it could have finished.
+Matched explicitly rather than left to fall through, so that widening the
+primary pattern later cannot quietly swallow this case.
+"""
+
+
+def _messages_in(data: Any) -> list[str]:
+    """Every message a failed payload carries, top-level and per error.
+
+    A GraphQL failure puts its text in `errors[].message`; a 403 puts it in a
+    top-level `message` with no `errors` array at all. Both are read, because
+    the second is the shape that went unclassified.
+    """
+    messages = [str(error["message"]) for error in _errors_in(data) if "message" in error]
+    if isinstance(data, dict) and isinstance(data.get("message"), str):
+        messages.append(data["message"])
+    return messages
+
+
 def _mentions_rate_limited(data: Any) -> bool:
-    """True if any error in a response says the budget is gone."""
-    return any(error.get("type") == RATE_LIMITED_TYPE for error in _errors_in(data))
+    """True if a response says the hourly budget is gone.
+
+    Two accepted shapes: the typed GraphQL error, and a 403 message naming the
+    primary limit. A secondary limit is excluded first - it is the one thing
+    that looks like this and means something else.
+    """
+    if any(error.get("type") == RATE_LIMITED_TYPE for error in _errors_in(data)):
+        return True
+    messages = _messages_in(data)
+    if any(SECONDARY_RATE_LIMIT.search(message) for message in messages):
+        return False
+    return any(PRIMARY_RATE_LIMIT.match(message) for message in messages)
 
 
 def _mentions_not_found(data: Any) -> bool:

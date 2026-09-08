@@ -6,8 +6,38 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.6.18] - 2026-09-08
+
+**A run reached the wall and said the budget had held.** The soak's exhaustion
+profile drove a token to zero remaining GraphQL points, and `statistics.json`
+reported `exhausted: false`, `incomplete_because_exhausted: false`. All five
+repositories were recorded as ordinary contributor failures - a row, no
+document - rather than as the one budget event they all were.
+
 ### Fixed
 
+- **Exhaustion is recognised in both shapes the API reports it.** GitHub
+  returns either a typed `RATE_LIMITED` GraphQL error or a 403 whose body
+  carries only a message. Only the first was classified, so the second became
+  `GM-COL-002`, `RateLimitExhaustedError` was never raised, and `BudgetGuard`
+  was never told - the v0.6.4 defect's exact signature on a route the v0.6.4
+  fix did not cover. `--on-exhaustion` was unreachable on the deep route: no
+  wait, no stop, no partial marking, whichever of the three was passed. The
+  exit was the degraded band (4) rather than the aborted one, so a consumer
+  testing `$? -ge 5` read a run that hit the wall as one that wrote a usable
+  file.
+- **The message is matched, not the exception type.** GitHub's wording is *API
+  rate limit **already** exceeded*, while PyGithub's `isPrimaryRateLimitError`
+  tests `startswith("api rate limit exceeded")` - so PyGithub does not
+  recognise it either, and raises a plain `GithubException`. A fix keyed on
+  `RateLimitExceededException` would have looked right and changed nothing.
+- **A secondary rate limit is explicitly not exhaustion.** Same status, same
+  PyGithub exception, opposite meaning: too fast rather than out of budget, and
+  it clears in seconds. Read as exhaustion it would make `wait` sleep an hour
+  over a pause. Matched deliberately rather than left to fall through, so a
+  later widening of the primary pattern cannot swallow it.
 - **The soak workflow read a secret that does not exist.** It named
   `SOAK_GITHUB_TOKEN`; the secret on the repository is `SOAK_GITHUB_METRICS`.
   An absent secret expands to an empty string rather than failing, so the job
@@ -16,16 +46,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   at all.
 - **A soak job that skips everything is now a failure.** The workflow sets
   `SOAK_REQUIRE_TOKEN=1` and the module refuses to be collected without a
-  token. Skipping stays right on a developer's machine, where a soak check is
-  not what pytest is being run for; it is wrong in the job that exists to run
-  these and nothing else. This is the same shape as every defect the file was
-  written to catch - a check that passes on the one route where it cannot fail.
-
+  token. Skipping stays right on a developer's machine; it is wrong in the job
+  that exists to run these and nothing else.
 - **A soak check read a key `statistics.json` does not carry.**
   `budget["graphql_points_remaining"]` was invented; the published name is
-  `graphql_remaining`. The assertion before it had already passed, so the first
-  run that actually reached the API drove three checks green and died on a typo
-  in the fourth.
+  `graphql_remaining`.
+- **The exhaustion profile could never have reached the wall.** It named one
+  repository, and `history.MAX_PAGES` caps a single walk at 2,000 pages so that
+  one repository cannot consume a whole run's quota - against a 5,000-point
+  budget the guard would never see exhaustion. It now names five large
+  histories, which also drains faster: `runner` gives one worker per
+  repository, so five walks run in parallel.
+- **The deep route gets its own subprocess timeout** (5,400s against the
+  default 1,800s). Draining a quota is 5,000 pages of a hundred commits.
 
 ### Added
 
@@ -35,19 +68,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it reads can be checked in the gate, and finding a typo there costs nothing
   instead of costing a dispatch and a wait.
 
-- **The exhaustion profile could never have reached the wall.** It named one
-  repository, and `history.MAX_PAGES` caps a single walk at 2,000 pages so that
-  one repository cannot consume a whole run's quota - against a 5,000-point
-  budget the guard would never see exhaustion, and the check would skip itself
-  after spending 2,000 points and half an hour. It now names five large
-  histories, which also drains faster: `runner` gives one worker per repository,
-  so five walks run in parallel.
-- **The deep route gets its own subprocess timeout** (5,400s against the
-  default 1,800s). Draining a quota is 5,000 pages of a hundred commits; a slow
-  afternoon should not turn a real result into a `TimeoutExpired` that says
-  nothing about the code.
+### Changed
 
-No package change: the tool itself is untouched.
+- **`L3-EXH-006`** widens the obligation. `L3-EXH-005` named only the typed
+  error, and so did both tests that verified it - including the one asserting
+  the deep route lets exhaustion escape, which passed throughout while that
+  route was broken. A verification covering only the shape a route cannot
+  produce is the recurring defect in this repository rather than an unlucky
+  one.
+
+### Notes
+
+Found by `make soak`, on its first run that reached the wall. Nothing in the
+offline suite could have found it: every stub answers the typed shape, because
+the typed shape is what the code was written against.
 
 ## [0.6.17] - 2026-09-07
 
